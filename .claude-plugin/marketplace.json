@@ -1,0 +1,17 @@
+{
+  "name": "ai-forge",
+  "owner": {
+    "name": "Bisalta Ltda",
+    "url": "https://github.com/Construplaza"
+  },
+  "metadata": {
+    "description": "Marketplace interno de Bisalta Ltda para tooling de Claude Code: plugins, skills y standards de desarrollo asistido por AI."
+  },
+  "plugins": [
+    {
+      "name": "sdd-flow",
+      "source": "./plugins/sdd-flow",
+      "description": "Spec-Driven Development multi-agente: planner Opus 4.8, ejecutores Sonnet/Haiku, coordinacion file-based AGENT_{uuid}."
+    }
+  ]
+}
