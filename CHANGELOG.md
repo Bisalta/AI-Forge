@@ -4,6 +4,9 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ## sdd-flow
 
+### 0.1.1 — 2026-06-09
+- Fix: manifest `plugin.json` inválido bloqueaba `/plugin install` (`agents: Invalid input`). Se eliminan las claves `commands`/`skills`/`agents` — apuntaban a los directorios default que Claude Code auto-descubre, y el schema de `agents` espera array de archivos, no string de directorio.
+
 ### 0.1.0 — 2026-06-09
 - Esqueleto inicial del plugin SDD multi-agente.
 - Comandos: `/sdd`, `/sdd-enrich`, `/sdd-contract`, `/sdd-status`, `/sdd-pr`.
