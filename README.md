@@ -5,11 +5,9 @@ Marketplace interno de **Bisalta Ltda** para tooling de Claude Code — plugins,
 ## Instalación (en cualquier proyecto)
 
 ```
-/plugin marketplace add <org>/ai-forge
+/plugin marketplace add Construplaza/AI-Forge
 /plugin install sdd-flow
 ```
-
-> Reemplazar `<org>` por la org de GitHub donde se hostee el repo (ej. `Construplaza`).
 
 Luego tipeá `/` y vas a ver los comandos del plugin (`/sdd-flow:sdd`, etc).
 
