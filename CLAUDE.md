@@ -57,7 +57,7 @@ AI-Forge/
 ├── .claude-plugin/marketplace.json   índice (owner: Bisalta Ltda)
 ├── plugins/sdd-flow/
 │   ├── .claude-plugin/plugin.json    v0.1.0
-│   ├── commands/   sdd · sdd-enrich · sdd-contract · sdd-status · sdd-pr
+│   ├── commands/   sdd · sdd-enrich · sdd-contract · sdd-status · sdd-pr · sdd-fixes
 │   ├── skills/     enrich-user-story · sdd-plan · write-pr-report
 │   ├── agents/     implementing-agent (sonnet) · reviewer-agent (opus)
 │   ├── hooks/      statusline.sh
@@ -66,7 +66,9 @@ AI-Forge/
 ├── CHANGELOG.md · README.md · .gitignore
 ```
 
-## Estado actual: v0.1.0 — ESQUELETO
+## Estado actual: v0.2.0 — ESQUELETO + /sdd-fixes
+
+**v0.2.0**: comando `/sdd-fixes` (batch de fixes con intake+triage+visualizador `fixes.md`) y badge statusline `⚡ fixes N/M` — spec en `docs/specs/2026-06-09-sdd-fixes-command-design.md`.
 
 **Funciona de verdad**: refinement (`enrich-user-story`) y generación de contract (`sdd-plan`). Son prompts/skills reales.
 
