@@ -57,24 +57,26 @@ AI-Forge/
 ├── .claude-plugin/marketplace.json   índice (owner: Bisalta Ltda)
 ├── plugins/sdd-flow/
 │   ├── .claude-plugin/plugin.json    v0.1.0
-│   ├── commands/   sdd · sdd-enrich · sdd-contract · sdd-status · sdd-pr · sdd-fixes
+│   ├── commands/   sdd · sdd-enrich · sdd-contract · sdd-status · sdd-pr · sdd-fixes · sdd-agents
 │   ├── skills/     enrich-user-story · sdd-plan · write-pr-report
 │   ├── agents/     implementing-agent (sonnet) · reviewer-agent (opus)
 │   ├── hooks/      statusline.sh
 │   ├── standards/  base-standards.md
-│   └── templates/  doc_architecture.md · doc_verification_guide.md
+│   └── templates/  doc_architecture.md · doc_verification_guide.md · coordination-README.md
 ├── CHANGELOG.md · README.md · .gitignore
 ```
 
-## Estado actual: v0.2.0 — ESQUELETO + /sdd-fixes
+## Estado actual: v0.3.0 — ESQUELETO + /sdd-fixes + /sdd-agents
 
 **v0.2.0**: comando `/sdd-fixes` (batch de fixes con intake+triage+visualizador `fixes.md`) y badge statusline `⚡ fixes N/M` — spec en `docs/specs/2026-06-09-sdd-fixes-command-design.md`.
+
+**v0.3.0**: comando `/sdd-agents` (bootstrap coordinación multi-agente `AGENT_<slug>` + kickoff prompts) y template `coordination-README.md` con el protocolo — spec en `docs/specs/2026-06-10-sdd-agents-bootstrap-design.md`. Cierra pendiente #2.
 
 **Funciona de verdad**: refinement (`enrich-user-story`) y generación de contract (`sdd-plan`). Son prompts/skills reales.
 
 **NO cableado todavía (pendiente)**:
 1. **Orquestador real `/sdd`**: hoy describe el flujo y dispara skills, pero NO spawnea subagentes de verdad con su modelo asignado. → cablear con Agent/Workflow.
-2. **Bootstrap `AGENT_{uuid}`**: auto-crear carpetas de coordinación (`contract.md`, `status.md`, `messages/AGENT_a__to__AGENT_b/`) al arrancar una tarea multi-repo.
+2. ~~**Bootstrap `AGENT_{uuid}`**~~ — ✅ CERRADO en v0.3.0 con `/sdd-agents`.
 3. **statusline**: `hooks/statusline.sh` lee `.sdd/state.json` que nadie escribe aún. Falta que el orquestador escriba ese estado.
 4. **Design doc formal** del plugin (el flujo de brainstorming quedó en diagrama, falta el doc en `docs/`).
 
