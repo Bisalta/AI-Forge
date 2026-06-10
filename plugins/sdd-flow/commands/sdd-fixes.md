@@ -53,9 +53,11 @@ Terminá mostrando: tabla resumen (ID, título, triage, repo) + conteo por triag
 
 ## Reglas para el resto de la sesión (al trabajar items)
 
+- **Rama base**: al arrancar el primer item de la tanda, proponé la base (`dev` si existe, sino la default del repo) y confirmala con el usuario UNA vez. Esa queda para toda la tanda salvo que el usuario diga otra cosa.
+- **Branch por item — NUNCA commits directos a ramas normales**: por cada item creá branch desde la base confirmada: `<MODULO>-<TICKET>` si hay ticket, sino `<MODULO>-<f-nn-desc-corta>` (ej. `COMPRAS-f-03-dropdown-filtros`). Commits del item van ahí, convención `[FIX] [TICKET] [Módulo] [Descripción]` (o `[IMP]` para mejoras).
+- **Integración = PR**: item verificado → push de la branch + PR contra la base. `Estado: hecho` + link del PR en `Detalle`. La branch se borra tras el merge.
 - Antes de arrancar un item: `Estado: en-curso` en `fixes.md`.
-- Item terminado y verificado: `Estado: hecho`. Bloqueado: `Estado: bloqueado` + nota del motivo en `Detalle`.
-- Un commit por item, convención `[FIX] [Módulo] [Descripción]` (o `[IMP]` para mejoras).
-- Items `Repo: ambos`: primero back, después front; commit por repo.
+- Bloqueado: `Estado: bloqueado` + nota del motivo en `Detalle`.
+- Items `Repo: ambos`: primero back, después front; branch + PR por repo; el PR de front referencia al de back.
 - Item `ambiguo` sin cerrar: NO adivines — usá `/sdd-enrich` o preguntá.
 - El usuario puede editar `fixes.md` a mano en cualquier momento: releelo del disco antes de cada item.

@@ -34,9 +34,9 @@ Con `<dir>` = dir compartido y `<slug>` = task-slug:
      <qué resuelve esta task multi-agente — completalo con lo que sepas del contexto de la sesión; si no hay contexto, dejá la pregunta explícita al usuario>
 
      ## Agentes y repos
-     | Agente | Repo | Responsabilidad |
-     |---|---|---|
-     | AGENT_<a> | <path> | <inferida o pendiente> |
+     | Agente | Repo | Rama base | Responsabilidad |
+     |---|---|---|---|
+     | AGENT_<a> | <path> | <dev si existe, sino default — confirmar con usuario> | <inferida o pendiente> |
 
      ## Contrato técnico
      <endpoints/shapes/interfaces EXACTOS. Closure rules: prohibido "if needed/or/prefer/may be". DRAFT hasta que el planner lo cierre.>
@@ -69,7 +69,7 @@ Mostrá:
 1. **Árbol** de lo creado (o "ya existía" por pieza).
 2. **Kickoff prompt por cada agente que NO es esta sesión**, en bloque copiable:
 
-   > Sos `AGENT_<x>` (repo `<path>`). Coordinación multi-agente en `<dir>/tasks/<slug>/`. Leé PRIMERO `<dir>/README.md` — protocolo obligatorio — y después `contract.md` (verificá versión vigente). Tu inbox: `<dir>/tasks/<slug>/messages/AGENT_*__to__AGENT_<x>/` (lo que no esté en `archive/`). Por turno: leé inbox en orden → trabajá en tu repo → respondé con mensaje numerado → mové procesados a `archive/` → apendeá a `logs/AGENT_<x>.md` → actualizá tu fila de `status.md`. Ante decisión no cubierta por el contract: fila en `blocked` + mensaje al planner (`AGENT_<planner>`). NUNCA adivines. El contract lo edita SOLO el planner — pedí cambios con mensaje `contract-change-request`.
+   > Sos `AGENT_<x>` (repo `<path>`). Coordinación multi-agente en `<dir>/tasks/<slug>/`. Leé PRIMERO `<dir>/README.md` — protocolo obligatorio — y después `contract.md` (verificá versión vigente). Tu inbox: `<dir>/tasks/<slug>/messages/AGENT_*__to__AGENT_<x>/` (lo que no esté en `archive/`). Por turno: leé inbox en orden → trabajá en tu repo → respondé con mensaje numerado → mové procesados a `archive/` → apendeá a `logs/AGENT_<x>.md` → actualizá tu fila de `status.md`. **Todo tu trabajo va en branch propia desde la rama base que declara el contract (si no está declarada, proponela al planner y esperá confirmación) — NUNCA commits directos a ramas normales; integrás SOLO vía PR y reportás el link por mensaje.** Ante decisión no cubierta por el contract: fila en `blocked` + mensaje al planner (`AGENT_<planner>`). NUNCA adivines. El contract lo edita SOLO el planner — pedí cambios con mensaje `contract-change-request`.
 
 3. Recordatorio al planner (esta sesión): sos dueño de `contract.md` — cerralo (DRAFT → CLOSED) antes de que los agentes implementen; primer paso típico: mandar mensaje kickoff `001` a cada agente con el alcance de su parte.
 
