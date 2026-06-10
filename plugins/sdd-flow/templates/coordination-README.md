@@ -86,15 +86,22 @@ Si una decisión necesaria no está en el contract: el agente pone su fila de `s
 
 Actualizar la propia fila (estado + timestamp UTC + nota corta) al final de cada turno de trabajo.
 
+## Branches y PRs (regla dura)
+
+- **Todo trabajo va en branch propia — NUNCA commits directos a ramas normales** (`main`, `dev`, `qa`, …).
+- La **rama base** de cada agente se declara en el contract (sección Agentes y repos o Contrato técnico); si no está declarada, el agente la propone al planner y espera confirmación antes de crear la branch.
+- Branch: `<MODULO>-<TICKET>` (sin ticket: `<MODULO>-<task-slug>`).
+- **Integración SOLO vía PR** contra la base. El número/link del PR se informa por mensaje y se anota en el log propio.
+
 ## Orden de integración
 
-Si hay dependencias entre repos, el contract declara orden de merge (ej. `AGENT_be` mergea primero, `AGENT_fe` después). No mergear fuera de orden.
+Si hay dependencias entre repos, el contract declara orden de **merge de PRs** (ej. PR de `AGENT_be` mergea primero, después el de `AGENT_fe`). No mergear fuera de orden.
 
 ## Turno de trabajo de un agente
 
 1. Leer inbox (`messages/*__to__AGENT_<self>/`, sin archive) — procesar en orden de secuencia.
 2. Leer `contract.md` (verificar versión) y `status.md`.
-3. Investigar/implementar en su propio repo, según convenciones de ese repo.
+3. Investigar/implementar en su propio repo, según convenciones de ese repo — **siempre en su branch de trabajo, integrando vía PR**.
 4. Responder con mensaje(s) numerado(s) — batchear: un mensaje por destinatario por turno, no spamear.
 5. Archivar los mensajes procesados.
 6. Apendear resumen del turno a su log.

@@ -18,10 +18,11 @@ Single source of truth para todos los agentes del ciclo SDD. (Condensado de `Con
 - `008-performance` · `009-ai-agent-behavior`
 
 ## Git / branches (de Construplaza)
-- Ramas protegidas: `main`, `dev`, `qa`, `pre-prod` — no push directo, no se borran.
-- Branch de feature: `<MODULO>-<TICKET>` (ej. `COMPRAS-FAC-81`), se borra al concluir.
+- **TODO trabajo (feature, fix, mejora, lo que sea) nace en branch nueva. NUNCA commits directos a ramas normales** (`main`, `dev`, `qa`, `pre-prod` — protegidas, no push directo, no se borran).
+- **Rama base: elegirla y confirmarla SIEMPRE** antes de crear la branch — proponé `dev` si existe, sino la default del repo, y confirmá con el usuario/planner.
+- Branch de trabajo: `<MODULO>-<TICKET>` (ej. `COMPRAS-FAC-81`); sin ticket: `<MODULO>-<desc-corta>`. Se borra al concluir.
 - Commits: `[TIPO] [TICKET] [Módulo] [Descripción]`. Tipos: ADD/FIX/REF/IMP/REM/REV/MOV/REL.
-- Merge = PR a CODEOWNERS. Tests verdes obligatorio.
+- **Integración SOLO vía PR** (a CODEOWNERS). Tests verdes obligatorio. Nada se mergea a mano.
 
 ## AI agent behavior
 - Scope acotado al task brief. Escalá (BLOCKED) ante decisión faltante — no adivines.
