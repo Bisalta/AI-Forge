@@ -56,7 +56,7 @@ Terminá mostrando: tabla resumen (ID, título, triage, repo) + conteo por triag
 - **Proxima (opcional)**: al arrancar la tanda, si el MCP `proxima` está disponible, ofrecé crear tareas (una por item, o una madre + subtask por item). Si el usuario acepta, creás la tarea ANTES de la branch y usás su key en el nombre. Solo vos llamás al MCP; la tarea pasa a `done` cuando el PR del item se mergea.
 - **Rama base**: al arrancar el primer item de la tanda, proponé la base (`dev` si existe, sino la default del repo) y confirmala con el usuario UNA vez. Esa queda para toda la tanda salvo que el usuario diga otra cosa.
 - **Branch por item — NUNCA commits directos a ramas normales**: por cada item creá branch desde la base confirmada: con Proxima `{action}-{KEY}-{f-nn-desc}` (ej. `fix-COMPRAS-12-dropdown-filtros`); sin Proxima `<MODULO>-<TICKET>` o `<MODULO>-<f-nn-desc-corta>` (ej. `COMPRAS-f-03-dropdown-filtros`). Commits del item van ahí, convención `[FIX] [TICKET] [Módulo] [Descripción]` (o `[IMP]` para mejoras).
-- **Integración = PR**: item verificado → push de la branch + PR contra la base. `Estado: hecho` + link del PR en `Detalle`. La branch se borra tras el merge.
+- **Integración según capa**: item verificado → con remote: push + PR contra la base (`Estado: hecho` + link del PR en `Detalle`); sin remote: review + merge local `--no-ff` (`Estado: hecho` + hash en `Detalle`); repo no-git: aplicá el fix sin branch y anotalo. La branch se borra tras integrar.
 - Antes de arrancar un item: `Estado: en-curso` en `fixes.md`.
 - Bloqueado: `Estado: bloqueado` + nota del motivo en `Detalle`.
 - Items `Repo: ambos`: primero back, después front; branch + PR por repo; el PR de front referencia al de back.

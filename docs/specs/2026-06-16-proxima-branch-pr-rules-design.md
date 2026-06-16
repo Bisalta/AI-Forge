@@ -27,8 +27,16 @@ disciplina dura: tarea Proxima → branch con el key → PR → cierre al mergea
 6. **Orden estricto**: tarea/subtask Proxima **primero** → branch **después**
    (el key debe existir para nombrar la branch).
 7. **Base branch**: confirmar SIEMPRE antes de crear branch. Nunca commit/push directo
-   a la base (`main`/`dev`/`qa`/...). Integración **solo vía PR** hacia la base de la
-   que se copió (`feature => dev`).
+   a la base (`main`/`dev`/`qa`/...). Integración hacia la base de la que se copió.
+8. **Capas de integración (flexibilidad por entorno)** — el flujo se adapta, detectando
+   una vez al arrancar:
+   - **git + remote** → branch + **PR** (capa completa).
+   - **git sin remote** → branch + review obligatorio + **merge local `--no-ff`**
+     (no hay PR; nunca commit directo a la base igual).
+   - **no es git** → avisar y correr el ciclo SDD **sin** capa de branch/PR.
+   Proxima es **ortogonal**: puede haber tracking en cualquier capa, o no haberlo en
+   la capa con remote. El cierre de tarea se dispara por "integración" (PR mergeado o
+   merge local), no específicamente por PR.
 
 ## Cambios por archivo
 

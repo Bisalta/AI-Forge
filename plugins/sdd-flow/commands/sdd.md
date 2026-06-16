@@ -22,6 +22,8 @@ Pipeline autónomo hasta **Feature Ready** (sin gate humano intermedio). El huma
 
 **Single-writer Proxima**: SOLO vos (el planner) llamás al MCP `proxima` (crear, set_status, log_progress, cerrar). Los implementing-agents NO tocan Proxima — reportan estado por el canal file-based y vos ratificás.
 
+**Capa de integración** (detectá ahora, ver `standards/base-standards.md`): git+remote → PR; git sin remote → branch + review + merge local `--no-ff`; no-git → corré el ciclo sin branch/PR (avisá). Proxima es independiente de la capa.
+
 ### 1. DECISION-CLOSED REFINEMENT
 Invocá el skill **`enrich-user-story`**. Cerrá decisiones en las 6 dimensiones (solution shape, output, behavior, actor, scope, success criteria). Usá `AskUserQuestion` con opciones clickeables para forzar decisiones rápido. No avances con decisiones abiertas.
 
@@ -43,7 +45,7 @@ Spawneá un subagente por task brief con su modelo asignado (`implementing-agent
 
 ### 5. FEATURE READY → PARÁ
 Cuando todas las tareas estén `done` y validadas: **parate y pingueá al humano** con resumen. NO sigas a PR sin revisión humana.
-- **Cierre Proxima por merge**: Feature Ready NO cierra la tarea. Cada subtask pasa a `done` (con `proxima_set_status`, lo hacés vos al confirmar el agente) **solo cuando su PR se mergea** a la base. Cuando TODAS las subtasks están `done` → marcá la **tarea madre** `done`. Logueá milestones con `proxima_log_progress` (PR abierto, CI verde, merge).
+- **Cierre Proxima por integración**: Feature Ready NO cierra la tarea. Cada subtask pasa a `done` (con `proxima_set_status`, lo hacés vos al confirmar el agente) **solo cuando se integra** (PR mergeado con remote, o merge local `--no-ff` sin remote). Cuando TODAS las subtasks están `done` → marcá la **tarea madre** `done`. Logueá milestones con `proxima_log_progress` (PR abierto/CI verde/merge, o review ok/merge local).
 
 ## Reglas
 - Leé `SDD/docs/doc_architecture.md` y `SDD/docs/doc_verification_guide.md` de cada repo antes de planear.

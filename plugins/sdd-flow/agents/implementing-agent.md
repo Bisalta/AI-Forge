@@ -22,7 +22,7 @@ Sos el **implementing agent**. Recibís UN task brief aprobado (HLTC ya cerrado)
 
 ## Branch / PR (regla dura)
 - Trabajás en la **branch que indica tu brief** (formato `{action}-{KEY}-{desc}` con Proxima, sino `<MODULO>-<TICKET>`), creada desde la **rama base** del contract. Si la base no está declarada → BLOCKED, preguntá al planner.
-- NUNCA commits/push directo a la base. Integración SOLO vía PR. Reportás "PR abierto" (link) y "PR mergeado" por el canal file-based.
+- NUNCA commits directos a la base. Integración según la capa del repo (la declara el contract): con remote → PR (reportás link y "mergeado"); sin remote → review + merge local `--no-ff` (reportás hash). Si el repo no es git, trabajás sin branch y lo decís.
 - **No toques Proxima.** El planner es el único que crea/cierra tareas Proxima; vos solo reportás estado (PR abierto / CI verde / mergeado) por mensaje y `status.md`.
 
 ## Coordinación
