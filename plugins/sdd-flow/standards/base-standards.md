@@ -31,9 +31,9 @@ Proxima es ortogonal a la capa de integración: puede haber tracking Proxima en 
 - **Rama base: elegirla y confirmarla SIEMPRE** antes de crear la branch — proponé `dev` si existe, sino la default del repo, y confirmá con el usuario/planner.
 - **Orden estricto**: primero la tarea Proxima, después la branch (el key debe existir para nombrarla).
 - Branch de trabajo:
-  - **Con Proxima**: `{action}-{KEY}-{desc}`, `action ∈ feat|fix|chore|refactor|docs`, `KEY` = key de la tarea/subtask Proxima (ej. `feat-TRANS-24-add-endpoint`). Reemplaza al formato viejo.
+  - **Con Proxima**: `{action}-{KEY}-{desc}`, `action ∈ feat|fix|chore|refactor|docs`. **`KEY` = key de la tarea madre** (ej. `GEN-30`) — las subtasks Proxima NO tienen key (solo UUID), por eso la branch usa siempre el key de la madre. Multi-agente: insertá el slug del agente para desambiguar → `{action}-{KEY}-{agente}-{desc}` (ej. `feat-GEN-30-be-add-endpoint`). Single-repo: `{action}-{KEY}-{desc}` (ej. `feat-GEN-30-add-endpoint`).
   - **Sin Proxima** (MCP ausente o el usuario declinó): `<MODULO>-<TICKET>` (ej. `COMPRAS-FAC-81`); sin ticket: `<MODULO>-<desc-corta>`.
-  - Se borra al mergear.
+  - Se borra al integrar.
 - Commits: `[TIPO] [TICKET] [Módulo] [Descripción]`. Tipos: ADD/FIX/REF/IMP/REM/REV/MOV/REL.
 - **Integración** según capa: con remote → **PR** (a CODEOWNERS) hacia la base; sin remote → **merge local `--no-ff`** tras review. Tests verdes obligatorio en ambas. Nunca commit directo a la base.
 - **Cierre Proxima**: la tarea/subtask pasa a `done` **cuando se integra** (PR mergeado, o merge local hecho) — no antes. Solo el planner llama al MCP `proxima`; los implementing-agents reportan estado/integración por el canal file-based.

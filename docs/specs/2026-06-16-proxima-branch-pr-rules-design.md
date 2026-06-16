@@ -10,12 +10,16 @@ disciplina dura: tarea Proxima → branch con el key → PR → cierre al mergea
 
 ## Decisiones (cerradas, no re-litigar)
 
-1. **Granularidad Proxima**: 1 **tarea madre** (la feature) + **1 subtask por agente**
-   (`AGENT_{uuid}` = repo+branch). Cada branch usa el key de SU subtask.
-2. **Formato de branch**: `{action}-{KEY}-{desc}` con `action ∈ feat|fix|chore|refactor|docs`.
-   Ej. `feat-TRANS-24-add-endpoint`. Este formato **reemplaza** `<MODULO>-<TICKET>`
-   cuando hay Proxima. **Fallback** sin Proxima / si el user declina: el viejo
-   `<MODULO>-<TICKET>` (o `<MODULO>-<desc>`).
+1. **Granularidad Proxima**: 1 **tarea madre** (la feature, con key) + **1 subtask por
+   agente** (`AGENT_{uuid}`) para cierre granular. ⚠️ **Hallazgo en testing**: las
+   subtasks Proxima NO devuelven key (solo UUID). Por eso la branch usa el **key de la
+   MADRE**, no el de la subtask; la subtask se referencia por su `id` para `set_status`.
+2. **Formato de branch**: `{action}-{KEY_MADRE}-{agente}-{desc}` multi-repo /
+   `{action}-{KEY_MADRE}-{desc}` single-repo, con `action ∈ feat|fix|chore|refactor|docs`.
+   `KEY_MADRE` = key de la tarea madre (ej. `GEN-30`); `{agente}` = slug del `AGENT_`
+   para desambiguar cuando varios agentes comparten la madre. Ej. `feat-GEN-30-be-add-endpoint`.
+   **Reemplaza** `<MODULO>-<TICKET>` cuando hay Proxima. **Fallback** sin Proxima / si el
+   user declina: `<MODULO>-<TICKET>` (o `<MODULO>-<desc>`).
 3. **Cierre de tarea**: subtask → `done` **al mergear su PR** (no en Feature Ready).
    Tarea madre → `done` cuando **todas** las subtasks están `done`.
 4. **Detección de proyecto (Fase 0)**: auto si hay match único y claro (solo avisa);

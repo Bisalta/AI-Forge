@@ -53,9 +53,9 @@ Terminá mostrando: tabla resumen (ID, título, triage, repo) + conteo por triag
 
 ## Reglas para el resto de la sesión (al trabajar items)
 
-- **Proxima (opcional)**: al arrancar la tanda, si el MCP `proxima` está disponible, ofrecé crear tareas (una por item, o una madre + subtask por item). Si el usuario acepta, creás la tarea ANTES de la branch y usás su key en el nombre. Solo vos llamás al MCP; la tarea pasa a `done` cuando el PR del item se mergea.
+- **Proxima (opcional)**: al arrancar la tanda, si el MCP `proxima` está disponible, ofrecé crear tareas. Recomendado: **una tarea madre por la tanda** + subtask por item (la madre tiene key, las subtasks solo UUID). La branch usa el **key de la madre** + el id del item (`F-NN`). Si el usuario acepta, creás la tarea ANTES de la branch. Solo vos llamás al MCP; la subtask pasa a `done` cuando el item se integra.
 - **Rama base**: al arrancar el primer item de la tanda, proponé la base (`dev` si existe, sino la default del repo) y confirmala con el usuario UNA vez. Esa queda para toda la tanda salvo que el usuario diga otra cosa.
-- **Branch por item — NUNCA commits directos a ramas normales**: por cada item creá branch desde la base confirmada: con Proxima `{action}-{KEY}-{f-nn-desc}` (ej. `fix-COMPRAS-12-dropdown-filtros`); sin Proxima `<MODULO>-<TICKET>` o `<MODULO>-<f-nn-desc-corta>` (ej. `COMPRAS-f-03-dropdown-filtros`). Commits del item van ahí, convención `[FIX] [TICKET] [Módulo] [Descripción]` (o `[IMP]` para mejoras).
+- **Branch por item — NUNCA commits directos a ramas normales**: por cada item creá branch desde la base confirmada: con Proxima `{action}-{KEY_MADRE}-{f-nn}-{desc}` (ej. `fix-GEN-30-f03-dropdown-filtros`); sin Proxima `<MODULO>-<TICKET>` o `<MODULO>-<f-nn-desc-corta>` (ej. `COMPRAS-f-03-dropdown-filtros`). Commits del item van ahí, convención `[FIX] [TICKET] [Módulo] [Descripción]` (o `[IMP]` para mejoras).
 - **Integración según capa**: item verificado → con remote: push + PR contra la base (`Estado: hecho` + link del PR en `Detalle`); sin remote: review + merge local `--no-ff` (`Estado: hecho` + hash en `Detalle`); repo no-git: aplicá el fix sin branch y anotalo. La branch se borra tras integrar.
 - Antes de arrancar un item: `Estado: en-curso` en `fixes.md`.
 - Bloqueado: `Estado: bloqueado` + nota del motivo en `Detalle`.

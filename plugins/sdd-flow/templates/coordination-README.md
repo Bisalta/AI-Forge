@@ -91,7 +91,7 @@ Actualizar la propia fila (estado + timestamp UTC + nota corta) al final de cada
 - **Todo trabajo va en branch propia — NUNCA commits directos a ramas normales** (`main`, `dev`, `qa`, …).
 - La **rama base** de cada agente se declara en el contract (sección Agentes y repos o Contrato técnico); si no está declarada, el agente la propone al planner y espera confirmación antes de crear la branch.
 - Branch:
-  - **Con Proxima**: `{action}-{KEY}-{desc}` (`action ∈ feat|fix|chore|refactor|docs`, `KEY` = subtask Proxima del agente, ej. `feat-TRANS-24-add-endpoint`). El key sale de la tabla del contract (lo pone el planner ANTES de que el agente cree la branch).
+  - **Con Proxima**: `{action}-{KEY_MADRE}-<agente>-{desc}` (`action ∈ feat|fix|chore|refactor|docs`, `KEY_MADRE` = key de la tarea madre — las subtasks no tienen key, solo UUID; `<agente>` = slug del `AGENT_` para desambiguar; ej. `feat-GEN-30-be-add-endpoint`). El key y la branch salen de la tabla del contract (los pone el planner ANTES de que el agente cree la branch).
   - **Sin Proxima**: `<MODULO>-<TICKET>` (sin ticket: `<MODULO>-<task-slug>`).
 - **Integración según capa del repo**: con remote → **PR** contra la base (link por mensaje + log). Sin remote → **merge local `--no-ff`** tras review (`reviewer-agent` o self-review); se informa el hash de merge. Nunca commit directo a la base.
 

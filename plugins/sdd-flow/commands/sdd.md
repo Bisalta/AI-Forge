@@ -32,8 +32,8 @@ Invocá el skill **`sdd-plan`** para producir el HLTC con *Architectural Delta*,
 
 ### 3. IMPLEMENTATION SPEC + TOPOLOGIA
 - Detectá los repos involucrados. Definí un `AGENT_{uuid}` por repo+branch+working-dir.
-- **Si hay tracking Proxima** (Fase 0): creá una **subtask por agente** con `proxima_create_task` (`parentKey`=key de la tarea madre). Guardá el `key` de cada subtask (ej. `TRANS-24`) — va en el task brief de ese agente y nombra su branch.
-- **Branch por agente** (orden estricto: subtask Proxima primero → branch después): `{action}-{KEY}-{desc}`, `action ∈ feat|fix|chore|refactor|docs` (ej. `feat-TRANS-24-add-endpoint`). Sin Proxima → fallback `<MODULO>-<TICKET>` / `<MODULO>-<desc>`. **Confirmá la rama base SIEMPRE; nunca commit/push directo a la base; integración SOLO vía PR** hacia la base de la que se copió.
+- **Si hay tracking Proxima** (Fase 0): creá una **subtask por agente** con `proxima_create_task` (`parentKey`=key de la tarea madre). Las subtasks NO devuelven key (solo UUID) — guardá su `id` para set_status/cierre. La **branch usa el key de la MADRE** (no el de la subtask).
+- **Branch por agente**: `{action}-{KEY}-{agente}-{desc}` con `KEY` = key de la tarea madre y `agente` = slug del `AGENT_` para desambiguar (ej. `feat-GEN-30-be-add-endpoint`); single-repo sin slug (`feat-GEN-30-add-endpoint`). `action ∈ feat|fix|chore|refactor|docs`. Sin Proxima → fallback `<MODULO>-<TICKET>` / `<MODULO>-<desc>`. **Confirmá la rama base SIEMPRE; nunca commit directo a la base; integración según la capa** (con remote → PR; sin remote → merge local `--no-ff` tras review) hacia la base de la que se copió.
 - Cortá el HLTC en task briefs por agente (task IDs `T<fase>.<i>`, checkboxes, Execution Report vacío). Cada brief lleva su `proxima_subtask_key` y la `branch` a usar.
 - **Asigná modelo por tarea**: `sonnet` default; `opus` si es pesada/arquitectónica; `haiku` si es trivial.
 - Si hay dependencias entre repos, definí **orden de integración** (ej. BE -> FE -> mobile).
@@ -45,7 +45,7 @@ Spawneá un subagente por task brief con su modelo asignado (`implementing-agent
 
 ### 5. FEATURE READY → PARÁ
 Cuando todas las tareas estén `done` y validadas: **parate y pingueá al humano** con resumen. NO sigas a PR sin revisión humana.
-- **Cierre Proxima por integración**: Feature Ready NO cierra la tarea. Cada subtask pasa a `done` (con `proxima_set_status`, lo hacés vos al confirmar el agente) **solo cuando se integra** (PR mergeado con remote, o merge local `--no-ff` sin remote). Cuando TODAS las subtasks están `done` → marcá la **tarea madre** `done`. Logueá milestones con `proxima_log_progress` (PR abierto/CI verde/merge, o review ok/merge local).
+- **Cierre Proxima por integración**: Feature Ready NO cierra la tarea. Cada subtask pasa a `done` (con `proxima_set_status` por su `id` — las subtasks no tienen key) **solo cuando se integra** (PR mergeado con remote, o merge local `--no-ff` sin remote). Cuando TODAS las subtasks están `done` → marcá la **tarea madre** `done` (por su `key`). Logueá milestones con `proxima_log_progress` (PR abierto/CI verde/merge, o review ok/merge local).
 
 ## Reglas
 - Leé `SDD/docs/doc_architecture.md` y `SDD/docs/doc_verification_guide.md` de cada repo antes de planear.
