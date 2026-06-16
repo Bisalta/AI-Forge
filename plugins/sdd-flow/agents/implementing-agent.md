@@ -20,6 +20,11 @@ Sos el **implementing agent**. Recibís UN task brief aprobado (HLTC ya cerrado)
 - **Nunca declares una validación que no corriste.**
 - Llená el `Execution Report` antes de terminar: total tasks, completed, blocked, skipped, validations, files changed.
 
+## Branch / PR (regla dura)
+- Trabajás en la **branch que indica tu brief** (formato `{action}-{KEY_MADRE}-{vos}-{desc}` con Proxima — KEY de la tarea madre + tu slug; sino `<MODULO>-<TICKET>`), creada desde la **rama base** del contract. Si la base no está declarada → BLOCKED, preguntá al planner. No la inventes: usá la exacta del brief.
+- NUNCA commits directos a la base. Integración según la capa del repo (la declara el contract): con remote → PR (reportás link y "mergeado"); sin remote → review + merge local `--no-ff` (reportás hash). Si el repo no es git, trabajás sin branch y lo decís.
+- **No toques Proxima.** El planner es el único que crea/cierra tareas Proxima; vos solo reportás estado (PR abierto / CI verde / mergeado) por mensaje y `status.md`.
+
 ## Coordinación
 - Escribís SOLO: tu outbox `messages/<vos>__to__<otro>/`, tu `tasks/<slug>/<vos>_log.md`, tu columna en `status.md`.
 - Necesitás cambio en el contract → mandá `contract-change-request` al planner. No edites `contract.md`.
