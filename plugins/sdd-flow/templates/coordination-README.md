@@ -90,8 +90,16 @@ Actualizar la propia fila (estado + timestamp UTC + nota corta) al final de cada
 
 - **Todo trabajo va en branch propia — NUNCA commits directos a ramas normales** (`main`, `dev`, `qa`, …).
 - La **rama base** de cada agente se declara en el contract (sección Agentes y repos o Contrato técnico); si no está declarada, el agente la propone al planner y espera confirmación antes de crear la branch.
-- Branch: `<MODULO>-<TICKET>` (sin ticket: `<MODULO>-<task-slug>`).
+- Branch:
+  - **Con Proxima**: `{action}-{KEY}-{desc}` (`action ∈ feat|fix|chore|refactor|docs`, `KEY` = subtask Proxima del agente, ej. `feat-TRANS-24-add-endpoint`). El key sale de la tabla del contract (lo pone el planner ANTES de que el agente cree la branch).
+  - **Sin Proxima**: `<MODULO>-<TICKET>` (sin ticket: `<MODULO>-<task-slug>`).
 - **Integración SOLO vía PR** contra la base. El número/link del PR se informa por mensaje y se anota en el log propio.
+
+## Proxima (single-writer)
+
+- SOLO el **planner** llama al MCP `proxima` (crear tarea madre, subtasks, set_status, cerrar). Los agentes NO tocan Proxima.
+- El agente reporta por mensaje + `status.md`: "PR abierto" (link), "CI verde", "PR mergeado". El planner traduce eso a Proxima.
+- **Cierre por merge**: la subtask de un agente pasa a `done` cuando su PR se mergea; la tarea madre cuando todas las subtasks están `done`.
 
 ## Orden de integración
 

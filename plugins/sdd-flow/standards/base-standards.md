@@ -20,9 +20,14 @@ Single source of truth para todos los agentes del ciclo SDD. (Condensado de `Con
 ## Git / branches (de Construplaza)
 - **TODO trabajo (feature, fix, mejora, lo que sea) nace en branch nueva. NUNCA commits directos a ramas normales** (`main`, `dev`, `qa`, `pre-prod` — protegidas, no push directo, no se borran).
 - **Rama base: elegirla y confirmarla SIEMPRE** antes de crear la branch — proponé `dev` si existe, sino la default del repo, y confirmá con el usuario/planner.
-- Branch de trabajo: `<MODULO>-<TICKET>` (ej. `COMPRAS-FAC-81`); sin ticket: `<MODULO>-<desc-corta>`. Se borra al concluir.
+- **Orden estricto**: primero la tarea Proxima, después la branch (el key debe existir para nombrarla).
+- Branch de trabajo:
+  - **Con Proxima**: `{action}-{KEY}-{desc}`, `action ∈ feat|fix|chore|refactor|docs`, `KEY` = key de la tarea/subtask Proxima (ej. `feat-TRANS-24-add-endpoint`). Reemplaza al formato viejo.
+  - **Sin Proxima** (MCP ausente o el usuario declinó): `<MODULO>-<TICKET>` (ej. `COMPRAS-FAC-81`); sin ticket: `<MODULO>-<desc-corta>`.
+  - Se borra al mergear.
 - Commits: `[TIPO] [TICKET] [Módulo] [Descripción]`. Tipos: ADD/FIX/REF/IMP/REM/REV/MOV/REL.
-- **Integración SOLO vía PR** (a CODEOWNERS). Tests verdes obligatorio. Nada se mergea a mano.
+- **Integración SOLO vía PR** (a CODEOWNERS) hacia la base de la que se copió. Tests verdes obligatorio. Nada se mergea a mano.
+- **Cierre Proxima**: la tarea/subtask pasa a `done` **cuando su PR se mergea** (no antes). Solo el planner llama al MCP `proxima`; los implementing-agents reportan estado/merge por el canal file-based.
 
 ## AI agent behavior
 - Scope acotado al task brief. Escalá (BLOCKED) ante decisión faltante — no adivines.

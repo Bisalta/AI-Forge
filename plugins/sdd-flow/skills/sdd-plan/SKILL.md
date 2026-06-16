@@ -38,6 +38,8 @@ Single-writer: solo el planner escribe `contract.md`. Versionalo (v1, v2...). Ag
 ## Fase B — Task briefs por agente
 
 Por cada `AGENT_{uuid}` (repo + branch + working-dir):
+- **Tracking Proxima** (si está activo): el planner crea una **subtask** por agente (`parentKey` = tarea madre) ANTES de definir la branch. El brief lleva `proxima_subtask_key` (ej. `TRANS-24`) y la `branch` exacta a usar: `{action}-{KEY}-{desc}` (`action ∈ feat|fix|chore|refactor|docs`). Sin Proxima → `<MODULO>-<TICKET>` / `<MODULO>-<desc>`. El implementing-agent NO crea tareas Proxima ni cambia su estado.
+- **Rama base** confirmada en el contract; nunca commit/push directo a la base; integración SOLO vía PR.
 - Objective + out-of-scope · prerequisites · files to create/update
 - Pasos en fases con task IDs estables: `- [ ] T<fase>.<i> Descripción` (una acción verificable por checkbox; no fusionar acciones).
 - **Modelo asignado**: `sonnet` default · `opus` si pesada/arquitectónica · `haiku` si trivial.

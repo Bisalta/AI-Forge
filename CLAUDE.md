@@ -66,7 +66,9 @@ AI-Forge/
 ├── CHANGELOG.md · README.md · .gitignore
 ```
 
-## Estado actual: v0.4.0 — ESQUELETO + /sdd-fixes + /sdd-agents + regla branch/PR
+## Estado actual: v0.5.0 — ESQUELETO + Proxima + branch atada a task key
+
+**v0.5.0**: integración Proxima (Fase 0 en `/sdd`: detectar MCP → match proyecto → preguntar → tarea madre + subtask por agente, planner single-writer del MCP) y branch `{action}-{KEY}-{desc}` atada al task key (reemplaza `<MODULO>-<TICKET>` con Proxima, fallback sin él); cierre de tarea al mergear el PR. Spec en `docs/specs/2026-06-16-proxima-branch-pr-rules-design.md`.
 
 **v0.4.0**: regla dura de branching (branch por trabajo, base confirmada, integración solo PR) aplicada en standards, `/sdd-fixes`, protocolo de coordinación y kickoffs.
 
