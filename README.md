@@ -28,6 +28,38 @@ ai-forge/
 └── README.md
 ```
 
+## Cómo usar sdd-flow
+
+### Flujo típico (del requerimiento al código)
+
+```
+/sdd-enrich <idea cruda>          → cierra decisiones, produce requerimiento
+/sdd-contract <slug o req>        → genera el contrato técnico (HLTC)
+/sdd <descripcion de lo que querés lograr>   → ciclo completo autónomo
+```
+
+**El flujo completo con `/sdd`** corre sin gates intermedios hasta **Feature Ready**: enrichment → contract → specs por agente → ejecución multi-agente → review. El humano interviene solo al final (Feature Ready → PR).
+
+### Comandos disponibles
+
+| Comando | Cuándo usarlo |
+|---|---|
+| `/sdd <idea>` | Ciclo SDD completo: refinement → contract → specs → ejecución multi-agente. Usalo cuando tenés una tarea nueva. |
+| `/sdd-enrich <idea>` | Solo la fase de refinement. Útil para cerrar decisiones antes de planear o cuando la tarea es compleja y querés separar el "qué" del "cómo". |
+| `/sdd-contract <slug>` | Genera o actualiza el High-Level Technical Contract (HLTC). Útil si ya tenés el requerimiento cerrado y querés planear sin ejecutar. |
+| `/sdd-status` | Tablero de estado: tareas activas, bloqueos, mensajes sin procesar entre agentes, versión de contract. Solo lectura. |
+| `/sdd-pr` | Genera la descripción del Pull Request a partir de los cambios del repo. Usalo antes de abrir el PR. |
+
+### Cómo funciona internamente
+
+El **planner (Opus 4.8)** toma la idea, cierra decisiones en 6 dimensiones (solution shape, output, behavior, actor, scope, success criteria), produce el HLTC y corta task briefs por `AGENT_{uuid}` (un agente = un repo + branch + working-dir). Cada task brief lleva modelo asignado (`sonnet` default, `opus` para tareas pesadas, `haiku` para triviales). Los **agentes implementadores** ejecutan; un **reviewer agent (Opus)** valida. Si un agente se bloquea por decisión no resuelta → le pregunta al planner, no adivina.
+
+### Closure rules (el contract es innegociable)
+
+El pipeline corre sin aprobación humana, por eso el contract debe ser preciso: **prohibido** "if needed / or / prefer / may be / when available". Si dos ingenieros lo implementarían distinto, la spec es inválida y el agente frena.
+
+---
+
 ## Agregar un plugin nuevo
 
 1. Crear `plugins/<nombre>/.claude-plugin/plugin.json` + sus `commands/skills/agents`.
