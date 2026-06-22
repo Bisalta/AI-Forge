@@ -23,6 +23,13 @@ Senior-reviewable. Debe cubrir:
 - Validation strategy (por escenario, no comandos)
 - Risks
 
+### SEO (si el contract trae `seo.applies == true`)
+Cuando el requerimiento incluye el bloque `seo:` con `applies: true`, agregá al HLTC acceptance criteria SEO **decision-closed** (sin "if needed / may / prefer"), tomados de `standards/seo-frontend.md`:
+- Siempre el Tier Universal.
+- El Tier Indexable solo si `seo.indexable == true`.
+- El ítem `hreflang` solo si `seo.indexable == true` **y** `seo.locales` tiene ≥2 entradas (es directiva de indexación: sin sitio indexable no aplica aunque sea multi-idioma).
+Si `seo.applies == false` o no hay bloque `seo:`, no agregues criterios SEO.
+
 ### Closure rules (obligatorias)
 Prohibido: "if needed", "if applicable", "or", "prefer", "may be", "when available", "if present", "derived from".
 - Toda decisión que afecta comportamiento → resuelta a un solo approach. Si no → pregunta-bloqueo.
@@ -52,6 +59,9 @@ Marcar `[x]` al completar, `[BLOCKED]` con explicación si no puede, llenar Exec
 
 ### Orden de integración
 Si hay dependencias entre repos, declarar el orden de merge (ej. BE -> FE -> mobile) en el contract.
+
+### SEO en el brief del FE agent
+Si el HLTC tiene criterios SEO, copiálos como acceptance criteria verificables en el brief del agente de frontend, marcando el tier (Universal / Indexable). El reviewer-agent los chequea en modo advisory; no son gate de Feature Ready.
 
 ## Self-review final
 Releé como agente sin contexto previo: ¿ejecutable end-to-end? ¿alguna frase permite dos implementaciones válidas? ¿el task brief introduce decisiones nuevas no aprobadas en el HLTC? Si hay bloqueo → preguntá antes de finalizar.

@@ -77,6 +77,11 @@ Your questions MUST collectively cover these dimensions:
 
 If any of these is unclear, you MUST ask about it.
 
+- **SEO (solo si el scope incluye frontend)**: son dos decisiones separadas, no una.
+  1. **¿Hay frontend en el alcance?** Si sí → `seo.applies: true` (activa el Tier Universal: perf/accesibilidad/HTML semántico, aplica también a apps internas, paneles admin y áreas autenticadas). Si no hay front → `seo.applies: false` y omitís el bloque.
+  2. **¿Ese frontend es público indexable por buscadores?** Si sí → `seo.indexable: true` (activa además el Tier Indexable) y confirmá idiomas/locales. Si es interno/autenticado → `seo.indexable: false` (igual conserva el Tier Universal).
+  No asumas — preguntá ambas.
+
 ---
 
 ### Code-grounded suggestions (CRITICAL)
@@ -201,6 +206,12 @@ so that <outcome>.
 
 - <decision>
 - <decision>
+
+## SEO
+<!-- Incluir solo si el scope tiene frontend. Si no hay front, omitir esta sección. -->
+- applies: <true|false>     # hay frontend con SEO en alcance
+- indexable: <true|false>   # es público indexable (activa tier Indexable)
+- locales: []               # vacío = monolingüe; ≥2 entradas activan hreflang
 
 ## Expected behavior
 

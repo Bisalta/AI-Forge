@@ -16,6 +16,7 @@ Single source of truth para todos los agentes del ciclo SDD. (Condensado de `Con
 - `000-core-principles` · `001-code-quality` · `002-security` · `003-git-workflow`
 - `004-testing` · `005-typescript` · `006-react-nextjs` · `007-api-design`
 - `008-performance` · `009-ai-agent-behavior`
+- **SEO (frontend)**: ver `standards/seo-frontend.md`. Advisory; aplica solo si el contract trae `seo.applies == true`.
 
 ## Capas de integración (degradación por entorno)
 

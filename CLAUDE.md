@@ -57,7 +57,7 @@ AI-Forge/
 ├── .claude-plugin/marketplace.json   índice (owner: Bisalta Ltda)
 ├── plugins/sdd-flow/
 │   ├── .claude-plugin/plugin.json    v0.1.0
-│   ├── commands/   sdd · sdd-enrich · sdd-contract · sdd-status · sdd-pr · sdd-fixes · sdd-agents
+│   ├── commands/   sdd · sdd-enrich · sdd-contract · sdd-status · sdd-pr · sdd-fixes · sdd-agents · sdd-seo
 │   ├── skills/     enrich-user-story · sdd-plan · write-pr-report
 │   ├── agents/     implementing-agent (sonnet) · reviewer-agent (opus)
 │   ├── hooks/      statusline.sh
@@ -66,7 +66,9 @@ AI-Forge/
 ├── CHANGELOG.md · README.md · .gitignore
 ```
 
-## Estado actual: v0.5.0 — ESQUELETO + Proxima + branch atada a task key
+## Estado actual: v0.6.0 — SEO frontend advisory
+
+**v0.6.0**: SEO frontend como concern **advisory** (nunca bloquea Feature Ready) para proyectos con front. Activación por pregunta en `enrich-user-story` (no automática): persiste como bloque `seo: { applies, indexable, locales }` en el contract. Checklist 2 tiers (Universal / Indexable) en `standards/seo-frontend.md`. `sdd-plan` inyecta criterios SEO decision-closed al HLTC y briefs cuando `seo.applies`. `reviewer-agent` reporta sección "SEO (advisory)" sin bloquear. Nuevo command + skill `/sdd-seo` (auditoría on-demand, Lighthouse o fallback estático). Spec en `docs/specs/2026-06-22-seo-frontend-advisory-design.md`.
 
 **v0.5.0**: integración Proxima (Fase 0 en `/sdd`: detectar MCP → match proyecto → preguntar → tarea madre + subtask por agente, planner single-writer del MCP) y branch `{action}-{KEY_MADRE}-{agente}-{desc}` atada al key de la tarea madre (las subtasks Proxima no tienen key, solo UUID; reemplaza `<MODULO>-<TICKET>` con Proxima, fallback sin él); cierre de tarea al integrar. **Flexible por entorno (capas de integración)**: git+remote → PR; git sin remote → branch + review + merge local `--no-ff`; no-git → ciclo sin branch/PR. Corre con o sin el MCP `proxima`. Spec en `docs/specs/2026-06-16-proxima-branch-pr-rules-design.md`.
 
