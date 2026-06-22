@@ -6,11 +6,11 @@ Checklist SEO para proyectos con frontend. **Advisory**: informa, no bloquea. Ac
 - `seo.applies == false` → no corras este checklist.
 - `seo.applies == true` → corré **Tier Universal**.
 - `seo.indexable == true` → corré además **Tier Indexable**.
-- `seo.locales` con ≥2 valores → activá el ítem `hreflang`.
+- `seo.indexable == true` **y** `seo.locales` con ≥2 valores → activá el ítem `hreflang` (vive en el Tier Indexable; sin indexable no aplica).
 
 ## Tier Universal (todo front con `seo.applies`)
 - [ ] HTML semántico: landmarks (`header/nav/main/footer`), headings jerárquicos, un solo `<h1>` por vista.
-- [ ] Core Web Vitals dentro de umbral: LCP < 2.5s, CLS < 0.1, INP < 200ms.
+- [ ] Core Web Vitals dentro de umbral: LCP < 2.5s, CLS < 0.1, INP < 200ms. *(Requiere runtime/Lighthouse. Bajo análisis estático → reportar **N/A** y limitarse a las buenas prácticas estáticas relacionadas: dimensiones de imagen, preload del recurso LCP, lazy-load.)*
 - [ ] Imágenes con `width`/`height` explícitos y `loading="lazy"` salvo el hero.
 - [ ] `lang` correcto en `<html>`.
 - [ ] `alt` en imágenes informativas; foco visible; contraste AA.

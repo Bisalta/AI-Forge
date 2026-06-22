@@ -77,7 +77,10 @@ Your questions MUST collectively cover these dimensions:
 
 If any of these is unclear, you MUST ask about it.
 
-- **SEO (solo si el scope incluye frontend)**: preguntá "¿hay UI pública indexable por buscadores?". Si la respuesta es no (app interna, panel admin, área autenticada), SEO no aplica. Si es sí, confirmá idiomas/locales. No asumas — preguntá.
+- **SEO (solo si el scope incluye frontend)**: son dos decisiones separadas, no una.
+  1. **¿Hay frontend en el alcance?** Si sí → `seo.applies: true` (activa el Tier Universal: perf/accesibilidad/HTML semántico, aplica también a apps internas, paneles admin y áreas autenticadas). Si no hay front → `seo.applies: false` y omitís el bloque.
+  2. **¿Ese frontend es público indexable por buscadores?** Si sí → `seo.indexable: true` (activa además el Tier Indexable) y confirmá idiomas/locales. Si es interno/autenticado → `seo.indexable: false` (igual conserva el Tier Universal).
+  No asumas — preguntá ambas.
 
 ---
 

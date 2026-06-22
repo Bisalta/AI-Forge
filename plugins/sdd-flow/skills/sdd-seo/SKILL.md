@@ -10,6 +10,7 @@ Auditás el frontend contra `standards/seo-frontend.md` y devolvés un reporte. 
 ## Proceso
 1. **Alcance**: ruta dada o autodetectada (package.json / framework / carpetas de UI). Sin front → terminá avisando.
 2. **Tiers**: respetá el bloque `seo:` del contract si existe; si no, corré Tier Universal y preguntá una vez si es indexable público para el Tier Indexable.
+   - **`seo.applies: false`**: como el usuario invocó `/sdd-seo` explícitamente, no salgas en silencio. Avisá que el contract marca SEO como no-aplica y ofrecé correr igual el Tier Universal (perf/accesibilidad/HTML semántico, válido también para apps internas). Solo saltás el Tier Indexable si `seo.indexable` es `false`.
 3. **Auditoría**: Lighthouse si está disponible (CWV/SEO reales); fallback a chequeo estático parseando HTML/JSX/templates.
 4. **Reporte**: tabla ítem · tier · severidad · estado · ubicación · fix. Conteo por severidad.
 

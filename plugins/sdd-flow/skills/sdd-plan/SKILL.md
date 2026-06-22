@@ -27,7 +27,7 @@ Senior-reviewable. Debe cubrir:
 Cuando el requerimiento incluye el bloque `seo:` con `applies: true`, agregá al HLTC acceptance criteria SEO **decision-closed** (sin "if needed / may / prefer"), tomados de `standards/seo-frontend.md`:
 - Siempre el Tier Universal.
 - El Tier Indexable solo si `seo.indexable == true`.
-- El ítem `hreflang` solo si `seo.locales` tiene ≥2 entradas.
+- El ítem `hreflang` solo si `seo.indexable == true` **y** `seo.locales` tiene ≥2 entradas (es directiva de indexación: sin sitio indexable no aplica aunque sea multi-idioma).
 Si `seo.applies == false` o no hay bloque `seo:`, no agregues criterios SEO.
 
 ### Closure rules (obligatorias)
