@@ -22,6 +22,7 @@ Núcleo SDD adaptado de [`Construplaza/TemplateNewRepository`](https://github.co
 | `/sdd-contract` | Generar/ver el High-Level Technical Contract |
 | `/sdd-status` | Tablero de agentes y tareas en vuelo |
 | `/sdd-pr` | Descripción de PR desde los cambios |
+| `/sdd-seo` | Auditoría SEO advisory on-demand del frontend. |
 
 ## Ciclo
 
