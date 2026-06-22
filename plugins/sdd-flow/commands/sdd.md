@@ -26,6 +26,7 @@ Pipeline autónomo hasta **Feature Ready** (sin gate humano intermedio). El huma
 
 ### 1. DECISION-CLOSED REFINEMENT
 Invocá el skill **`enrich-user-story`**. Cerrá decisiones en las 6 dimensiones (solution shape, output, behavior, actor, scope, success criteria). Usá `AskUserQuestion` con opciones clickeables para forzar decisiones rápido. No avances con decisiones abiertas.
+- Si el scope tiene frontend, el refinement cierra el bloque `seo:` (applies/indexable/locales) — ver `enrich-user-story`.
 
 ### 2. HIGH-LEVEL TECHNICAL CONTRACT
 Invocá el skill **`sdd-plan`** para producir el HLTC con *Architectural Delta*, *Decision Closure* y *Data Contract Closure*. **Auto-aprobá y logueá** el contract (no frenes a esperar humano). Single-writer: solo vos editás el contract; versionalo (v1, v2...).
@@ -42,6 +43,7 @@ Invocá el skill **`sdd-plan`** para producir el HLTC con *Architectural Delta*,
 ### 4. EJECUCIÓN
 Spawneá un subagente por task brief con su modelo asignado (`implementing-agent`). Para cada output, corré `reviewer-agent` (Opus, sin sesgo) sobre la spec/diff. Loop hasta cumplir acceptance criteria.
 - Agente bloqueado (decisión no resuelta) → **BLOCKED → te pregunta, no adivina** → actualizás contract/spec → desbloqueás.
+- Si `seo.applies == true`, el reviewer-agent adjunta una sección **SEO (advisory)** al testing/PR report. No bloquea Feature Ready.
 
 ### 5. FEATURE READY → PARÁ
 Cuando todas las tareas estén `done` y validadas: **parate y pingueá al humano** con resumen. NO sigas a PR sin revisión humana.
