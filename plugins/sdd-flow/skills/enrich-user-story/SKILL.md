@@ -77,6 +77,8 @@ Your questions MUST collectively cover these dimensions:
 
 If any of these is unclear, you MUST ask about it.
 
+- **SEO (solo si el scope incluye frontend)**: preguntá "¿hay UI pública indexable por buscadores?". Si la respuesta es no (app interna, panel admin, área autenticada), SEO no aplica. Si es sí, confirmá idiomas/locales. No asumas — preguntá.
+
 ---
 
 ### Code-grounded suggestions (CRITICAL)
@@ -201,6 +203,12 @@ so that <outcome>.
 
 - <decision>
 - <decision>
+
+## SEO
+<!-- Incluir solo si el scope tiene frontend. Si no hay front, omitir esta sección. -->
+- applies: <true|false>     # hay frontend con SEO en alcance
+- indexable: <true|false>   # es público indexable (activa tier Indexable)
+- locales: []               # vacío = monolingüe; ≥2 entradas activan hreflang
 
 ## Expected behavior
 
