@@ -10,8 +10,10 @@ Núcleo SDD adaptado de [`Construplaza/TemplateNewRepository`](https://github.co
 
 ```
 /plugin marketplace add Bisalta/AI-Forge
-/plugin install sdd-flow
+/plugin install sdd-flow@ai-forge
 ```
+
+**Actualizar** (sin desinstalar): `/plugin marketplace update ai-forge` → `/plugin install sdd-flow@ai-forge` → `/reload-plugins`. El marketplace sirve la rama default del repo — lo mergeado, no lo que está en PRs.
 
 ## Uso
 
@@ -95,7 +97,7 @@ sdd-flow/
 │   ├── quality-gates.md         DoD, ACs↔test, escalera, evidencia, mitigaciones prohibidas
 │   ├── orchestration.md         state.json, retornos sdd.result/sdd.review, spawn, caps, resume
 │   ├── security.md              threat model, tests negativos, secret scan + audit, supply chain
-│   ├── archetypes.md            8 arquetipos: NFR + tests + checklist por tipo de requerimiento
+│   ├── archetypes.md            9 arquetipos: NFR + tests + checklist por tipo de requerimiento
 │   ├── concerns.md              transversales blocking/advisory (a11y, design, privacy, i18n, perf…)
 │   └── seo-frontend.md          checklist SEO advisory (2 tiers)
 └── templates/                   doc_architecture.md, doc_verification_guide.md, doc_quality_gates.md,

@@ -6,11 +6,26 @@ Marketplace interno de **Bisalta Ltda** para tooling de Claude Code — plugins,
 
 ```
 /plugin marketplace add Bisalta/AI-Forge
-/plugin install sdd-flow
-/plugin install project-foundation
+/plugin install sdd-flow@ai-forge
+/plugin install project-foundation@ai-forge
 ```
 
-Luego tipeá `/` y vas a ver los comandos de cada plugin (`/sdd-flow:sdd`, `/project-foundation:init`, etc).
+Después corré `/reload-plugins` (o reiniciá la sesión). Tipeá `/` y vas a ver los comandos de cada plugin (`/sdd-flow:sdd`, `/project-foundation:init`, etc).
+
+## Actualización (ya lo tenías instalado)
+
+**No hace falta desinstalar.** El flujo es:
+
+```
+/plugin marketplace update ai-forge     ← refresca el catálogo (baja lo último de la rama default del repo)
+/plugin install sdd-flow@ai-forge       ← reinstala sobre la versión anterior
+/reload-plugins                         ← activa la nueva versión en la sesión actual
+```
+
+Notas:
+- **El marketplace sirve lo que está en la rama default (`prod`)**: un PR abierto en AI-Forge no te llega hasta que se mergea. Si acabás de mergear un PR del plugin, corré el `marketplace update` primero — sin eso, reinstalar te da la versión vieja del catálogo cacheado.
+- Podés activar **auto-update** para este marketplace: `/plugin` → tab **Marketplaces** → `ai-forge` → *Enable auto-update* (los marketplaces de terceros vienen con auto-update apagado por default). Con eso Claude Code refresca catálogo y plugins solo, y te avisa cuándo correr `/reload-plugins`.
+- Verificá qué versión te quedó: `/plugin` → tab **Installed** → `sdd-flow` (compará contra el `CHANGELOG.md` de este repo).
 
 ## Plugins disponibles
 
@@ -41,7 +56,13 @@ ai-forge/
 /sdd <descripcion de lo que querés lograr>   → ciclo completo autónomo
 ```
 
-**El flujo completo con `/sdd`** corre sin gates intermedios hasta **Feature Ready**: enrichment → contract → specs por agente → ejecución multi-agente → review. El humano interviene solo al final (Feature Ready → PR).
+### Qué esperar al correr `/sdd` (dónde pregunta, dónde corre solo, dónde para)
+
+1. **Al arranque te pregunta lo mínimo** (≤2 rondas agrupadas): decisiones del requerimiento que no puede inferir del código, arquetipo si es ambiguo, tracking Proxima (si el MCP está), y **la rama base** (una vez). Todo lo inferible te lo propone como default ya elegido, con evidencia.
+2. **Después corre solo** hasta Feature Ready: contract auto-aprobado (con linter de closure), task briefs, implementación, review hasta 3 rondas, gates con evidencia generada por script. Solo te interrumpe si un agente queda `BLOCKED` (falta una decisión) o un review escala (`ESCALATE`).
+3. **En Feature Ready PARA — siempre.** Te entrega un brief de una pantalla (qué es, decisiones que tomó por vos, dónde está el riesgo, qué mirar en 5 minutos) y espera tu revisión. **Nunca abre el PR solo**: vos decidís, y ahí mismo le podés decir "dale, abrí el PR" (o usar `/sdd-pr` para generar la descripción). Es la decisión de diseño #2 del plugin: un solo gate humano, pero de verdad.
+
+Casos especiales: repo sin tests/gates → la primera task es `project-scaffold` (funda la infraestructura de calidad antes de la feature); pedido trivial (typo, fix chico) → te propone la vía corta `/sdd-fixes` en vez de la ceremonia completa.
 
 ### Comandos disponibles
 
@@ -86,4 +107,4 @@ Misma lógica aplicada a la calidad del código, en `standards/quality-gates.md`
 
 ## Versionado
 
-SemVer por plugin (`MAJOR.MINOR.PATCH`) en cada `plugin.json`. El marketplace no tiene versión propia; lo que versiona es cada plugin. Los usuarios actualizan con `/plugin marketplace update ai-forge` + reinstalar.
+SemVer por plugin (`MAJOR.MINOR.PATCH`) en cada `plugin.json`. El marketplace no tiene versión propia; lo que versiona es cada plugin. Cómo actualizar: ver la sección **Actualización** de arriba.
