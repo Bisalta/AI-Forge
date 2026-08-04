@@ -20,6 +20,7 @@ Una tarea está `done` sólo si TODO esto es cierto. Sin excepciones por tamaño
 6. Docs delta aplicado: si el Architectural Delta tocó capas/rutas/contratos → `SDD/docs/doc_architecture.md` actualizado; si aparecieron comandos de verificación nuevos → `doc_verification_guide.md` y `doc_quality_gates.md` actualizados.
 7. Review con veredicto `APPROVED` (§7).
 8. Execution Report completo, sin ninguna validación declarada que no se corrió.
+9. Contabilidad cerrada: los `MINOR` no corregidos y los `N/A` aceptados quedaron en el ledger de deuda (`SDD/debt.md`, ver `templates/debt-ledger.md`); si el contract tomó una decisión arquitectónica (dependencia nueva, cambio de capa/ownership, patrón nuevo, breaking change) existe su ADR en `docs/adr/` (`templates/adr.md`); las dependencias nuevas del diff están todas declaradas en el contract (`standards/security.md` §4).
 
 Un ítem que no aplica se marca `N/A` **con razón**, no se omite en silencio.
 
@@ -74,7 +75,8 @@ Siempre en este orden — de lo más barato a lo más caro. El primero que falla
 | 6 | build | sí, si el repo compila/bundlea | |
 | 7 | e2e | sólo si el AC lo exige o el flujo de usuario cambió | no es default |
 | 8 | cobertura del diff | sí | ver abajo |
-| 9 | smoke manual | sólo para ACs `manual-only` | pasos exactos, resultado escrito |
+| 9 | security (secret scan del diff + audit de dependencias) | sí | política y detalle en `standards/security.md` §3 |
+| 10 | smoke manual | sólo para ACs `manual-only` | pasos exactos, resultado escrito |
 
 **Suite completa antes de integrar**: los escalones 4-5 pueden correrse filtrados por área durante la iteración, pero antes de abrir PR (o de mergear local) corre la suite completa al menos una vez. Un cambio "chico" que rompe otra área es el caso exacto que esto ataca.
 

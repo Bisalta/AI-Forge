@@ -32,6 +32,8 @@ Diferencia con los otros dos docs SDD:
 | 6 | build | `[PLACEHOLDER]` | sí / N/A | |
 | 7 | e2e | `[PLACEHOLDER]` | sólo si un AC lo exige / N/A | prerequisitos: [PLACEHOLDER] |
 | 8 | cobertura del diff | `[PLACEHOLDER]` | sí | ver política abajo |
+| 9 | security — secret scan | `[PLACEHOLDER]` | sí | gitleaks/trufflehog, o el grep mínimo de `security.md` §3 |
+| 9 | security — audit deps | `[PLACEHOLDER]` | sí / N/A | `npm audit` / `pip-audit` / equivalente; política: critical/high directa con fix = BLOCKER |
 
 **Suite completa** (obligatoria una vez antes de integrar): `[PLACEHOLDER]`
 

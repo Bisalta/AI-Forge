@@ -22,6 +22,8 @@ Senior-reviewable. Debe cubrir:
 - **Impact set**: por cada símbolo que se modifica, los callers/imports existentes (grepealos, no los supongas). Es la base del análisis de regresión de los briefs.
 - Source of truth · Mapping ownership
 - Error/fallback behavior
+- **Threat model mínimo** (obligatorio si el requerimiento toca una superficie invocable — endpoint, comando, job, webhook): las 4 preguntas cerradas de `standards/security.md` §1 (quién invoca, qué recibe el rol equivocado, qué pasa con input hostil, qué datos de quién). Sus respuestas se convierten en ACs negativos (§2 de ese archivo: rol equivocado, 401, IDOR, input hostil). Sin superficie nueva → `threat model: N/A — no cambia superficie invocable`, explícito.
+- **Dependencias nuevas**: cada una declarada con justificación de una línea y alternativa descartada (`security.md` §4). Un brief nunca autoriza a agregar dependencias no listadas acá.
 - **Acceptance criteria numerados `AC1..ACn`** (ver abajo)
 - Validation strategy (por escenario, no comandos)
 - Risks
@@ -91,6 +93,9 @@ Escribí las validaciones como comandos que existen. Si el repo no tiene un tipo
 
 ### Accountability del implementing agent (incluir en cada brief)
 Marcar `[x]` al completar, `[BLOCKED]` con explicación si no puede, llenar Execution Report, nunca declarar una validación que no corrió. Recordarle las **mitigaciones prohibidas** (`quality-gates.md` §6): ante un gate que no pasa sin ablandar un test o silenciar el type-checker → BLOCKED y pregunta al planner, nunca el atajo.
+
+### ADR cuando la decisión sobrevive a la task
+Si el HLTC toma una decisión arquitectónica — dependencia nueva, cambio de capa/ownership, patrón nuevo, breaking change de contrato público — emití un ADR en `docs/adr/NNN-<slug>.md` con `templates/adr.md` (numeración incremental, nunca reusar). El contract de la task no lo vuelve a leer nadie; el ADR sí: `/sdd-init` y el refinement de la próxima feature lo usan como contexto. Decisión sin ADR = memoria del proyecto perdida.
 
 ### Loop de review acotado
 El ciclo implementar → review es de **máximo 3 rondas** por brief. Si la ronda 3 no cierra en `APPROVED`, el reviewer emite `ESCALATE` y vos decidís: ratificar contract (bump de versión), cortar scope, o elevarlo al gate humano de Feature Ready. No dejes el loop abierto: es el escenario donde el agente empieza a ablandar tests para salir.

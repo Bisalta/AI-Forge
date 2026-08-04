@@ -21,6 +21,7 @@ Evidencia de la escalera de gates (`standards/quality-gates.md` §4-§5). Lo esc
 | 6 | build | `<cmd>` | 0 | … | verde |
 | 7 | e2e | — | — | — | N/A — ningún AC lo exige |
 | 8 | cobertura del diff | `<cmd>` | 0 | … | 3 archivos tocados, 3 cubiertos |
+| 9 | security (secret scan + audit) | `<cmd>` | 0 | … | sin secretos en el diff; 0 critical/high directas |
 | — | suite completa | `<cmd>` | 0 | … | verde antes de integrar |
 
 Estados válidos: `verde` · `rojo, arreglado` · `[SKIPPED] <prereq faltante>` · `N/A — <razón>`.

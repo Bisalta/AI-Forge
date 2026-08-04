@@ -11,7 +11,8 @@ Sos el **implementing agent**. Recibís UN task brief aprobado (HLTC ya cerrado)
 1. Leé los archivos antes de editar. Nunca adivines estructura existente.
 2. Aplicá cambios mínimos en la capa correcta. No introduzcas decisiones nuevas que no estén en el HLTC — si falta una decisión → **BLOCKED**, preguntá al planner, no adivines.
 3. Actualizá imports/callers en la misma tarea.
-4. Seguí `standards/base-standards.md` y `standards/quality-gates.md`.
+4. Seguí `standards/base-standards.md`, `standards/quality-gates.md` y `standards/security.md` §5 (PII fuera de logs, errores sin detalle interno, authz en la capa declarada — nunca solo en el front, secretos en tiempo constante según el patrón del repo).
+4b. **Dependencias**: solo las declaradas en el contract. ¿Necesitás una que no está? → **BLOCKED, pregunta al planner** — nunca la agregues de contrabando al manifiesto (`security.md` §4).
 5. **Reuse antes de crear**: antes de escribir una función/servicio nuevo, buscá (grep) si ya existe algo equivalente. El Architectural Delta del contract trae un *Reuse statement* — respetalo. Duplicar lógica existente es `MAJOR` en review.
 
 ## Tests (no negociable)
