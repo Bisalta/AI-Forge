@@ -16,6 +16,17 @@ try:
     agents = s.get("agents_active", 0)
     blocked = s.get("blocked", 0)
     badge = f"[SDD · fase {phase}/{total} · {agents} agentes"
+    # gates agregados de agents[] (schema v1 de standards/orchestration.md)
+    green = red = missing = 0
+    for a in s.get("agents", []) or []:
+        g = a.get("gates") or {}
+        green += g.get("green", 0) or 0
+        red += g.get("red", 0) or 0
+        missing += (a.get("acs") or {}).get("missing_test", 0) or 0
+    if green or red:
+        badge += f" · ✓{green}" + (f" ✗{red}" if red else "")
+    if missing:
+        badge += f" · AC s/test {missing}"
     if blocked:
         badge += f" · ⛔{blocked}"
     badge += "]"

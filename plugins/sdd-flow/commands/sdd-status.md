@@ -4,7 +4,9 @@ description: Muestra el tablero de estado de los agentes y tareas SDD en vuelo.
 
 # /sdd-status — Tablero SDD
 
-Leé el directorio de coordinación (por defecto `cross_agent_implementations/` o el `.sdd/` del proyecto) y mostrá:
+**Si existe `.sdd/state.json`** (schema en `standards/orchestration.md` §1), esa es la fuente primaria: mostrá task, fase, caps, y por agente estado/ronda/veredicto/gates/ACs directamente del state, cruzando contra los markdown solo para el detalle. Si el state contradice la evidencia (`verification/`), gana la evidencia — marcá la discrepancia.
+
+**Sin state** (ciclo pre-orquestador o coordinación manual), leé el directorio de coordinación (por defecto `cross_agent_implementations/` o el `.sdd/` del proyecto) y mostrá:
 
 1. **Tareas activas** (`tasks/<slug>/status.md`) — estado por agente: `pending | in_progress | blocked | done`.
 2. **Mensajes sin procesar** por outbox `messages/AGENT_a__to__AGENT_b/` (los que NO están en `archive/`).

@@ -52,3 +52,5 @@ Si tu cambio tocó capas/rutas/contratos del Architectural Delta → actualizá 
 
 ## Reporte final
 files changed · contract impact · tabla AC ↔ test completa · gates corridos con exit codes (link a `verification.md`) · rojos preexistentes si hubo.
+
+**Cerrá tu output con exactamente un bloque JSON `sdd.result`** (el último bloque del mensaje — el orquestador lo parsea; sin él tu trabajo cuenta como `failed`). Formato exacto en `standards/orchestration.md` §2: `status` (`done|blocked|failed`), `acs[]` con test y estado (`pass|fail|manual|missing` — `missing` es admisión honesta, no lo escondas), `gates[]` con comando y exit code, ruta de tu `verification`, `files`, `commit`, `blockers[]` con la pregunta concreta si estás bloqueado, y el `contract_version` contra el que trabajaste.
