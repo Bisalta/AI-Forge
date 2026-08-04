@@ -27,9 +27,17 @@ Notas:
 - Podés activar **auto-update** para este marketplace: `/plugin` → tab **Marketplaces** → `ai-forge` → *Enable auto-update* (los marketplaces de terceros vienen con auto-update apagado por default). Con eso Claude Code refresca catálogo y plugins solo, y te avisa cuándo correr `/reload-plugins`.
 - Verificá qué versión te quedó: `/plugin` → tab **Installed** → `sdd-flow` (compará contra el `CHANGELOG.md` de este repo).
 
-### Entornos sin `/plugin` (Claude Code web / sesiones cloud)
+### Dónde funciona cada método de instalación
 
-En sesiones remotas el panel `/plugin` no existe (`/plugin isn't available in this environment`) — es un comando de la CLI de terminal y de la app de escritorio. Para que los plugins estén disponibles en sesiones web/cloud, declaralos en el `.claude/settings.json` **del repo donde trabajás**:
+El comando `/plugin` es **solo de la CLI de terminal**. En los demás entornos:
+
+| Entorno | Cómo instalar |
+|---|---|
+| CLI de terminal | comandos `/plugin ...` de arriba |
+| App de escritorio, sesión **Local** | botón `+` junto al prompt → **Plugins** → **Add plugin** (el marketplace de Bisalta tiene que estar registrado: una vez por CLI, o vía `extraKnownMarketplaces` en `~/.claude/settings.json`) |
+| Sesiones **Cloud** (web, o desktop con Environment=Cloud) | **solo** vía `.claude/settings.json` del repo (abajo) — el plugin browser y `/plugin` no existen ahí |
+
+Para sesiones cloud (y como vía recomendada para el equipo), declaralos en el `.claude/settings.json` **del repo donde trabajás**:
 
 ```json
 {
