@@ -48,7 +48,9 @@ parallel once 1–2 exist; the implementation plan sequences everything.
 Default output directory: **`docs/foundation/`** (create it). Write the six
 numbered files there plus a `README.md` index that links them and states the
 "last updated" date. If the repo already has a docs convention, place them to fit
-it and link from the existing docs index. Respect the argument-hint overrides.
+it and link from the existing docs index. Respect any overrides the caller
+provides: mode (greenfield | existing), output directory (default
+`docs/foundation`), and a subset of documents (`only: 1,2,..`).
 
 > If the project already has overlapping docs (an architecture plan, a backlog, a
 > go-to-market, ADRs), **consolidate — don't duplicate.** Reference and absorb
