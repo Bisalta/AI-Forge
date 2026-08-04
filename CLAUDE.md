@@ -70,7 +70,7 @@ AI-Forge/
 │   └── templates/  doc_architecture.md · doc_verification_guide.md · coordination-README.md
 ├── plugins/project-foundation/
 │   ├── .claude-plugin/plugin.json    v0.1.0
-│   ├── commands/   project-foundation
+│   ├── commands/   init (→ /project-foundation:init)
 │   └── skills/     project-foundation (los seis docs fundacionales)
 ├── CHANGELOG.md · README.md · .gitignore
 ```

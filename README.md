@@ -10,7 +10,7 @@ Marketplace interno de **Bisalta Ltda** para tooling de Claude Code — plugins,
 /plugin install project-foundation
 ```
 
-Luego tipeá `/` y vas a ver los comandos de cada plugin (`/sdd-flow:sdd`, `/project-foundation:project-foundation`, etc).
+Luego tipeá `/` y vas a ver los comandos de cada plugin (`/sdd-flow:sdd`, `/project-foundation:init`, etc).
 
 ## Plugins disponibles
 

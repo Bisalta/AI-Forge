@@ -12,7 +12,6 @@ description: >-
   codebase (derive from the code, then confirm). Triggers: "PRD", "TRD",
   "documento de requerimientos", "brief de diseño", "app flow", "esquema del
   backend", "plan de implementación", "founding docs", "documentos fundacionales".
-argument-hint: "[greenfield | existing] [docs output dir, default docs/foundation] [only: 1,2,..]"
 ---
 
 # Project Foundation — the six documents every project needs from day zero

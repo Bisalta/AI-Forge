@@ -9,7 +9,7 @@ Núcleo SDD adaptado de [`Construplaza/TemplateNewRepository`](https://github.co
 ## Instalación
 
 ```
-/plugin marketplace add Construplaza/sdd-flow
+/plugin marketplace add Bisalta/AI-Forge
 /plugin install sdd-flow
 ```
 

@@ -2,7 +2,7 @@
 
 Plugin de Claude Code para crear (o back-fillear) los **seis documentos fundacionales** que todo proyecto debería tener desde el día cero: PRD, TRD, UI/UX Brief, App Flow, Backend Schema e Implementation Plan.
 
-Funciona **greenfield** (entrevista al usuario — no puede inventar la visión de producto) y en **proyecto existente** (deriva del codebase con subagentes de exploración en paralelo, luego confirma supuestos).
+Funciona **greenfield** (entrevista al usuario — no puede inventar la visión de producto) y en **proyecto existente** (deriva del codebase — el prompt instruye usar subagentes de exploración en paralelo cuando el entorno los soporta, sin que eso sea un mecanismo cableado — luego confirma supuestos).
 
 ## Instalación
 
@@ -15,7 +15,7 @@ Funciona **greenfield** (entrevista al usuario — no puede inventar la visión 
 
 | Comando | Qué hace |
 |---|---|
-| `/project-foundation [greenfield\|existing] [dir] [only: 1,2,..]` | Crea o back-fillea los seis documentos, en `docs/foundation/` por defecto. |
+| `/project-foundation:init [greenfield\|existing] [dir] [only: 1,2,..]` | Crea o back-fillea los seis documentos, en `docs/foundation/` por defecto. |
 
 También se auto-invoca por descripción cuando el usuario pide un PRD, TRD, brief de diseño, app flow, esquema de backend o plan de implementación sin usar el comando explícito.
 
@@ -47,7 +47,7 @@ Nada de esto es obligatorio — `project-foundation` funciona standalone, sin `s
 ```
 project-foundation/
 ├── .claude-plugin/plugin.json   manifest
-├── commands/project-foundation.md
+├── commands/init.md              → /project-foundation:init
 ├── skills/project-foundation/SKILL.md
 └── README.md
 ```
