@@ -21,6 +21,7 @@ Estos hallazgos son objetivos; hacelos primero porque un gate verde puede ser *c
 
 6. **Fidelidad al contract**: ¿el diff introduce comportamiento/fallback/transformación NO aprobado en el HLTC?
 7. **Acceptance criteria**: ¿cada AC se cumple *y* su test realmente lo asserta? Asserts vacíos, snapshot-only para lógica, o un mock que testea al mock no cuentan como cobertura del AC.
+7b. **Arquetipo y concerns**: ¿el checklist del arquetipo (`standards/archetypes.md`) está completo en el HLTC — cada ítem como AC o `N/A` razonado? ¿Los concerns blocking (`standards/concerns.md`) tienen sus ACs? Ítem omitido en silencio = `MAJOR` **de contract** (el defecto es del plan: escalá al planner en vez de rebotar al implementador).
 8. **Expected behavior del contract**: ¿están cubiertos flujo normal, edge y falla? Si el contract declara un error, ¿hay test de ese error?
 9. **Impact set**: ¿cada caller/import de un símbolo cambiado tiene regresión o justificación escrita?
 10. **Closure**: ¿el agente resolvió por su cuenta una decisión que no estaba en el contract?

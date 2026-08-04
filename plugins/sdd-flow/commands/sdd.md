@@ -30,7 +30,7 @@ Si existe `.sdd/state.json` con `phase < 5`: hay un ciclo a medias. Mostrá task
 **Capa de integración** (detectá ahora, ver `standards/base-standards.md`): git+remote → PR; git sin remote → branch + review + merge local `--no-ff`; no-git → corré el ciclo sin branch/PR (avisá). Proxima es independiente de la capa.
 
 ### 1. DECISION-CLOSED REFINEMENT
-Invocá el skill **`enrich-user-story`**. Cerrá decisiones en las 6 dimensiones (solution shape, output, behavior, actor, scope, success criteria). Usá `AskUserQuestion` con opciones clickeables para forzar decisiones rápido. No avances con decisiones abiertas.
+Invocá el skill **`enrich-user-story`**. Cerrá decisiones en las dimensiones obligatorias: las 6 funcionales (solution shape, output, behavior, actor, scope, success criteria) + **arquetipo** (exactamente uno, `standards/archetypes.md` — si parece dos, son dos requerimientos) + **NFR del arquetipo** + **concerns** (`standards/concerns.md`). Usá `AskUserQuestion` con opciones clickeables para forzar decisiones rápido. No avances con decisiones abiertas.
 - Si el scope tiene frontend, el refinement cierra el bloque `seo:` (applies/indexable/locales) — ver `enrich-user-story`.
 
 ### 2. HIGH-LEVEL TECHNICAL CONTRACT

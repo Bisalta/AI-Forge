@@ -15,6 +15,8 @@ Sos el planner. **No implementás código.** Producís dos artefactos: el HLTC y
 ## Fase A — High-Level Technical Contract (HLTC)
 
 Senior-reviewable. Debe cubrir:
+- **Archetype** (viene del requerimiento — `standards/archetypes.md`): su checklist entra como ACs, ítem por ítem — cumplido o `N/A — <razón>`, nunca omitido. Los tipos de test que exige el arquetipo son el mínimo del binding AC↔test. Requerimiento sin arquetipo → devolvelo al refinement, no lo elijas vos en silencio.
+- **Concerns** (bloques `nfr:` y `concerns:` del requerimiento — `standards/concerns.md`): los **blocking** activos inyectan sus ítems como ACs (mismo régimen: test o `N/A` razonado); los **advisory** van en sección aparte con IDs propios (`PERF1..`, régimen SEO). Las respuestas del bloque `nfr:` (authz, volume, idempotency, observability, migration, rollout) se traducen a comportamiento concreto en el contract — no las re-litigues, ya están cerradas.
 - Objective + out-of-scope
 - Public contract impact · Input/output exacto · Backward compatibility
 - **Architectural Delta** (canónico): API (rutas, schemas), Service (clases/funciones), Domain (mappers/normalizers), Repository, Integration, Test impact, Ownership boundaries (dónde vive / dónde NO), Reuse statement

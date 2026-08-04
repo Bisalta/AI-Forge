@@ -81,6 +81,25 @@ Your questions MUST collectively cover these dimensions:
 6. Success criteria  
    (how we know this is correctly implemented — if `docs/foundation/01-prd.md` exists, align with its stated success metrics/KPIs where relevant)
 
+7. **Archetype** (`standards/archetypes.md`)  
+   Exactamente uno: `api-endpoint · ui-feature · data-migration · background-job · third-party-integration · bugfix · refactor · infra`. Inferilo del pedido y **confirmalo** (no preguntes en abierto si es obvio — proponé y validá). Si el trabajo parece dos arquetipos, son dos requerimientos: decilo y cerrá el primero. El arquetipo determina qué preguntas NFR siguen.
+
+8. **NFR — solo las dimensiones que el arquetipo marca obligatorias** (ver la sección "NFR obligatorias" de cada arquetipo). Cada una se cierra con valor concreto, no con adjetivo:
+   - `authz`: rol/scope exacto que puede invocar/ver, y qué recibe el rol equivocado.
+   - `volume`: orden de magnitud esperado + límite/paginación concretos.
+   - `idempotency`: qué pasa si se ejecuta/entrega dos veces.
+   - `observability`: **"¿cómo te das cuenta en producción de que esto se rompió?"** — la respuesta es un criterio, "mirando la base" no cuenta.
+   - `migration`: dry-run, conteo esperado, rollback, convivencia con el código viejo.
+   - `rollout`: flag/kill-switch, orden de deploy, plan de reversa.
+
+9. **Concerns** (`standards/concerns.md`) — 4 flags cierran la activación; no preguntes lo que ya se respondió en otra dimensión:
+   - ¿Hay UI en el alcance? → activa `a11y` + `design` (y la pregunta SEO de abajo). Con UI: ¿hay diseño de referencia (Figma/mock/vista existente)? Nombralo.
+   - ¿Hay contrato público consumido por terceros? → `api-compat`.
+   - ¿Se tocan datos personales? → `data-privacy`.
+   - ¿El producto maneja ≥2 locales? → `i18n`.
+   - Performance: ¿hay presupuesto con número (p95, bundle, query)? Con número es blocking; sin número queda advisory.
+   `security` y `observability` no se preguntan: aplican siempre.
+
 If any of these is unclear, you MUST ask about it.
 
 - **SEO (solo si el scope incluye frontend)**: son dos decisiones separadas, no una.
@@ -192,6 +211,10 @@ Respond in the same language as the user:
 
 # Requirement: <clear title>
 
+## Archetype
+
+- archetype: <api-endpoint | ui-feature | data-migration | background-job | third-party-integration | bugfix | refactor | infra>
+
 ## Story
 
 As a <actor>,  
@@ -222,6 +245,26 @@ so that <outcome>.
 
 - <decision>
 - <decision>
+
+## NFR
+<!-- Solo las dimensiones que el arquetipo marca obligatorias (standards/archetypes.md). Valores concretos, cerrados. -->
+- authz: <rol/scope exacto · qué recibe el rol equivocado>
+- volume: <orden de magnitud · límite/paginación>
+- idempotency: <comportamiento ante doble ejecución/entrega>
+- observability: <cómo se detecta en producción que se rompió>
+- migration: <dry-run · conteo esperado · rollback · convivencia>
+- rollout: <flag/kill-switch · orden · reversa>
+
+## Concerns
+<!-- standards/concerns.md — cada uno: blocking | advisory | n/a (con la razón del n/a). security y observability nunca son n/a. -->
+- security: blocking
+- observability: blocking
+- a11y: <blocking | n/a — sin UI>
+- design: <blocking (ref: <Figma/mock/vista>) | n/a — sin UI>
+- data-privacy: <blocking | n/a — sin datos personales>
+- api-compat: <blocking | n/a — sin contrato público>
+- i18n: <blocking | n/a — monolingüe>
+- performance: <blocking (presupuesto: <número>) | advisory — sin presupuesto>
 
 ## SEO
 <!-- Incluir solo si el scope tiene frontend. Si no hay front, omitir esta sección. -->
