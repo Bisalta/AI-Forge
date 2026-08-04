@@ -4,14 +4,15 @@ Guía para Claude Code al trabajar en este repo. Captura el contexto de diseño 
 
 ## Qué es
 
-**AI-Forge** = marketplace interno de **Bisalta Ltda** (hosteado en `github.com/Construplaza/AI-Forge`) para tooling de Claude Code. Primer y único plugin por ahora: **`sdd-flow`**.
+**AI-Forge** = marketplace interno de **Bisalta Ltda** (hosteado en `github.com/Bisalta/AI-Forge`) para tooling de Claude Code. Dos plugins: **`sdd-flow`** (SDD multi-agente) y **`project-foundation`** (los seis docs fundacionales de un proyecto).
 
-**Objetivo**: standard de empresa (NO obligatorio) para que todos los devs usen Claude de forma eficiente y consistente vía Spec-Driven Development multi-agente.
+**Objetivo**: standard de empresa (NO obligatorio) para que todos los devs usen Claude de forma eficiente y consistente.
 
 Install para cualquier dev:
 ```
-/plugin marketplace add Construplaza/AI-Forge
+/plugin marketplace add Bisalta/AI-Forge
 /plugin install sdd-flow
+/plugin install project-foundation
 ```
 
 ## El plugin sdd-flow — concepto
@@ -29,6 +30,10 @@ USER STORY
   → FEATURE READY  ←★ ÚNICO gate humano  → FEATURE FOR PR → FEATURE PUBLISHED
 ```
 Diagrama renderizado: `cross_agent_implementations/sdd-cycle-v2.jpg`.
+
+## El plugin project-foundation — concepto
+
+Empaqueta el skill personal `project-foundation` (que ya vivía en `~/.claude-personal/skills/`) para distribuirlo como standard de empresa. Genera los **seis documentos fundacionales** de un proyecto (PRD → TRD → UI/UX Brief · App Flow · Backend Schema → Implementation Plan) en `docs/foundation/`, greenfield (entrevista) o derivando de un codebase existente. Standalone — no depende de `sdd-flow` — pero si ambos están instalados, `sdd-flow` puede leer sus outputs (ver PR de bootstrap de docs fundacionales en `sdd-flow`, si ya se mergeó).
 
 ## Decisiones de diseño tomadas (no re-litigar)
 
@@ -63,6 +68,10 @@ AI-Forge/
 │   ├── hooks/      statusline.sh
 │   ├── standards/  base-standards.md
 │   └── templates/  doc_architecture.md · doc_verification_guide.md · coordination-README.md
+├── plugins/project-foundation/
+│   ├── .claude-plugin/plugin.json    v0.1.0
+│   ├── commands/   init (→ /project-foundation:init)
+│   └── skills/     project-foundation (los seis docs fundacionales)
 ├── CHANGELOG.md · README.md · .gitignore
 ```
 

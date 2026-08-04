@@ -4,7 +4,7 @@
   "description": "Spec-Driven Development flow para Claude Code. Planner Opus 4.8 cierra decisiones y corta tareas; subagentes Sonnet/Haiku ejecutan; coordinacion file-based multi-repo con topologia AGENT_{uuid}. Standard de empresa (opcional).",
   "author": {
     "name": "Bisalta Ltda",
-    "url": "https://github.com/Construplaza"
+    "url": "https://github.com/Bisalta"
   },
   "keywords": ["sdd", "spec-driven", "multi-agent", "planning", "opus", "orchestration"]
 }

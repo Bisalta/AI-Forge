@@ -1,0 +1,10 @@
+{
+  "name": "project-foundation",
+  "version": "0.1.0",
+  "description": "Crea o back-fillea los seis documentos fundacionales de un proyecto (PRD, TRD, UI/UX Brief, App Flow, Backend Schema, Implementation Plan) desde cero o derivando de un codebase existente. Interopera con sdd-flow si tambien esta instalado.",
+  "author": {
+    "name": "Bisalta Ltda",
+    "url": "https://github.com/Bisalta"
+  },
+  "keywords": ["prd", "trd", "foundation", "day-zero", "planning", "documentation"]
+}

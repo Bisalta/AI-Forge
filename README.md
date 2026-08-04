@@ -5,17 +5,19 @@ Marketplace interno de **Bisalta Ltda** para tooling de Claude Code — plugins,
 ## Instalación (en cualquier proyecto)
 
 ```
-/plugin marketplace add Construplaza/AI-Forge
+/plugin marketplace add Bisalta/AI-Forge
 /plugin install sdd-flow
+/plugin install project-foundation
 ```
 
-Luego tipeá `/` y vas a ver los comandos del plugin (`/sdd-flow:sdd`, etc).
+Luego tipeá `/` y vas a ver los comandos de cada plugin (`/sdd-flow:sdd`, `/project-foundation:init`, etc).
 
 ## Plugins disponibles
 
 | Plugin | Versión | Qué hace |
 |---|---|---|
 | [**sdd-flow**](./plugins/sdd-flow) | 0.7.0 | Spec-Driven Development multi-agente: planner Opus 4.8 cierra decisiones y corta tareas, subagentes Sonnet/Haiku ejecutan, coordinación file-based `AGENT_{uuid}`. |
+| [**project-foundation**](./plugins/project-foundation) | 0.1.0 | Crea o back-fillea los seis documentos fundacionales de un proyecto (PRD, TRD, UI/UX Brief, App Flow, Backend Schema, Implementation Plan) desde cero o derivando de un codebase existente. Interopera con `sdd-flow` si ambos están instalados. |
 
 ## Estructura
 
@@ -23,7 +25,8 @@ Luego tipeá `/` y vas a ver los comandos del plugin (`/sdd-flow:sdd`, etc).
 ai-forge/
 ├── .claude-plugin/marketplace.json   índice del marketplace
 ├── plugins/
-│   └── sdd-flow/                      primer plugin (ver su README)
+│   ├── sdd-flow/                      SDD multi-agente (ver su README)
+│   └── project-foundation/            seis docs fundacionales (ver su README)
 ├── CHANGELOG.md
 └── README.md
 ```
