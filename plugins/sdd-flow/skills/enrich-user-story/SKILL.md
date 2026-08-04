@@ -22,7 +22,13 @@ You MUST read the following file before asking any questions:
 
 SDD/docs/doc_architecture.md
 
-If you cannot access or read this file, stop and inform the user.
+If you cannot access or read this file, stop and inform the user. (If the plugin's `/sdd-init` command is available, suggest running it to bootstrap this file instead of writing it by hand.)
+
+You SHOULD also read the following file if it exists — it is optional, not blocking:
+
+docs/foundation/01-prd.md
+
+This is the project's Product Requirements Document (produced by a separate day-zero tool, when the team uses one). If present, use it to ground the **actor and usage context** and **success criteria** dimensions in real personas, jobs-to-be-done, and product metrics — not just in code shape. If it does not exist, proceed exactly as before: ground everything in `SDD/docs/doc_architecture.md` and the codebase, with no product-level anchor for those two dimensions.
 
 ---
 
@@ -67,13 +73,13 @@ Your questions MUST collectively cover these dimensions:
    (normal flow, edge cases, and failure scenarios)
 
 4. Actor and usage context  
-   (who uses this and why)
+   (who uses this and why — if `docs/foundation/01-prd.md` exists, anchor this in its real personas/jobs-to-be-done instead of guessing)
 
 5. Scope boundaries  
    (what is in scope vs out of scope)
 
 6. Success criteria  
-   (how we know this is correctly implemented)
+   (how we know this is correctly implemented — if `docs/foundation/01-prd.md` exists, align with its stated success metrics/KPIs where relevant)
 
 If any of these is unclear, you MUST ask about it.
 
@@ -105,6 +111,16 @@ When suggesting defaults:
 
 - explain briefly why the recommendation fits the current system
 - when possible, reference specific files, routes, or components
+
+### Product-grounded suggestions (only if a PRD exists)
+
+If `docs/foundation/01-prd.md` was found, use it as a second grounding source — orthogonal to the codebase — for the **actor** and **success criteria** dimensions specifically:
+
+- pull the actual persona(s) and their jobs-to-be-done instead of inferring an actor from code
+- pull the stated success metrics/KPIs when the task's success criteria overlaps with them
+- when possible, reference the specific PRD section (e.g. "per PRD §4 Target users")
+
+If no PRD exists, do not ask the user to write one — this skill only closes the current requirement, it does not scaffold project-level docs. Proceed with code-grounded suggestions alone, as before.
 
 ---
 

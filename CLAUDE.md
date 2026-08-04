@@ -56,9 +56,9 @@ Diagrama renderizado: `cross_agent_implementations/sdd-cycle-v2.jpg`.
 AI-Forge/
 ├── .claude-plugin/marketplace.json   índice (owner: Bisalta Ltda)
 ├── plugins/sdd-flow/
-│   ├── .claude-plugin/plugin.json    v0.1.0
-│   ├── commands/   sdd · sdd-enrich · sdd-contract · sdd-status · sdd-pr · sdd-fixes · sdd-agents · sdd-seo
-│   ├── skills/     enrich-user-story · sdd-plan · write-pr-report
+│   ├── .claude-plugin/plugin.json    v0.7.0
+│   ├── commands/   sdd-init · sdd · sdd-enrich · sdd-contract · sdd-status · sdd-pr · sdd-fixes · sdd-agents · sdd-seo
+│   ├── skills/     sdd-init · enrich-user-story · sdd-plan · sdd-seo · write-pr-report
 │   ├── agents/     implementing-agent (sonnet) · reviewer-agent (opus)
 │   ├── hooks/      statusline.sh
 │   ├── standards/  base-standards.md
@@ -66,7 +66,9 @@ AI-Forge/
 ├── CHANGELOG.md · README.md · .gitignore
 ```
 
-## Estado actual: v0.6.0 — SEO frontend advisory
+## Estado actual: v0.7.0 — bootstrap de docs fundacionales
+
+**v0.7.0**: nuevo comando+skill `/sdd-init` — bootstrapea `SDD/docs/doc_architecture.md` y `doc_verification_guide.md` (derivar de codebase existente o entrevistar en greenfield) en vez de dejarlos como esqueleto `[PLACEHOLDER]`. Antes de esto, si esos docs no existían llenos, `enrich-user-story` frenaba sin ninguna ruta de recuperación dentro del plugin. Si el repo ya tiene `docs/foundation/` (seis documentos de un day-zero externo — convención del skill `project-foundation`), `doc_architecture.md` referencia `02-trd.md`/`05-backend-schema.md` en vez de duplicarlos; `doc_verification_guide.md` siempre se genera fresco. Además, `enrich-user-story` ahora lee `docs/foundation/01-prd.md` si existe (opcional, no bloqueante) para anclar actor/success-criteria en producto real, y `sdd-plan` chequea `docs/foundation/06-implementation-plan.md` si existe para detectar scope creep contra el roadmap. Spec en `docs/specs/2026-08-03-foundation-docs-bootstrap-design.md`.
 
 **v0.6.0**: SEO frontend como concern **advisory** (nunca bloquea Feature Ready) para proyectos con front. Activación por pregunta en `enrich-user-story` (no automática): persiste como bloque `seo: { applies, indexable, locales }` en el contract. Checklist 2 tiers (Universal / Indexable) en `standards/seo-frontend.md`. `sdd-plan` inyecta criterios SEO decision-closed al HLTC y briefs cuando `seo.applies`. `reviewer-agent` reporta sección "SEO (advisory)" sin bloquear. Nuevo command + skill `/sdd-seo` (auditoría on-demand, Lighthouse o fallback estático). Spec en `docs/specs/2026-06-22-seo-frontend-advisory-design.md`.
 
@@ -78,7 +80,7 @@ AI-Forge/
 
 **v0.3.0**: comando `/sdd-agents` (bootstrap coordinación multi-agente `AGENT_<slug>` + kickoff prompts) y template `coordination-README.md` con el protocolo — spec en `docs/specs/2026-06-10-sdd-agents-bootstrap-design.md`. Cierra pendiente #2.
 
-**Funciona de verdad**: refinement (`enrich-user-story`) y generación de contract (`sdd-plan`). Son prompts/skills reales.
+**Funciona de verdad**: bootstrap de docs (`sdd-init`), refinement (`enrich-user-story`) y generación de contract (`sdd-plan`). Son prompts/skills reales.
 
 **NO cableado todavía (pendiente)**:
 1. **Orquestador real `/sdd`**: hoy describe el flujo y dispara skills, pero NO spawnea subagentes de verdad con su modelo asignado. → cablear con Agent/Workflow.
