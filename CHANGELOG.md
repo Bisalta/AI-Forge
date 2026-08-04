@@ -2,6 +2,14 @@
 
 Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero).
 
+## project-foundation
+
+### 0.1.0 — 2026-08-03
+- Plugin nuevo: empaqueta el skill personal `project-foundation` para distribuirlo como standard de empresa (opcional). Crea o back-fillea los seis documentos fundacionales de un proyecto — PRD, TRD, UI/UX Brief, App Flow, Backend Schema, Implementation Plan — desde cero (entrevista, greenfield) o derivando de un codebase existente (subagentes de exploración en paralelo, luego confirma supuestos).
+- Escribe por defecto en `docs/foundation/`, con dependencia declarada PRD → TRD → (UI/UX Brief ∥ App Flow ∥ Backend Schema) → Implementation Plan.
+- **Interopera con `sdd-flow`** (si también está instalado, no es requisito): habilita que `enrich-user-story` lea el PRD, `sdd-plan` chequee el Implementation Plan, y `/sdd-init` referencie el TRD/Backend Schema en vez de duplicarlos — ver `sdd-flow` 0.7.0.
+- Nuevo comando `/project-foundation`.
+
 ## sdd-flow
 
 ### 0.7.0 — 2026-08-03
