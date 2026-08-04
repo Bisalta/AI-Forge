@@ -61,13 +61,14 @@ Empaqueta el skill personal `project-foundation` (que ya vivía en `~/.claude-pe
 AI-Forge/
 ├── .claude-plugin/marketplace.json   índice (owner: Bisalta Ltda)
 ├── plugins/sdd-flow/
-│   ├── .claude-plugin/plugin.json    v0.8.0
+│   ├── .claude-plugin/plugin.json    v0.9.0
 │   ├── commands/   sdd-init · sdd · sdd-enrich · sdd-contract · sdd-verify · sdd-status · sdd-pr · sdd-fixes · sdd-agents · sdd-seo
 │   ├── skills/     sdd-init · enrich-user-story · sdd-plan · sdd-verify · sdd-seo · write-pr-report
 │   ├── agents/     implementing-agent (sonnet) · reviewer-agent (opus)
 │   ├── hooks/      statusline.sh · hooks.json · guard-git.sh (PreToolUse Bash)
-│   ├── standards/  base-standards.md · quality-gates.md · seo-frontend.md
-│   └── templates/  doc_architecture.md · doc_verification_guide.md · doc_quality_gates.md · verification-report.md · coordination-README.md
+│   ├── scripts/    sdd-check.sh (chequeo mecánico del diff — review y CI)
+│   ├── standards/  base-standards.md · quality-gates.md · orchestration.md · security.md · archetypes.md · concerns.md · seo-frontend.md
+│   └── templates/  doc_architecture.md · doc_verification_guide.md · doc_quality_gates.md · verification-report.md · adr.md · debt-ledger.md · coordination-README.md
 ├── plugins/project-foundation/
 │   ├── .claude-plugin/plugin.json    v0.1.0
 │   ├── commands/   init (→ /project-foundation:init)
@@ -75,7 +76,9 @@ AI-Forge/
 ├── CHANGELOG.md · README.md · .gitignore
 ```
 
-## Estado actual: v0.8.0 — quality gates verificables
+## Estado actual: v0.9.0 — orquestación + seguridad + arquetipos
+
+**v0.9.0** (mismo PR que v0.8.0): tres frentes. (1) **Contrato de máquina** (`standards/orchestration.md`): `.sdd/state.json` single-writer compatible con la statusline, retornos `sdd.result`/`sdd.review` (último bloque JSON de cada subagente), spawn real vía Agent tool con modelo por brief y **fallback inline** (Workflow tool descartado: requiere opt-in), serialización un-agente-por-repo, caps duros (3 rondas · 2 reintentos de gate · 3 paralelos · 1 re-spawn), resume tras crash (Fase −1 de `/sdd`) y retro (`SDD/retro.md`). La Fase 1 mecánica del review ahora es un script determinístico (`scripts/sdd-check.sh`, fail-open, exit 2 con BLOCKERs candidatos; `/sdd-init` lo copia a `SDD/scripts/` para CI). (2) **Seguridad como gate** (`standards/security.md`): threat model de 4 preguntas cerradas en el HLTC, ACs negativos obligatorios (403/401/**IDOR**/input hostil), gate 9 (secret scan + audit de deps, critical/high = BLOCKER), supply chain (dependencia nueva = decisión del contract; de contrabando = MAJOR). Más memoria de mantenibilidad: ADRs (`docs/adr/`), ledger de deuda (`SDD/debt.md`), DoD ítem 9, umbrales estructurales, paridad con CI ofrecida por `/sdd-init`. (3) **Arquetipos + concerns** (cierra pendiente #5): 8 arquetipos con NFR/tests/checklist→ACs (`standards/archetypes.md`, exactamente uno por requerimiento), concerns transversales con el patrón `seo:` generalizado (`standards/concerns.md`; security/observability siempre blocking, performance blocking solo con número), `enrich-user-story` con dimensiones 7-9 y bloques `archetype:`/`nfr:`/`concerns:`. Spec en `docs/specs/2026-08-04-orchestration-archetypes-security-design.md`.
 
 **v0.8.0**: la calidad pasa de declarada a verificable. El plugin ya cerraba bien *qué* construir; esto cierra *cómo se prueba*. Nuevo `standards/quality-gates.md` (ship con el plugin, ya no un puntero al repo de standards de la empresa): **Definition of Done** idéntica para cualquier requerimiento, **acceptance criteria numerados `AC1..ACn`** en el HLTC con **binding AC↔test obligatorio** (AC sin test = BLOCKER, aunque la suite esté verde), **escalera de gates** fija con los comandos reales del repo en el nuevo `SDD/docs/doc_quality_gates.md` (lo genera `/sdd-init` — nadie inventa comandos), **evidencia con exit codes** en `verification/AGENT_<slug>.md` (nada se declara `done` sin ella; bugfix exige doble corrida del test de reproducción), **mitigaciones prohibidas** explícitas (ablandar tests, `@ts-ignore`, bajar thresholds, `--no-verify` → BLOCKED y pregunta al planner), **reviewer con Fase 1 mecánica** (grep + re-corrida propia del subset barato) y **severidades + cota de 3 rondas + `ESCALATE`**. Nuevo `/sdd-verify` (escalera on-demand + evidencia) y **primer enforcement determinístico** del plugin: `hooks/guard-git.sh` (`PreToolUse` sobre Bash) bloquea commit en rama protegida, `--no-verify` y `push --force` sin lease — fail-open, escape hatch `SDD_ALLOW_BASE_COMMIT=1`. Spec en `docs/specs/2026-08-04-quality-gates-design.md`.
 
@@ -91,14 +94,16 @@ AI-Forge/
 
 **v0.3.0**: comando `/sdd-agents` (bootstrap coordinación multi-agente `AGENT_<slug>` + kickoff prompts) y template `coordination-README.md` con el protocolo — spec en `docs/specs/2026-06-10-sdd-agents-bootstrap-design.md`. Cierra pendiente #2.
 
-**Funciona de verdad**: bootstrap de docs (`sdd-init`), refinement (`enrich-user-story`), generación de contract (`sdd-plan`) y gates+evidencia (`sdd-verify`). Son prompts/skills reales. El único componente que **enforcea** sin depender de que el modelo obedezca es `hooks/guard-git.sh`.
+**Funciona de verdad**: bootstrap de docs (`sdd-init`), refinement (`enrich-user-story`), generación de contract (`sdd-plan`) y gates+evidencia (`sdd-verify`). Son prompts/skills reales. Componentes que **enforcean** sin depender de que el modelo obedezca: `hooks/guard-git.sh` y `scripts/sdd-check.sh`.
 
-**NO cableado todavía (pendiente)**:
-1. **Orquestador real `/sdd`**: hoy describe el flujo y dispara skills, pero NO spawnea subagentes de verdad con su modelo asignado. → cablear con Agent/Workflow.
+**Pendiente**:
+1. ~~**Orquestador real `/sdd`**~~ — ✅ CERRADO (contrato) en v0.9.0: state + retornos estructurados + spawn con Agent tool/fallback inline + caps + resume. Falta **kilometraje real**: correr el ciclo completo en un repo de verdad y ajustar lo que cruja (en particular si el parseo de `sdd.result` es robusto en la práctica).
 2. ~~**Bootstrap `AGENT_{uuid}`**~~ — ✅ CERRADO en v0.3.0 con `/sdd-agents`.
-3. **statusline**: `hooks/statusline.sh` lee `.sdd/state.json` que nadie escribe aún. Falta que el orquestador escriba ese estado (ahora podría incluir gates verdes/rojos y ACs sin test).
+3. ~~**statusline `state.json`**~~ — ✅ CERRADO en v0.9.0 (el orquestador lo escribe; la statusline muestra gates y ACs sin test).
 4. **Design doc formal** del plugin (el flujo de brainstorming quedó en diagrama, falta el doc en `docs/`).
-5. **Arquetipos de requerimiento** (la otra mitad de "no importa el requerimiento"): taxonomía `api-endpoint · ui-feature · data-migration · background-job · third-party-integration · bugfix · refactor · infra`, cada uno con checklist obligatorio, tipos de test exigidos y NFRs por defecto (migración → dry-run + idempotencia + conteo antes/después; endpoint → authz + paginación + taxonomía de errores). Hoy el pipeline trata igual un endpoint y una migración. Va con un bloque `nfr:` en `enrich-user-story` (mismo patrón que el bloque `seo:`) para cerrar authz, volumen, idempotencia/concurrencia, observabilidad, migración/backfill y rollout — las seis dimensiones actuales son todas funcionales.
+5. ~~**Arquetipos + bloque `nfr:`**~~ — ✅ CERRADO en v0.9.0 (`standards/archetypes.md` + `standards/concerns.md` + dimensiones 7-9 de `enrich-user-story`).
+6. **Enforcement de caps por hook** (hoy los caps son prompt del orquestador) — evaluar cuando el orquestador tenga kilometraje.
+7. **Modo opt-in `--hasta-pr`** (de Feature Ready a PR abierto) — cambia la decisión #2; solo si el usuario lo pide explícito.
 
 ## Convenciones
 
@@ -111,7 +116,4 @@ AI-Forge/
 
 ## Próximo paso sugerido
 
-Dos frentes, en este orden:
-
-1. **Arquetipos de requerimiento + bloque `nfr:`** (#5) — es lo que falta para que la consistencia no dependa de que el planner improvise bien según el tipo de trabajo. Los gates de v0.8.0 aseguran que *lo que se define* se pruebe; los arquetipos aseguran que *se defina lo que corresponde* al tipo de requerimiento.
-2. **Cablear el orquestador `/sdd`** (#1) — es lo que convierte el esqueleto en algo que realmente ejecuta. Antes de codear: brainstorming/design doc de CÓMO spawnear (Agent tool vs Workflow tool) y cómo el orquestador escribe el estado para statusline (#3), incluyendo el estado de gates.
+**Kilometraje real** (#1): correr `/sdd` de punta a punta en un repo de verdad — un requerimiento chico por arquetipo distinto — y anotar en `SDD/retro.md` todo lo que cruja (parseo de `sdd.result`, resume, serialización por repo, ruido de los checklists). El plugin ya tiene la superficie normativa completa; lo que falta no es más spec, es fricción real que diga qué sobra y qué falta ajustar.

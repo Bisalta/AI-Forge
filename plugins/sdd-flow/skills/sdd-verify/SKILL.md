@@ -1,6 +1,6 @@
 ---
 name: sdd-verify
-description: Corre la escalera de gates de calidad (format, lint, type-check, unit, integration, build, e2e, cobertura del diff) sobre el trabajo actual y produce el verification report con comandos, exit codes y output real. Usar antes de declarar una tarea done, antes de abrir PR, o cuando alguien pregunta si algo esta probado.
+description: Corre la escalera de gates de calidad (format, lint, type-check, unit, integration, build, e2e, cobertura del diff, security) sobre el trabajo actual y produce el verification report con comandos, exit codes y output real. Usar antes de declarar una tarea done, antes de abrir PR, o cuando alguien pregunta si algo esta probado.
 ---
 
 # SDD Verify — correr los gates y dejar evidencia
@@ -17,7 +17,7 @@ Normativa: `standards/quality-gates.md`. Comandos del repo: `SDD/docs/doc_qualit
 
 ## Paso 1 — Correr la escalera en orden
 
-Orden fijo de `quality-gates.md` §4: format → lint → type-check → unit → integration → build → e2e → cobertura del diff. **Corta al primer rojo**: arreglá o reportá, y reiniciá desde ese escalón — no sigas corriendo escalones caros sobre un árbol que ya sabés roto.
+Orden fijo de `quality-gates.md` §4: format → lint → type-check → unit → integration → build → e2e → cobertura del diff → security. **Corta al primer rojo**: arreglá o reportá, y reiniciá desde ese escalón — no sigas corriendo escalones caros sobre un árbol que ya sabés roto.
 
 Por cada gate registrá: comando exacto, exit code, timestamp UTC, últimas ~15 líneas de output relevante. Nunca resumas un output como "verde" sin haber capturado el exit code.
 
@@ -29,12 +29,13 @@ Si algo falla y no parece relacionado con el diff: corré ese mismo gate en la r
 
 ## Paso 3 — Chequeos mecánicos sobre el diff
 
-Aunque los gates estén verdes, corré los greps de `quality-gates.md` §7.1 sobre el diff:
+Aunque los gates estén verdes, corré `SDD/scripts/sdd-check.sh <base>` si existe (lo instala `/sdd-init`; exit 2 = BLOCKERs candidatos — confirmá cada uno contra el contract). Complementá con lo que el script no cubre (`quality-gates.md` §7.1):
 
-1. ¿Se borró, `skip`eó, comentó o aflojó algún test existente?
-2. ¿Aparecen markers prohibidos (`@ts-ignore`, `eslint-disable`, `# type: ignore`, `any`, `xit(`, `.skip(`, `--no-verify`, thresholds bajados)?
-3. ¿Cada test declarado en el binding AC↔test existe literal en su archivo?
-4. ¿Hay archivo nuevo/modificado sin ningún test que lo ejercite?
+1. ¿Se aflojó alguna assertion existente (`toEqual` → `toBeTruthy`, tolerancias, casos borrados de table tests)?
+2. ¿Cada test declarado en el binding AC↔test existe literal en su archivo?
+3. ¿Hay archivo nuevo/modificado sin ningún test que lo ejercite?
+
+Sin el script, hacé también sus greps a mano (tests skipeados/eliminados, supresores, `any` nuevo, configs ablandadas).
 
 Un hallazgo acá pesa más que un gate verde: el gate verde puede ser consecuencia del hallazgo.
 

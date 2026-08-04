@@ -1,5 +1,5 @@
 ---
-description: Corre la escalera de gates de calidad sobre el trabajo actual (format, lint, type-check, tests, build, cobertura del diff) y escribe el verification report con comandos y exit codes reales.
+description: Corre la escalera de gates de calidad sobre el trabajo actual (format, lint, type-check, tests, build, cobertura del diff, security) y escribe el verification report con comandos y exit codes reales.
 argument-hint: "[area o filtro opcional — por default, el diff contra la rama base]"
 ---
 

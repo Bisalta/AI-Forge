@@ -12,6 +12,32 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ## sdd-flow
 
+### 0.9.0 — 2026-08-04
+Tres frentes sobre la base de v0.8.0: **contrato de máquina** para orquestación real, **seguridad como gate**, y **arquetipos + concerns** (la otra mitad de "no importa el requerimiento"). Spec en `docs/specs/2026-08-04-orchestration-archetypes-security-design.md`.
+
+**Orquestación (contrato de máquina)**
+- **Nuevo `standards/orchestration.md`**: schema de `.sdd/state.json` (single-writer el planner, escrito antes/después de cada transición, compatible con las claves que `statusline.sh` ya leía — el state es índice, la evidencia manda), retornos estructurados **`sdd.result`/`sdd.review`** (último bloque JSON del output de cada subagente; `acs[].state: missing` hace parseable la admisión honesta), aceptación de un `done` validando el artefacto, **caps duros** (3 rondas, 2 reintentos del mismo gate rojo, 3 agentes paralelos, 1 re-spawn por `failed`) y **resume** tras crash (agente `spawned` sin retorno → verificar su branch real y re-spawnear desde el brief).
+- **Spawn real en `/sdd`**: Agent tool con el **modelo del brief como override**; sin Agent tool, **degradación inline documentada**. Se descartó Workflow tool (requiere opt-in del usuario, no está en todos los entornos). **Serialización por repo**: un agente activo por working tree; mismo repo → serie o worktrees declarados. Nueva **Fase −1** de resume.
+- **Nuevo `scripts/sdd-check.sh`**: la Fase 1 mecánica del review como script determinístico (tests skipeados/eliminados, supresores, `any` nuevo, configs ablandadas, catch silencioso; exit 2 con BLOCKERs candidatos, fail-open fuera de git). El script propone, el reviewer confirma contra el contract. `/sdd-init` lo copia a `SDD/scripts/` para que review y CI lo corran sin el plugin.
+- `statusline.sh` muestra gates (`✓/✗`) y ACs sin test desde el state; `/sdd-status` usa el state como fuente primaria (la evidencia gana ante discrepancia). Retro: `SDD/retro.md` append-only (una línea por `ESCALATE`/blocker repetido); en Feature Ready, patrones repetidos → propuesta de ajuste a docs.
+
+**Seguridad (nuevo `standards/security.md`)**
+- **Threat model mínimo de 4 preguntas cerradas** en el HLTC para toda superficie invocable; sin superficie nueva → `N/A` explícito. HLTC sin threat model = BLOCKER de contract (el reviewer escala al planner).
+- **Tests negativos obligatorios como ACs**: 403 de rol equivocado, 401, **IDOR** (usuario A no toca recursos de B), input hostil — mismo régimen AC sin test = BLOCKER.
+- **Gate 9 nuevo en la escalera**: secret scan del diff + audit de dependencias (critical/high directa con fix = BLOCKER, resto al ledger). Sin tooling → grep mínimo declarado, nunca `N/A` silencioso.
+- **Supply chain**: dependencia nueva = decisión del contract (justificación + alternativa descartada); implementing agent que la necesita y no está → BLOCKED; meterla de contrabando = MAJOR (el reviewer diffea manifiestos). Reglas de implementación: PII fuera de logs, errores sin detalle interno, authz en la capa declarada (nunca solo front).
+
+**Mantenibilidad con memoria**
+- **ADRs** (`templates/adr.md` → `docs/adr/`): el planner los emite cuando la decisión sobrevive a la task; `/sdd-init` y el refinement los leen después.
+- **Ledger de deuda** (`templates/debt-ledger.md` → `SDD/debt.md`): `MINOR` sin corregir, `N/A` aceptados y vulns sin fix, con dueño y estado; el reviewer los registra al aprobar. **DoD ítem 9**: contabilidad cerrada.
+- Reviewer: umbrales estructurales como señal `MAJOR` sin justificación (12c), cediendo ante el patrón del repo.
+- **Paridad con CI** (`/sdd-init`): con CI existente compara y alinea la escalera hacia CI; sin CI (GitHub) ofrece generar el workflow con los mismos comandos + `sdd-check.sh`. Nunca de oficio.
+
+**Arquetipos + concerns**
+- **Nuevo `standards/archetypes.md`**: 8 arquetipos (`api-endpoint · ui-feature · data-migration · background-job · third-party-integration · bugfix · refactor · infra`), cada uno con NFR obligatorias, tests exigidos y checklist que entra al HLTC como ACs (omisión silenciosa = MAJOR de contract). **Exactamente uno por requerimiento**; si parece dos, son dos. Los checklists codifican los failure modes de cada forma: migración → dry-run/conteo/rollback; job → re-entrega/veneno/alarma de silencio; UI → los cuatro estados (vacío·carga·error·éxito); refactor → suite intacta + caracterización previa; bugfix → causa raíz + búsqueda de hermanos.
+- **Nuevo `standards/concerns.md`**: el patrón `seo:` generalizado — activación cerrada en refinement (4 flags + observabilidad + presupuesto), blocking/advisory declarado por adelantado. `security` y `observability` siempre blocking; `a11y`/`design` con UI; `data-privacy`, `api-compat`, `i18n` por flag; `performance` blocking solo con número.
+- **`enrich-user-story`**: dimensiones 7 (arquetipo), 8 (NFR con valores concretos: authz, volume, idempotency, observability, migration, rollout) y 9 (concerns); el requerimiento lleva bloques `archetype:`, `nfr:` y `concerns:`. **`sdd-plan`** los inyecta como ACs (blocking) o sección advisory.
+
 ### 0.8.0 — 2026-08-04
 Calidad **verificable** en vez de declarada. El plugin ya cerraba bien *qué* construir; esta versión cierra *cómo se prueba* que se construyó bien, para que la salida sea consistente sin importar el requerimiento. Spec en `docs/specs/2026-08-04-quality-gates-design.md`.
 

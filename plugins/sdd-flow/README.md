@@ -28,12 +28,22 @@ Núcleo SDD adaptado de [`Construplaza/TemplateNewRepository`](https://github.co
 | `/sdd-fixes` | Batch de fixes con intake + triage automático |
 | `/sdd-seo` | Auditoría SEO advisory on-demand del frontend. |
 
+## Orquestación
+
+`/sdd` corre con contrato de máquina (`standards/orchestration.md`): estado en `.sdd/state.json` (lo escribe solo el planner; lo leen la statusline y `/sdd-status`), subagentes que retornan bloques JSON parseables (`sdd.result`/`sdd.review`), spawn vía Agent tool con el modelo del brief (fallback inline si el entorno no tiene subagentes), **un agente activo por repo**, caps duros (3 rondas de review · 2 reintentos de gate · 3 agentes paralelos) y **resume**: si la sesión muere a mitad de ciclo, `/sdd` detecta el state y ofrece continuar sin reejecutar lo aprobado.
+
+## Qué exige cada tipo de requerimiento
+
+- **`standards/archetypes.md`** — 8 arquetipos (`api-endpoint · ui-feature · data-migration · background-job · third-party-integration · bugfix · refactor · infra`), cada uno con NFR obligatorias, tests exigidos y checklist que entra al contract como ACs. Exactamente uno por requerimiento.
+- **`standards/concerns.md`** — cualidades transversales activadas en el refinement y declaradas blocking/advisory por adelantado: `security` y `observability` siempre; `a11y`/`design` con UI; `data-privacy`, `api-compat`, `i18n` por flag; `performance` blocking solo con presupuesto numérico; `seo` advisory.
+- **`standards/security.md`** — threat model de 4 preguntas en el contract, tests negativos obligatorios (403/401/IDOR/input hostil), gate de secret scan + audit de dependencias, y toda dependencia nueva como decisión del contract.
+
 ## Calidad verificable
 
 La promesa del plugin es que **no importa el requerimiento**, la salida sea consistente y probada. Eso no se sostiene con prosa, así que `standards/quality-gates.md` lo convierte en artefactos:
 
 - **Acceptance criteria numerados** `AC1..ACn` en el contract → cada uno con **su test declarado** (`archivo::"caso"`). AC sin test no se aprueba, aunque la suite esté verde.
-- **Escalera de gates** fija (format → lint → type-check → unit → integration → build → e2e → cobertura del diff) con los comandos reales del repo en `SDD/docs/doc_quality_gates.md`. Nadie inventa comandos.
+- **Escalera de gates** fija (format → lint → type-check → unit → integration → build → e2e → cobertura del diff → security) con los comandos reales del repo en `SDD/docs/doc_quality_gates.md`. Nadie inventa comandos.
 - **Evidencia con exit codes** por gate en `verification/AGENT_<slug>.md`. Nada se declara `done` sin ella; el reviewer re-corre el subset barato y compara.
 - **Mitigaciones prohibidas**: ablandar un test, `@ts-ignore`, bajar un threshold o `--no-verify` para pasar un gate es rechazo directo. El camino es BLOCKED → preguntar al planner.
 - **Review con severidades** (`BLOCKER`/`MAJOR`/`MINOR`/`ADVISORY`) y **cota de 3 rondas** con `ESCALATE`, para que el loop no se convierta en presión para ablandar tests.
@@ -61,25 +71,32 @@ sdd-flow/
 ├── commands/                    /sdd-init, /sdd, /sdd-enrich, /sdd-contract, /sdd-verify, /sdd-status, /sdd-pr, /sdd-agents, /sdd-fixes, /sdd-seo
 ├── skills/
 │   ├── sdd-init/                bootstrap de docs fundacionales (derivar o entrevistar)
-│   ├── enrich-user-story/       refinement decision-closed (de Construplaza; lee PRD si existe)
-│   ├── sdd-plan/                planner Opus: HLTC + task briefs (closure rules, ACs numerados)
+│   ├── enrich-user-story/       refinement decision-closed + arquetipo + NFR + concerns
+│   ├── sdd-plan/                planner Opus: HLTC + task briefs (closure rules, ACs, threat model, ADRs)
 │   ├── sdd-verify/              escalera de gates + evidencia con exit codes
 │   ├── sdd-seo/                 auditoría SEO advisory on-demand
 │   └── write-pr-report/         descripción de PR (de Construplaza)
 ├── agents/
-│   ├── implementing-agent.md    ejecutor (Sonnet default)
-│   └── reviewer-agent.md        revisor adversarial (Opus, severidades + ESCALATE)
+│   ├── implementing-agent.md    ejecutor (Sonnet default; retorna sdd.result)
+│   └── reviewer-agent.md        revisor adversarial (Opus, severidades + ESCALATE; retorna sdd.review)
 ├── hooks/
-│   ├── statusline.sh            badge [SDD · fase x/5 · n agentes]
+│   ├── statusline.sh            badge [SDD · fase x/5 · agentes · ✓gates ✗rojos]
 │   ├── hooks.json               registro de hooks del plugin
 │   └── guard-git.sh             PreToolUse: rama protegida · --no-verify · push --force
+├── scripts/
+│   └── sdd-check.sh             chequeo mecánico del diff (review Fase 1 + CI)
 ├── standards/
 │   ├── base-standards.md        reglas no negociables
 │   ├── quality-gates.md         DoD, ACs↔test, escalera, evidencia, mitigaciones prohibidas
+│   ├── orchestration.md         state.json, retornos sdd.result/sdd.review, spawn, caps, resume
+│   ├── security.md              threat model, tests negativos, secret scan + audit, supply chain
+│   ├── archetypes.md            8 arquetipos: NFR + tests + checklist por tipo de requerimiento
+│   ├── concerns.md              transversales blocking/advisory (a11y, design, privacy, i18n, perf…)
 │   └── seo-frontend.md          checklist SEO advisory (2 tiers)
-└── templates/                   doc_architecture.md, doc_verification_guide.md, doc_quality_gates.md, verification-report.md, coordination-README.md
+└── templates/                   doc_architecture.md, doc_verification_guide.md, doc_quality_gates.md,
+                                 verification-report.md, adr.md, debt-ledger.md, coordination-README.md
 ```
 
 ## Estado
 
-**v0.8.0.** Funcionan de verdad como prompts/skills: `/sdd-init`, refinement (`enrich-user-story`), generación de contract (`sdd-plan`) y `/sdd-verify`. El guard de git es el único componente que enforcea de forma determinística. Pendiente de cablear: orquestación real de spawn de subagentes para `/sdd`, statusline `state.json` (nadie lo escribe todavía), y arquetipos de requerimiento (la otra mitad de la consistencia). Ver `CHANGELOG.md` para el detalle versión por versión y `CLAUDE.md` para el estado completo del roadmap.
+**v0.9.0.** La superficie normativa está completa: refinement con arquetipo/NFR/concerns, contract con threat model y ACs, ejecución con contrato de máquina (state, retornos estructurados, caps, resume), gates con evidencia y review con severidades. Enforcement determinístico: `hooks/guard-git.sh` y `scripts/sdd-check.sh`. Lo que falta es kilometraje real del orquestador — correr el ciclo completo en repos de verdad y ajustar con `SDD/retro.md`. Ver `CHANGELOG.md` para el detalle versión por versión y `CLAUDE.md` para el roadmap.

@@ -16,7 +16,7 @@ Luego tipeá `/` y vas a ver los comandos de cada plugin (`/sdd-flow:sdd`, `/pro
 
 | Plugin | Versión | Qué hace |
 |---|---|---|
-| [**sdd-flow**](./plugins/sdd-flow) | 0.8.0 | Spec-Driven Development multi-agente: planner Opus 4.8 cierra decisiones y corta tareas, subagentes Sonnet/Haiku ejecutan con quality gates verificables (AC numerados, binding AC↔test, evidencia con exit codes), coordinación file-based `AGENT_{uuid}`. |
+| [**sdd-flow**](./plugins/sdd-flow) | 0.9.0 | Spec-Driven Development multi-agente: refinement con arquetipo/NFR/concerns, planner Opus 4.8 con threat model y ACs numerados, orquestación con estado y caps, subagentes con quality gates verificables y gate de seguridad, coordinación file-based `AGENT_{uuid}`. |
 | [**project-foundation**](./plugins/project-foundation) | 0.1.0 | Crea o back-fillea los seis documentos fundacionales de un proyecto (PRD, TRD, UI/UX Brief, App Flow, Backend Schema, Implementation Plan) desde cero o derivando de un codebase existente. Interopera con `sdd-flow` si ambos están instalados. |
 
 ## Estructura
