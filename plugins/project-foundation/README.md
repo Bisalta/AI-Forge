@@ -7,7 +7,7 @@ Funciona **greenfield** (entrevista al usuario — no puede inventar la visión 
 ## Instalación
 
 ```
-/plugin marketplace add Construplaza/AI-Forge
+/plugin marketplace add Bisalta/AI-Forge
 /plugin install project-foundation
 ```
 

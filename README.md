@@ -5,7 +5,7 @@ Marketplace interno de **Bisalta Ltda** para tooling de Claude Code — plugins,
 ## Instalación (en cualquier proyecto)
 
 ```
-/plugin marketplace add Construplaza/AI-Forge
+/plugin marketplace add Bisalta/AI-Forge
 /plugin install sdd-flow
 /plugin install project-foundation
 ```

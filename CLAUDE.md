@@ -4,13 +4,13 @@ Guía para Claude Code al trabajar en este repo. Captura el contexto de diseño 
 
 ## Qué es
 
-**AI-Forge** = marketplace interno de **Bisalta Ltda** (hosteado en `github.com/Construplaza/AI-Forge`) para tooling de Claude Code. Dos plugins: **`sdd-flow`** (SDD multi-agente) y **`project-foundation`** (los seis docs fundacionales de un proyecto).
+**AI-Forge** = marketplace interno de **Bisalta Ltda** (hosteado en `github.com/Bisalta/AI-Forge`) para tooling de Claude Code. Dos plugins: **`sdd-flow`** (SDD multi-agente) y **`project-foundation`** (los seis docs fundacionales de un proyecto).
 
 **Objetivo**: standard de empresa (NO obligatorio) para que todos los devs usen Claude de forma eficiente y consistente.
 
 Install para cualquier dev:
 ```
-/plugin marketplace add Construplaza/AI-Forge
+/plugin marketplace add Bisalta/AI-Forge
 /plugin install sdd-flow
 /plugin install project-foundation
 ```
