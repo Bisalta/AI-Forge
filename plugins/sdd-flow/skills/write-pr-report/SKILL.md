@@ -43,16 +43,20 @@ Exclude:
 
 ### 3. Validation must be credible
 
+Base the Validation section on the verification evidence that actually exists (`tasks/<slug>/verification/AGENT_<slug>.md`, or `SDD/verification/<branch>.md`) — read it, do not reconstruct it from memory. State only what has a recorded exit code. If a gate was skipped, say what was not run in one short line; a silent omission reads as "everything passed" and destroys the reviewer's trust.
+
 Allowed:
 - "All tests passing"
 - "Integration tests added for X"
 - "Regression tests confirm Y remains unchanged"
+- "E2E not run — no user flow changed"
 
 Forbidden:
 - Listing raw commands
+- Claiming a check that has no recorded result
 - Mentioning inability to reproduce tests
 - Referencing local environment issues
-- Saying "based on execution report"
+- Saying "based on execution report" or naming internal artifacts
 
 ### 4. Language constraints
 
@@ -117,9 +121,10 @@ Never mention:
 ## Process
 
 1. Inspect repository changes using git diff and git status.
-2. Group changes by responsibility: API, Services, Domain, Tests.
-3. Extract the intent of the change.
-4. Generate the PR description following the strict rules above.
+2. Read the verification report of this work if it exists, to ground the Validation section in recorded results instead of assumptions.
+3. Group changes by responsibility: API, Services, Domain, Tests.
+4. Extract the intent of the change.
+5. Generate the PR description following the strict rules above.
 
 ## Output
 

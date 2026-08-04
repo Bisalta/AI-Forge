@@ -11,7 +11,7 @@
     {
       "name": "sdd-flow",
       "source": "./plugins/sdd-flow",
-      "description": "Spec-Driven Development multi-agente: planner Opus 4.8, ejecutores Sonnet/Haiku, coordinacion file-based AGENT_{uuid}."
+      "description": "Spec-Driven Development multi-agente: refinement decision-closed con arquetipos y concerns, contract con threat model y ACs numerados, orquestacion con estado y caps, quality gates con evidencia generada por script, coordinacion file-based AGENT_{uuid}."
     },
     {
       "name": "project-foundation",

@@ -1,17 +1,17 @@
 ---
 name: sdd-init
-description: Bootstrapea o llena SDD/docs/doc_architecture.md y SDD/docs/doc_verification_guide.md — los dos documentos que enrich-user-story exige leer antes de cerrar decisiones. Deriva de un codebase existente o entrevista en greenfield. Detecta docs/foundation/ (project-foundation) para no duplicar contenido. Usar cuando enrich-user-story frena por falta de estos docs, o al arrancar sdd-flow en un repo nuevo.
+description: Bootstrapea o llena SDD/docs/doc_architecture.md, doc_verification_guide.md y doc_quality_gates.md — los documentos que el resto del ciclo SDD exige leer antes de cerrar decisiones y antes de validar. Deriva de un codebase existente o entrevista en greenfield. Detecta docs/foundation/ (project-foundation) para no duplicar contenido. Usar cuando enrich-user-story frena por falta de estos docs, o al arrancar sdd-flow en un repo nuevo.
 ---
 
 # SDD Init — bootstrap de docs fundacionales
 
-Sin `SDD/docs/doc_architecture.md`, `enrich-user-story` frena antes de la primera pregunta. Este skill existe para que ese frenazo tenga una salida dentro del propio plugin, en vez de depender de que alguien haya llenado el esqueleto `[PLACEHOLDER]` a mano.
+Sin `SDD/docs/doc_architecture.md`, `enrich-user-story` frena antes de la primera pregunta. Sin `SDD/docs/doc_quality_gates.md`, los agentes inventan comandos de validación. Este skill existe para que esos frenazos tengan una salida dentro del propio plugin, en vez de depender de que alguien haya llenado el esqueleto `[PLACEHOLDER]` a mano.
 
-**No implementás código ni generás los seis documentos completos de un day-zero (PRD/TRD/UI-UX/App-Flow/Backend-Schema/Implementation-Plan) — eso es responsabilidad de otra herramienta, si el equipo la usa.** Tu único output son los dos archivos que el ciclo SDD necesita: arquitectura y guía de verificación.
+**No implementás código ni generás los seis documentos completos de un day-zero (PRD/TRD/UI-UX/App-Flow/Backend-Schema/Implementation-Plan) — eso es responsabilidad de otra herramienta, si el equipo la usa.** Tu output son los tres archivos que el ciclo SDD necesita: arquitectura, guía de verificación y gates de calidad.
 
 ## Paso 0 — Detectar estado
 
-1. ¿Existen ya `SDD/docs/doc_architecture.md` y `SDD/docs/doc_verification_guide.md` **sin** `[PLACEHOLDER]` pendiente? Si ambos están completos → avisá que no hay nada que hacer y terminá.
+1. ¿Existen ya `SDD/docs/doc_architecture.md`, `SDD/docs/doc_verification_guide.md` y `SDD/docs/doc_quality_gates.md` **sin** `[PLACEHOLDER]` pendiente? Si los tres están completos → avisá que no hay nada que hacer y terminá.
 2. ¿Existe `docs/foundation/` (carpeta que produce el skill `project-foundation`, con `01-prd.md` .. `06-implementation-plan.md`)? Anotá cuáles de los seis existen — los vas a referenciar, no a duplicar (ver Paso 2).
 3. ¿Hay codebase real (el repo tiene manifiestos de paquete, rutas, código fuente) o está vacío/recién creado? Eso decide el modo:
    - **Hay código** → modo `existing` (derivar).
@@ -53,18 +53,45 @@ Este archivo se genera **siempre completo**, exista o no `docs/foundation/` — 
 
 Seguí el esqueleto de `templates/doc_verification_guide.md`: reemplazá cada `[PLACEHOLDER]` por el comando real (leé `package.json`/Makefile/scripts del repo para sacar los comandos reales de test unitario, integración, e2e, lint, type-check, run local). Si el repo no tiene todavía un tipo de test (p. ej. no hay e2e), decilo explícito en esa sección en vez de dejar el placeholder o inventar un comando que no existe.
 
+## Paso 3.5 — Escribir `SDD/docs/doc_quality_gates.md`
+
+También **siempre**, y con comandos **verificados**, no supuestos. Seguí `templates/doc_quality_gates.md`.
+
+Diferencia con el paso anterior: `doc_verification_guide.md` es la guía curada ("qué conviene correr según qué cambié"); `doc_quality_gates.md` es la **escalera obligatoria** que corre siempre antes de declarar `done`, con exit codes registrados. Los dos existen y no se solapan.
+
+Cómo llenarlo sin inventar:
+1. Leé los manifiestos reales (`package.json` scripts, `Makefile`, `pyproject.toml`/`tox.ini`, `*.csproj`, `build.gradle`, config de CI) y sacá de ahí el comando de cada gate.
+2. **Verificá lo que puedas verificar**: `--help`/`--version` del runner, o que el script exista en el manifiesto. Si un gate no existe en el repo (típico: e2e, coverage), escribí `N/A — no existe en este repo` en vez de proponer un comando que va a fallar. Ofrecé al usuario agregarlo como mejora, no lo declares como si estuviera.
+3. Detectá el **perfil de calidad** del stack (`quality-gates.md` §9) y anotalo, junto con los markers prohibidos específicos (ej. `@ts-ignore` en TS, `# type: ignore` en Python).
+4. Anotá los **prerequisitos de entorno** de los gates de integración/e2e (docker, `.env.test`, migraciones): son la diferencia entre un rojo real y un falso rojo.
+5. Anotá los **rojos preexistentes** si al correr la suite algo ya falla en la rama base — para que ningún agente cargue con una falla que no causó. Si no corriste la suite, decilo en lugar de dejar el placeholder.
+6. Anotá el **tiempo esperado** de la suite completa (aunque sea aproximado): evita que un agente interprete un test lento como un cuelgue.
+7. **Gate 9 (security)**: detectá qué hay para secret scan (gitleaks/trufflehog en devDeps, CI o pre-commit) y para audit (`npm audit`, `pip-audit`, `dotnet list package --vulnerable`). Si no hay nada, declarás el fallback del grep mínimo de `standards/security.md` §3 — ese siempre se puede correr.
+8. **Copiá los scripts del plugin a `SDD/scripts/`** (creando el dir): `sdd-check.sh` (chequeo mecánico del diff), `sdd-run-gates.sh` (corre la escalera y genera la evidencia) y `sdd-lint-contract.sh` (closure del contract). Dentro del repo no dependen de que el plugin esté instalado, y CI puede correrlos. **Versionado**: cada script responde `--version`; si ya existen copias, compará — copia más vieja que la del plugin → actualizala avisando; jamás pises una copia modificada localmente sin mostrar el diff.
+9. **Emití `SDD/scripts/sdd-check.patterns`** con los markers prohibidos específicos del stack detectado (formato: `SEVERIDAD<TAB>regla<TAB>ERE`, una por línea — `sdd-check.sh` los aplica a las líneas agregadas del diff). Así la sección "Markers prohibidos" del doc deja de ser prosa y pasa a ser grep. Ejemplos: TS → `BLOCKER\tconsole-log\tconsole\.(log|debug)\(`; Python → `BLOCKER\tprint-debug\t^\s*print\(`. Solo patrones que el equipo de verdad prohíbe — un patterns ruidoso se ignora entero.
+
+En modo `greenfield` no hay comandos que verificar todavía: escribí los del stack elegido en la entrevista y marcá el archivo como *sin verificar — validar en el primer commit con código*.
+
+## Paso 3.6 — Paridad con CI (ofrecer, no imponer)
+
+Los gates que corre el plugin y los que corre CI tienen que ser **los mismos comandos**, o "verde local" no significa nada. Después de escribir `doc_quality_gates.md`:
+
+1. **Si el repo ya tiene CI** (`.github/workflows/`, `.gitlab-ci.yml`, etc.): comparalo contra la escalera. Divergencias (CI corre algo que la escalera no, o al revés) → listalas y proponé alinear **la escalera hacia CI** primero (CI es lo que ya protege el repo); lo que CI no corre y la escalera sí, ofrecé agregarlo a CI.
+2. **Si no tiene CI y el remote es GitHub**: ofrecé generar `.github/workflows/sdd-gates.yml` — un job que corre `bash SDD/scripts/sdd-run-gates.sh --keep-going` (la misma escalera, el mismo parser, el mismo reporte) + `bash SDD/scripts/sdd-check.sh origin/<base>` como paso final. Un solo lugar define los comandos: el doc de gates. Solo si el usuario acepta; no lo generes de oficio.
+3. Otro CI u otra plataforma: decí qué pasos equivalentes necesitaría y dejalo como pendiente anotado, no lo inventes.
+
 ## Paso 4 — Cierre
 
 Reportá:
-1. Qué se creó/actualizó (los dos archivos, con diff resumido si ya existían parcialmente).
+1. Qué se creó/actualizó (los tres archivos, con diff resumido si ya existían parcialmente).
 2. Si corriste en modo `existing`: lista de **"Supuestos a confirmar"** — todo lo que llenaste sin evidencia directa (igual que project-foundation).
 3. Si detectaste `docs/foundation/`: qué secciones quedaron como referencia en vez de contenido propio, y a qué archivo apuntan.
 4. Recordatorio: ahora `enrich-user-story` puede correr sin frenar.
 
 ## Reglas
 
-- No generes los seis documentos de un day-zero completo — solo arquitectura y verificación.
+- No generes los seis documentos de un day-zero completo — solo arquitectura, verificación y gates.
 - No dupliques contenido que ya vive en `docs/foundation/`; referencialo.
 - Nunca dejes `[PLACEHOLDER]` en el archivo final.
-- Nunca declares un comando de verificación que no confirmaste que existe en el repo.
+- Nunca declares un comando de verificación que no confirmaste que existe en el repo. Un gate ausente se declara `N/A` con razón — es información útil; un comando inventado es una trampa para el próximo agente.
 - Respondé siempre en el idioma del usuario.

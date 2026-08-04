@@ -6,17 +6,32 @@ Marketplace interno de **Bisalta Ltda** para tooling de Claude Code — plugins,
 
 ```
 /plugin marketplace add Bisalta/AI-Forge
-/plugin install sdd-flow
-/plugin install project-foundation
+/plugin install sdd-flow@ai-forge
+/plugin install project-foundation@ai-forge
 ```
 
-Luego tipeá `/` y vas a ver los comandos de cada plugin (`/sdd-flow:sdd`, `/project-foundation:init`, etc).
+Después corré `/reload-plugins` (o reiniciá la sesión). Tipeá `/` y vas a ver los comandos de cada plugin (`/sdd-flow:sdd`, `/project-foundation:init`, etc).
+
+## Actualización (ya lo tenías instalado)
+
+**No hace falta desinstalar.** El flujo es:
+
+```
+/plugin marketplace update ai-forge     ← refresca el catálogo (baja lo último de la rama default del repo)
+/plugin install sdd-flow@ai-forge       ← reinstala sobre la versión anterior
+/reload-plugins                         ← activa la nueva versión en la sesión actual
+```
+
+Notas:
+- **El marketplace sirve lo que está en la rama default (`prod`)**: un PR abierto en AI-Forge no te llega hasta que se mergea. Si acabás de mergear un PR del plugin, corré el `marketplace update` primero — sin eso, reinstalar te da la versión vieja del catálogo cacheado.
+- Podés activar **auto-update** para este marketplace: `/plugin` → tab **Marketplaces** → `ai-forge` → *Enable auto-update* (los marketplaces de terceros vienen con auto-update apagado por default). Con eso Claude Code refresca catálogo y plugins solo, y te avisa cuándo correr `/reload-plugins`.
+- Verificá qué versión te quedó: `/plugin` → tab **Installed** → `sdd-flow` (compará contra el `CHANGELOG.md` de este repo).
 
 ## Plugins disponibles
 
 | Plugin | Versión | Qué hace |
 |---|---|---|
-| [**sdd-flow**](./plugins/sdd-flow) | 0.7.0 | Spec-Driven Development multi-agente: planner Opus 4.8 cierra decisiones y corta tareas, subagentes Sonnet/Haiku ejecutan, coordinación file-based `AGENT_{uuid}`. |
+| [**sdd-flow**](./plugins/sdd-flow) | 0.10.0 | Spec-Driven Development multi-agente: refinement con arquetipo/NFR/concerns, planner Opus 4.8 con threat model y ACs numerados, orquestación con estado y caps, subagentes con quality gates verificables y gate de seguridad, coordinación file-based `AGENT_{uuid}`. |
 | [**project-foundation**](./plugins/project-foundation) | 0.1.0 | Crea o back-fillea los seis documentos fundacionales de un proyecto (PRD, TRD, UI/UX Brief, App Flow, Backend Schema, Implementation Plan) desde cero o derivando de un codebase existente. Interopera con `sdd-flow` si ambos están instalados. |
 
 ## Estructura
@@ -41,17 +56,24 @@ ai-forge/
 /sdd <descripcion de lo que querés lograr>   → ciclo completo autónomo
 ```
 
-**El flujo completo con `/sdd`** corre sin gates intermedios hasta **Feature Ready**: enrichment → contract → specs por agente → ejecución multi-agente → review. El humano interviene solo al final (Feature Ready → PR).
+### Qué esperar al correr `/sdd` (dónde pregunta, dónde corre solo, dónde para)
+
+1. **Al arranque te pregunta lo mínimo** (≤2 rondas agrupadas): decisiones del requerimiento que no puede inferir del código, arquetipo si es ambiguo, tracking Proxima (si el MCP está), y **la rama base** (una vez). Todo lo inferible te lo propone como default ya elegido, con evidencia.
+2. **Después corre solo** hasta Feature Ready: contract auto-aprobado (con linter de closure), task briefs, implementación, review hasta 3 rondas, gates con evidencia generada por script. Solo te interrumpe si un agente queda `BLOCKED` (falta una decisión) o un review escala (`ESCALATE`).
+3. **En Feature Ready PARA — siempre.** Te entrega un brief de una pantalla (qué es, decisiones que tomó por vos, dónde está el riesgo, qué mirar en 5 minutos) y espera tu revisión. **Nunca abre el PR solo**: vos decidís, y ahí mismo le podés decir "dale, abrí el PR" (o usar `/sdd-pr` para generar la descripción). Es la decisión de diseño #2 del plugin: un solo gate humano, pero de verdad.
+
+Casos especiales: repo sin tests/gates → la primera task es `project-scaffold` (funda la infraestructura de calidad antes de la feature); pedido trivial (typo, fix chico) → te propone la vía corta `/sdd-fixes` en vez de la ceremonia completa.
 
 ### Comandos disponibles
 
 | Comando | Cuándo usarlo |
 |---|---|
-| `/sdd-init` | Bootstrapea (o llena) `SDD/docs/doc_architecture.md` y `doc_verification_guide.md` — derivando de un codebase existente o entrevistando en greenfield. Corrélo si `/sdd-enrich` frena por falta de estos docs, o al arrancar sdd-flow en un repo nuevo. |
+| `/sdd-init` | Bootstrapea (o llena) `SDD/docs/doc_architecture.md`, `doc_verification_guide.md` y `doc_quality_gates.md` — derivando de un codebase existente o entrevistando en greenfield. Corrélo si `/sdd-enrich` frena por falta de estos docs, o al arrancar sdd-flow en un repo nuevo. |
 | `/sdd <idea>` | Ciclo SDD completo: refinement → contract → specs → ejecución multi-agente. Usalo cuando tenés una tarea nueva. |
 | `/sdd-enrich <idea>` | Solo la fase de refinement. Útil para cerrar decisiones antes de planear o cuando la tarea es compleja y querés separar el "qué" del "cómo". |
 | `/sdd-contract <slug>` | Genera o actualiza el High-Level Technical Contract (HLTC). Útil si ya tenés el requerimiento cerrado y querés planear sin ejecutar. |
-| `/sdd-status` | Tablero de estado: tareas activas, bloqueos, mensajes sin procesar entre agentes, versión de contract. Solo lectura. |
+| `/sdd-verify` | Corre la escalera de gates (format → lint → type-check → tests → build → cobertura del diff) y escribe la evidencia con comando + exit code. Usalo antes de declarar algo terminado o de abrir el PR. |
+| `/sdd-status` | Tablero de estado: tareas activas, estado de gates por agente, ACs sin test, bloqueos, mensajes sin procesar, versión de contract. Solo lectura. |
 | `/sdd-pr` | Genera la descripción del Pull Request a partir de los cambios del repo. Usalo antes de abrir el PR. |
 | `/sdd-agents` | Bootstrapea coordinación file-based multi-agente (`AGENT_<slug>`) para una task que cruza varios repos. |
 | `/sdd-fixes` | Estructura una tanda de fixes/ajustes sueltos en `fixes.md`, con triage automático (trivial/mediano/ambiguo). |
@@ -65,6 +87,16 @@ El **planner (Opus 4.8)** toma la idea, cierra decisiones en 6 dimensiones (solu
 
 El pipeline corre sin aprobación humana, por eso el contract debe ser preciso: **prohibido** "if needed / or / prefer / may be / when available". Si dos ingenieros lo implementarían distinto, la spec es inválida y el agente frena.
 
+### Quality gates (probado, no "declarado como probado")
+
+Misma lógica aplicada a la calidad del código, en `standards/quality-gates.md`:
+
+- El contract emite **acceptance criteria numerados** (`AC1..ACn`) y cada uno tiene que quedar atado a un test concreto (`archivo::"caso"`). **AC sin test no se aprueba**, aunque la suite esté verde.
+- La **escalera de gates** corre siempre antes de declarar algo terminado, con los comandos reales del repo (`SDD/docs/doc_quality_gates.md`, lo genera `/sdd-init`) — ningún agente inventa comandos.
+- Cada `done` deja **evidencia con exit codes**; el reviewer re-corre el subset barato y compara en vez de creerle al reporte.
+- **Prohibido ablandar el gate** (skipear un test, `@ts-ignore`, bajar un threshold, `--no-verify`). Si un gate no pasa, el agente se bloquea y pregunta — no toma el atajo. Tres de esas prohibiciones las bloquea un hook, no un prompt.
+- Review con severidades y **cota de 3 rondas**: si no cierra, escala en vez de degradar los tests para salir del loop.
+
 ---
 
 ## Agregar un plugin nuevo
@@ -75,4 +107,4 @@ El pipeline corre sin aprobación humana, por eso el contract debe ser preciso: 
 
 ## Versionado
 
-SemVer por plugin (`MAJOR.MINOR.PATCH`) en cada `plugin.json`. El marketplace no tiene versión propia; lo que versiona es cada plugin. Los usuarios actualizan con `/plugin marketplace update ai-forge` + reinstalar.
+SemVer por plugin (`MAJOR.MINOR.PATCH`) en cada `plugin.json`. El marketplace no tiene versión propia; lo que versiona es cada plugin. Cómo actualizar: ver la sección **Actualización** de arriba.
