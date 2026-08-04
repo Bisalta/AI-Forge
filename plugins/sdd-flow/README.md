@@ -34,7 +34,7 @@ Núcleo SDD adaptado de [`Construplaza/TemplateNewRepository`](https://github.co
 
 ## Qué exige cada tipo de requerimiento
 
-- **`standards/archetypes.md`** — 8 arquetipos (`api-endpoint · ui-feature · data-migration · background-job · third-party-integration · bugfix · refactor · infra`), cada uno con NFR obligatorias, tests exigidos y checklist que entra al contract como ACs. Exactamente uno por requerimiento.
+- **`standards/archetypes.md`** — 9 arquetipos (`api-endpoint · ui-feature · data-migration · background-job · third-party-integration · bugfix · refactor · infra · project-scaffold`), cada uno con NFR obligatorias, tests exigidos y checklist que entra al contract como ACs. Exactamente uno por requerimiento; repo sin gates → `project-scaffold` primero; trabajo trivial → vía corta `/sdd-fixes` con mini-DoD.
 - **`standards/concerns.md`** — cualidades transversales activadas en el refinement y declaradas blocking/advisory por adelantado: `security` y `observability` siempre; `a11y`/`design` con UI; `data-privacy`, `api-compat`, `i18n` por flag; `performance` blocking solo con presupuesto numérico; `seo` advisory.
 - **`standards/security.md`** — threat model de 4 preguntas en el contract, tests negativos obligatorios (403/401/IDOR/input hostil), gate de secret scan + audit de dependencias, y toda dependencia nueva como decisión del contract.
 
@@ -44,10 +44,11 @@ La promesa del plugin es que **no importa el requerimiento**, la salida sea cons
 
 - **Acceptance criteria numerados** `AC1..ACn` en el contract → cada uno con **su test declarado** (`archivo::"caso"`). AC sin test no se aprueba, aunque la suite esté verde.
 - **Escalera de gates** fija (format → lint → type-check → unit → integration → build → e2e → cobertura del diff → security) con los comandos reales del repo en `SDD/docs/doc_quality_gates.md`. Nadie inventa comandos.
-- **Evidencia con exit codes** por gate en `verification/AGENT_<slug>.md`. Nada se declara `done` sin ella; el reviewer re-corre el subset barato y compara.
+- **Evidencia generada, no declarada**: `scripts/sdd-run-gates.sh` corre la escalera desde el doc de gates y **emite él mismo** el reporte con exit codes — el agente lo referencia, no lo escribe. El reviewer re-corre el subset barato y compara; una tabla manuscrita sin razón es BLOCKER.
 - **Mitigaciones prohibidas**: ablandar un test, `@ts-ignore`, bajar un threshold o `--no-verify` para pasar un gate es rechazo directo. El camino es BLOCKED → preguntar al planner.
 - **Review con severidades** (`BLOCKER`/`MAJOR`/`MINOR`/`ADVISORY`) y **cota de 3 rondas** con `ESCALATE`, para que el loop no se convierta en presión para ablandar tests.
-- **Un guard determinístico** (`hooks/guard-git.sh`): bloquea commit en rama protegida, `--no-verify` y `push --force` sin lease. Fail-open; escape hatch `SDD_ALLOW_BASE_COMMIT=1`.
+- **Closure linteable**: `scripts/sdd-lint-contract.sh` — frases abiertas ("if needed", "podría ser") = BLOCKER; paths citados que no existen = WARN. Corre antes de auto-aprobar el contract.
+- **Guards determinísticos** (`hooks/guard-git.sh` + `scripts/`): commit en rama protegida (configurable, `SDD_PROTECTED_BRANCHES` con globs), `--no-verify`, `push --force` sin lease. Fail-open; escape hatch `SDD_ALLOW_BASE_COMMIT=1`.
 
 ## Ciclo
 
@@ -84,7 +85,11 @@ sdd-flow/
 │   ├── hooks.json               registro de hooks del plugin
 │   └── guard-git.sh             PreToolUse: rama protegida · --no-verify · push --force
 ├── scripts/
-│   └── sdd-check.sh             chequeo mecánico del diff (review Fase 1 + CI)
+│   ├── sdd-check.sh             chequeo mecánico del diff (+ patterns por repo)
+│   ├── sdd-run-gates.sh         corre la escalera y GENERA el reporte de evidencia
+│   └── sdd-lint-contract.sh     closure del contract (frases abiertas, paths alucinados)
+├── evals/
+│   └── golden-requirements.md   un golden por arquetipo + propiedades (G1-G11)
 ├── standards/
 │   ├── base-standards.md        reglas no negociables
 │   ├── quality-gates.md         DoD, ACs↔test, escalera, evidencia, mitigaciones prohibidas
@@ -94,9 +99,10 @@ sdd-flow/
 │   ├── concerns.md              transversales blocking/advisory (a11y, design, privacy, i18n, perf…)
 │   └── seo-frontend.md          checklist SEO advisory (2 tiers)
 └── templates/                   doc_architecture.md, doc_verification_guide.md, doc_quality_gates.md,
-                                 verification-report.md, adr.md, debt-ledger.md, coordination-README.md
+                                 verification-report.md, adr.md, debt-ledger.md, feature-ready-brief.md,
+                                 coordination-README.md
 ```
 
 ## Estado
 
-**v0.9.0.** La superficie normativa está completa: refinement con arquetipo/NFR/concerns, contract con threat model y ACs, ejecución con contrato de máquina (state, retornos estructurados, caps, resume), gates con evidencia y review con severidades. Enforcement determinístico: `hooks/guard-git.sh` y `scripts/sdd-check.sh`. Lo que falta es kilometraje real del orquestador — correr el ciclo completo en repos de verdad y ajustar con `SDD/retro.md`. Ver `CHANGELOG.md` para el detalle versión por versión y `CLAUDE.md` para el roadmap.
+**v0.10.0.** La superficie normativa está completa y lo crítico dejó de depender de prompts: la evidencia la genera un script, el closure se lintea, el greenfield arranca con `project-scaffold`, y el gate humano recibe un brief de una pantalla. Enforcement determinístico: `guard-git.sh`, `sdd-check.sh`, `sdd-run-gates.sh`, `sdd-lint-contract.sh`. Lo que falta es kilometraje real — correr los goldens de `evals/` y ciclos completos en repos de verdad, y podar con esa data (v1.0 debería ser más chica, no más grande). Ver `CHANGELOG.md` y `CLAUDE.md`.

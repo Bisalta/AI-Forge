@@ -80,10 +80,19 @@ BRANCH="$(git -C "$CWD" rev-parse --abbrev-ref HEAD 2>/dev/null)" || allow
 [ -n "$BRANCH" ] || allow
 [ "$BRANCH" != "HEAD" ] || allow   # detached HEAD: rebase/bisect en curso, no molestar
 
-case "$BRANCH" in
-  main|master|dev|develop|qa|test|staging|stage|pre-prod|preprod|prod|production|release)
-    deny "sdd-flow: '$BRANCH' es una rama protegida y todo trabajo nace en branch propia (standards/base-standards.md). Creá la branch desde la base confirmada (con Proxima: {action}-{KEY}-{desc}; sin Proxima: <MODULO>-<TICKET>) y commiteá ahí; la integración va por PR o merge --no-ff. Si commitear acá es legítimo en este repo, corré con SDD_ALLOW_BASE_COMMIT=1."
-    ;;
-esac
+# Lista de ramas protegidas: SDD_PROTECTED_BRANCHES la REEMPLAZA (patrones glob,
+# separados por coma) — p.ej. "main,trunk,release/*,hotfix/*".
+PROTECTED="${SDD_PROTECTED_BRANCHES:-main,master,dev,develop,qa,test,staging,stage,pre-prod,preprod,prod,production,release,release/*,hotfix/*}"
+OLD_IFS="$IFS"; IFS=','
+for pat in $PROTECTED; do
+  # shellcheck disable=SC2254  # el glob sin comillas es intencional (case pattern)
+  case "$BRANCH" in
+    $pat)
+      IFS="$OLD_IFS"
+      deny "sdd-flow: '$BRANCH' es una rama protegida y todo trabajo nace en branch propia (standards/base-standards.md). Creá la branch desde la base confirmada (con Proxima: {action}-{KEY}-{desc}; sin Proxima: <MODULO>-<TICKET>) y commiteá ahí; la integración va por PR o merge --no-ff. Si commitear acá es legítimo en este repo, corré con SDD_ALLOW_BASE_COMMIT=1 (o ajustá SDD_PROTECTED_BRANCHES)."
+      ;;
+  esac
+done
+IFS="$OLD_IFS"
 
 allow

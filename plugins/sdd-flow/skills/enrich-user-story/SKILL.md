@@ -51,11 +51,18 @@ Your goal is NOT to explore — it is to **force decisions**.
 
 Rules:
 - tone: conversational
-- ask as many questions as needed to fully close decisions (no artificial limit)
+- ask as many questions as needed to fully close decisions (no artificial limit on decisions — but see the fatigue rules below on *how* to close them)
 - each question must resolve a concrete decision
 - avoid redundant or overlapping questions
 - prefer trade-off questions (A vs B) over open-ended ones
 - whenever possible, include a suggested default
+
+**Fatigue rules (a decision closed by a tired user is worse than an open one — the pipeline will treat it as truth):**
+
+- **Infer first, ask second.** Everything derivable from the codebase, `doc_architecture.md`, ADRs in `docs/adr/`, or the PRD gets presented as an **already-chosen default with its evidence** ("authz: rol `admin`, igual que los otros endpoints de `routes/admin/*`"), not as a question. You only ask what you genuinely cannot infer.
+- **Batch into at most ~2 question rounds.** Group by theme (funcional / NFR / concerns) using `AskUserQuestion` with clickable options. Twelve sequential questions is an interrogation; two rounds of grouped choices is a conversation.
+- **Watch for fatigue signals** (monosyllabic answers, "sí dale", "lo que te parezca"): stop asking one-by-one. Consolidate everything remaining into ONE package of recommended defaults and ask for a single confirmation of the package — with an explicit invitation to reject any line item.
+- **Mark inferred vs. confirmed.** In the final artifact, decisions the user explicitly confirmed and defaults they accepted as a package are both closed — but if a packaged default turns out wrong later, that's a `contract-change-request`, not a broken promise. Inferring well is your job; hiding that you inferred is a failure.
 
 ---
 
@@ -82,7 +89,9 @@ Your questions MUST collectively cover these dimensions:
    (how we know this is correctly implemented — if `docs/foundation/01-prd.md` exists, align with its stated success metrics/KPIs where relevant)
 
 7. **Archetype** (`standards/archetypes.md`)  
-   Exactamente uno: `api-endpoint · ui-feature · data-migration · background-job · third-party-integration · bugfix · refactor · infra`. Inferilo del pedido y **confirmalo** (no preguntes en abierto si es obvio — proponé y validá). Si el trabajo parece dos arquetipos, son dos requerimientos: decilo y cerrá el primero. El arquetipo determina qué preguntas NFR siguen.
+   Exactamente uno: `api-endpoint · ui-feature · data-migration · background-job · third-party-integration · bugfix · refactor · infra · project-scaffold`. Inferilo del pedido y **confirmalo** (no preguntes en abierto si es obvio — proponé y validá). Si el trabajo parece dos arquetipos, son dos requerimientos: decilo y cerrá el primero. El arquetipo determina qué preguntas NFR siguen.
+   - **Repo sin escalera funcional** (sin runner de tests, `doc_quality_gates.md` todo `N/A`): avisá que la primera task va a ser `project-scaffold` — el requerimiento funcional viene después, con gates vivos.
+   - **Trabajo trivial** (cambio localizado, sin superficie nueva, sin schema, sin decisión de diseño): proponé la **vía corta** — `/sdd-fixes` con su mini-DoD — en vez de este pipeline. No infles un typo a ceremonia completa.
 
 8. **NFR — solo las dimensiones que el arquetipo marca obligatorias** (ver la sección "NFR obligatorias" de cada arquetipo). Cada una se cierra con valor concreto, no con adjetivo:
    - `authz`: rol/scope exacto que puede invocar/ver, y qué recibe el rol equivocado.

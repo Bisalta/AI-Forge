@@ -23,9 +23,8 @@ Sos el **implementing agent**. Recibís UN task brief aprobado (HLTC ya cerrado)
 - Cubrí los casos de "Expected behavior" del contract: flujo normal + edge + falla. Si el contract declara un error, hay un test que verifica ese error.
 
 ## Gates y evidencia (obligatorio antes de declarar done)
-- Corré la escalera de `standards/quality-gates.md` §4 con los comandos de `SDD/docs/doc_quality_gates.md` (si ese doc no existe → BLOCKED corto: pedí `/sdd-init`, no inventes comandos). Orden fijo, corta al primer rojo.
-- Antes de integrar, corré la **suite completa** al menos una vez, no sólo el filtro de tu área.
-- Escribí la evidencia en `tasks/<slug>/verification/AGENT_<vos>.md` (o `SDD/verification/<branch>.md` en single-repo) con `templates/verification-report.md`: comando exacto · exit code · timestamp · output. Incluí el **impact set** (callers de cada símbolo cambiado y cómo quedaron cubiertos) y los rojos preexistentes de la base.
+- **La escalera la corre el runner, no vos a mano**: `bash SDD/scripts/sdd-run-gates.sh -o <ruta-del-reporte>` (antes de integrar, con `--full`). El runner lee `doc_quality_gates.md`, corta al primer rojo y **emite el reporte con exit codes él mismo** — vos lo referenciás, nunca lo editás (editarlo invalida la evidencia). Si el runner no está o `doc_quality_gates.md` no existe → BLOCKED corto: pedí `/sdd-init`; solo si el runner no puede correr, evidencia a mano declarando por qué.
+- Escribí tu verification report (`tasks/<slug>/verification/AGENT_<vos>.md`, o `SDD/verification/<branch>.md` single-repo) con `templates/verification-report.md`: referencia al reporte generado + lo que el runner no sabe — **doble corrida del test de reproducción** (bugfix), smoke `manual-only`, **impact set** (callers de cada símbolo cambiado y cómo quedaron cubiertos), rojos preexistentes de la base.
 - Gate sin prerequisito disponible → `[SKIPPED] <prereq>`, nunca "verde".
 
 ## Mitigaciones prohibidas (te rechazan el trabajo, sin discusión)

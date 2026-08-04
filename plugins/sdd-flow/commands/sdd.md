@@ -34,7 +34,9 @@ Invocá el skill **`enrich-user-story`**. Cerrá decisiones en las dimensiones o
 - Si el scope tiene frontend, el refinement cierra el bloque `seo:` (applies/indexable/locales) — ver `enrich-user-story`.
 
 ### 2. HIGH-LEVEL TECHNICAL CONTRACT
-Invocá el skill **`sdd-plan`** para producir el HLTC con *Architectural Delta*, *Decision Closure* y *Data Contract Closure*. **Auto-aprobá y logueá** el contract (no frenes a esperar humano). Single-writer: solo vos editás el contract; versionalo (v1, v2...).
+Invocá el skill **`sdd-plan`** para producir el HLTC con *Architectural Delta*, *Decision Closure* y *Data Contract Closure*. Antes de auto-aprobar: **`sdd-lint-contract.sh` verde** (frases abiertas y paths alucinados — exit 2 = el contract no está cerrado). **Auto-aprobá y logueá** el contract (no frenes a esperar humano). Single-writer: solo vos editás el contract; versionalo (v1, v2...).
+- **Greenfield / repo sin escalera funcional**: si `doc_quality_gates.md` quedó todo `N/A` o no hay runner de tests, la **primera task es `project-scaffold`** (`standards/archetypes.md`) — el requerimiento funcional se planifica como segunda task, con gates ya vivos. No corras un ciclo de calidad con el sistema de calidad apagado.
+- **Trabajo trivial detectado en el refinement** → cortá acá y derivá a `/sdd-fixes` (vía corta con mini-DoD). No infles la ceremonia.
 
 ### 3. IMPLEMENTATION SPEC + TOPOLOGIA
 - Detectá los repos involucrados. Definí un `AGENT_{uuid}` por repo+branch+working-dir.
@@ -61,9 +63,9 @@ Ejecutá los briefs según `orchestration.md` §4:
 - Si `seo.applies == true`, el reviewer-agent adjunta una sección **SEO (advisory)** al testing/PR report. No bloquea Feature Ready.
 
 ### 5. FEATURE READY → PARÁ
-Cuando todas las tareas estén `done` y validadas: **parate y pingueá al humano** con resumen. NO sigas a PR sin revisión humana. Escribí el state final (`phase: 5`) y releé `SDD/retro.md`: si un patrón se repitió, proponé el ajuste al doc que corresponda.
-- **Checklist de Feature Ready** (si algo falla, no es Feature Ready — es trabajo en curso): todos los ACs del HLTC con test verde o smoke `manual-only` ejecutado · suite completa corrida al menos una vez · `verification.md` de cada agente con exit codes · cero mitigaciones prohibidas en el diff · veredicto `APPROVED` de cada brief · docs delta aplicado.
-- El resumen al humano incluye: ACs cubiertos (con su test), gates corridos, `MINOR` conocidos que quedaron abiertos, rojos preexistentes de la base, y `ADVISORY` de SEO si aplica.
+Cuando todas las tareas estén `done` y validadas: **parate y pingueá al humano**. NO sigas a PR sin revisión humana. Escribí el state final (`phase: 5`) y releé `SDD/retro.md`: si un patrón se repitió, proponé el ajuste al doc que corresponda.
+- **Checklist de Feature Ready** (si algo falla, no es Feature Ready — es trabajo en curso): todos los ACs del HLTC con test verde o smoke `manual-only` ejecutado · suite completa corrida al menos una vez · reporte de gates **generado por el runner** por cada agente · cero mitigaciones prohibidas en el diff · veredicto `APPROVED` de cada brief · docs delta aplicado · deuda registrada en el ledger.
+- **El ping al humano es el brief de `templates/feature-ready-brief.md` — UNA pantalla**: qué es, las decisiones que tomaste por él, dónde está el riesgo, qué mirar en 5 minutos, estado honesto en tabla, y la evidencia completa como apéndice de links. Un muro de ACs y exit codes en el único gate humano lo convierte en rubber-stamp — el detalle está disponible, no en el cuerpo.
 - **Cierre Proxima por integración**: Feature Ready NO cierra la tarea. Cada subtask pasa a `done` (con `proxima_set_status` por su `id` — las subtasks no tienen key) **solo cuando se integra** (PR mergeado con remote, o merge local `--no-ff` sin remote). Cuando TODAS las subtasks están `done` → marcá la **tarea madre** `done` (por su `key`). Logueá milestones con `proxima_log_progress` (PR abierto/CI verde/merge, o review ok/merge local).
 
 ## Reglas

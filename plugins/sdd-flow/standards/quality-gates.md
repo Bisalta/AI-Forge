@@ -88,17 +88,21 @@ Un gate que el repo no tiene (`doc_quality_gates.md` lo declara ausente) se regi
 
 ## 5. Contrato de evidencia
 
-"Nunca declares una validación que no corriste" sólo es auditable si la corrida deja rastro. Cada agente escribe su propio verification report con `templates/verification-report.md`:
+"Nunca declares una validación que no corriste" sólo es auditable si la corrida deja rastro — y el rastro más confiable es el que **no escribe un modelo**.
+
+**Regla de oro: la tabla de gates la genera `scripts/sdd-run-gates.sh`** (lee `doc_quality_gates.md`, corre la escalera en orden, emite el reporte con exit codes y timestamps él mismo — `SDD/scripts/sdd-run-gates.sh` si `/sdd-init` lo instaló). El agente **referencia** ese archivo generado; no lo transcribe ni lo edita — editarlo a mano invalida la evidencia. Evidencia narrada a mano solo como fallback cuando el runner no puede correr (y el reporte declara por qué), porque una tabla escrita por el mismo agente que hizo el trabajo vale lo que vale la palabra del interesado.
+
+Lo que sí escribe el agente (las partes que requieren juicio) va en su verification report con `templates/verification-report.md`:
 
 - multi-agente: `tasks/<task-slug>/verification/AGENT_<slug>.md` — un archivo por agente, para no romper el ownership 1-way del protocolo de coordinación;
 - single-repo / sin coordinación file-based: `SDD/verification/<branch>.md`.
 
 Contenido:
 
-- una fila por gate: comando exacto · exit code · timestamp UTC · las últimas ~15 líneas de output (o el resumen del runner);
-- exit code registrado siempre, también cuando es ≠ 0 y se arregló después (la historia de rojos es señal, no vergüenza);
-- para bugfixes, las **dos** corridas del test de reproducción (roja antes, verde después);
-- para ACs `manual-only`, pasos ejecutados y resultado observado.
+- **referencia al reporte generado** por el runner (path + fecha) — la historia de rojos intermedios es señal, no vergüenza: no se borra un reporte rojo, se genera uno nuevo;
+- para bugfixes, las **dos** corridas del test de reproducción (roja antes, verde después) — el runner no las conoce, van a mano con comando + exit code;
+- para ACs `manual-only`, pasos ejecutados y resultado observado;
+- impact set y rojos preexistentes de la base.
 
 El Execution Report del brief referencia este archivo; no lo duplica. **Evidencia ausente o sin exit codes = BLOCKER**: el reviewer no la infiere ni la asume.
 

@@ -17,11 +17,11 @@ Normativa: `standards/quality-gates.md`. Comandos del repo: `SDD/docs/doc_qualit
 
 ## Paso 1 — Correr la escalera en orden
 
-Orden fijo de `quality-gates.md` §4: format → lint → type-check → unit → integration → build → e2e → cobertura del diff → security. **Corta al primer rojo**: arreglá o reportá, y reiniciá desde ese escalón — no sigas corriendo escalones caros sobre un árbol que ya sabés roto.
+**Preferí el runner**: `bash SDD/scripts/sdd-run-gates.sh -o .sdd/gates-run.md` (con `--full` antes de integrar). Corre la escalera de `quality-gates.md` §4 en orden, corta al primer rojo y **genera el reporte con exit codes él mismo** — evidencia que ningún modelo escribió. Su última línea `{"type":"sdd.gates",...}` es el resumen parseable.
 
-Por cada gate registrá: comando exacto, exit code, timestamp UTC, últimas ~15 líneas de output relevante. Nunca resumas un output como "verde" sin haber capturado el exit code.
+Sin el runner (no instalado, o el doc de gates no parsea): corré la escalera a mano en el mismo orden — format → lint → type-check → unit → integration → build → e2e → cobertura del diff → security — registrando comando exacto, exit code, timestamp UTC y últimas ~15 líneas por gate, y **declarando en el reporte que la evidencia es manual y por qué**. Corta al primer rojo: arreglá o reportá, y reiniciá desde ese escalón.
 
-Antes de declarar terminado, corré la **suite completa** al menos una vez (no sólo el filtro por área).
+Antes de declarar terminado, la **suite completa** corrió al menos una vez (no sólo el filtro por área).
 
 ## Paso 2 — Distinguir rojo propio de rojo preexistente
 

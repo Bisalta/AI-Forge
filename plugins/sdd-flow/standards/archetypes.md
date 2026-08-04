@@ -4,6 +4,8 @@ Un endpoint y una migración de datos no se prueban igual, no fallan igual y no 
 
 **Regla**: todo requerimiento se clasifica en **exactamente un arquetipo** (decision-closed — se elige en el refinement, el usuario confirma). Si un trabajo parece dos arquetipos ("endpoint + migración"), son **dos requerimientos** con orden de integración declarado, no uno gordo. El arquetipo determina: qué dimensiones del bloque `nfr:` son obligatorias de cerrar, qué tipos de test se exigen, y qué ítems entran al HLTC como ACs.
 
+**Proporcionalidad**: la DoD no se negocia, la ceremonia sí. Trabajo trivial (cambio localizado, sin superficie invocable nueva, sin schema, sin decisión de diseño — el triage `trivial` de `/sdd-fixes`) no necesita este pipeline completo: va por `/sdd-fixes` con su mini-DoD (branch propia + test del cambio + `sdd-run-gates.sh` verde + PR). Forzar la ceremonia completa para un typo entrena al equipo a esquivar el proceso también cuando importa.
+
 Cada checklist es **mínimo obligatorio**, no techo: el planner agrega lo que el caso pida. Ítem no aplicable → `N/A` con razón en el HLTC, nunca omisión silenciosa.
 
 ---
@@ -18,6 +20,7 @@ Cada checklist es **mínimo obligatorio**, no techo: el planner agrega lo que el
   - Idempotencia declarada si muta (¿retry del cliente duplica el efecto?).
   - Backward compatibility del contrato público, o el breaking change con versión + ADR.
   - Timeout y comportamiento ante dependencia caída (si llama a otro servicio).
+  - Si otro agente consume este endpoint: **contract fixtures** ejecutables (ver `sdd-plan` — pares request/response que ambos lados testean).
 
 ## `ui-feature` — pantalla, componente o flujo de UI
 
@@ -81,6 +84,22 @@ Cada checklist es **mínimo obligatorio**, no techo: el planner agrega lo que el
   - Si el área a refactorizar no tiene tests → **primero** se escriben tests de caracterización del comportamiento actual (es scope del refactor, no opcional).
   - Métrica de mejora declarada (qué mejora: acoplamiento, duplicación, líneas, dependencia cíclica — algo medible, no "queda más limpio").
   - Sin features ni fixes de contrabando: bug encontrado durante el refactor → se registra, no se arregla en el mismo diff.
+
+## `project-scaffold` — el repo todavía no puede sostener calidad
+
+El caso greenfield tiene una trampa: la escalera de gates nace toda `N/A` (no hay runner, ni lint, ni CI) — el sistema de calidad está apagado justo cuando se funda el proyecto. Por eso, **en un repo sin escalera funcional, la primera task de cualquier `/sdd` es SIEMPRE `project-scaffold`**, antes del primer requerimiento funcional. No es opcional ni se mezcla con la feature: es su prerequisito.
+
+- **NFR obligatorias**: ninguna funcional — el scaffold ES la infraestructura.
+- **Tests exigidos**: **un primer test real que pasa** (no un placeholder `expect(true)`): un test de humo del entry point o de la primera unidad de dominio.
+- **Checklist → ACs**:
+  - Layout de carpetas según `doc_architecture.md` (que `/sdd-init` acaba de generar/entrevistar).
+  - Runner de tests instalado y corriendo (el comando exacto queda en `doc_quality_gates.md`, verificado, no supuesto).
+  - Lint + formatter + type-check configurados según el perfil del stack (`quality-gates.md` §9), con el primer pase verde.
+  - `doc_quality_gates.md` **re-verificado contra la realidad**: cada comando declarado corre (el runner `sdd-run-gates.sh` termina sin gates `[SKIPPED]` por comando inexistente).
+  - Scripts del plugin copiados a `SDD/scripts/` y `.sdd/` en `.gitignore`.
+  - CI mínimo si hay remote (la escalera, mismos comandos — paridad desde el día cero).
+  - Si hay UI: design tokens / librería base elegida **como ADR** (el concern `design` de todo lo que siga referencia esa decisión).
+- Al terminar, la escalera está viva: el primer requerimiento funcional ya corre con gates de verdad.
 
 ## `infra` — CI, deploy, config de plataforma, tooling
 

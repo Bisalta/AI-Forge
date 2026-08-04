@@ -102,6 +102,11 @@ Si el HLTC toma una decisión arquitectónica — dependencia nueva, cambio de c
 ### Loop de review acotado
 El ciclo implementar → review es de **máximo 3 rondas** por brief. Si la ronda 3 no cierra en `APPROVED`, el reviewer emite `ESCALATE` y vos decidís: ratificar contract (bump de versión), cortar scope, o elevarlo al gate humano de Feature Ready. No dejes el loop abierto: es el escenario donde el agente empieza a ablandar tests para salir.
 
+### Contract fixtures (cuando dos agentes comparten una interfaz)
+La prosa del contract no evita el drift BE↔FE: cada lado la interpreta y se entera del desacuerdo al integrar. Cuando dos agentes comparten una interfaz (endpoint, evento, shape de mensaje), **emití fixtures ejecutables**: `tasks/<slug>/fixtures/<interfaz>.json` con pares ejemplo concretos (request/response, evento/efecto — valores reales, casos normal + edge + error declarados en el contract). Single-writer, como el contract: solo vos los escribís y versionás.
+
+Cada brief que toca la interfaz lleva la tarea: **un contract test que valida su lado contra el fixture** (el productor responde exactamente eso; el consumidor acepta exactamente eso). Cambia la interfaz → cambia el fixture (bump del contract) → ambos tests lo detectan. El fixture ES el contract ejecutable; el markdown lo explica.
+
 ### Orden de integración
 Si hay dependencias entre repos, declarar el orden de merge (ej. BE -> FE -> mobile) en el contract.
 
@@ -109,7 +114,9 @@ Si hay dependencias entre repos, declarar el orden de merge (ej. BE -> FE -> mob
 Si el HLTC tiene `## SEO criteria (advisory)`, copiálos al brief del agente de frontend en una sección propia (IDs `SEO1..SEOn`, con su tier Universal / Indexable), **separada de la tabla `AC ↔ test binding`** — no exigen test ni entran en la Definition of Done. El reviewer-agent los chequea en modo advisory; no son gate de Feature Ready.
 
 ## Self-review final
-Releé como agente sin contexto previo:
+**Primero lo mecánico**: corré `SDD/scripts/sdd-lint-contract.sh <contract>` (o el del plugin) sobre el HLTC final — frases que violan las closure rules y paths citados que no existen en el repo. Exit 2 = el contract no está cerrado: arreglalo antes de auto-aprobar. Un linter verde no prueba closure (frases nuevas de ambigüedad existen), pero un linter rojo prueba que NO hay closure.
+
+Después releé como agente sin contexto previo:
 - ¿ejecutable end-to-end? ¿alguna frase permite dos implementaciones válidas?
 - ¿el task brief introduce decisiones nuevas no aprobadas en el HLTC?
 - ¿**cada AC del HLTC está asignado a exactamente un brief**, y ninguno quedó huérfano?

@@ -15,6 +15,9 @@
 
 set -uo pipefail
 
+VERSION="0.10.0"
+[ "${1:-}" = "--version" ] && { echo "sdd-check $VERSION"; exit 0; }
+
 command -v git >/dev/null 2>&1 || { echo "WARN	-	env	git no disponible — chequeo omitido"; exit 0; }
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "WARN	-	env	no es un repo git — chequeo omitido"; exit 0; }
 
@@ -90,4 +93,26 @@ printf '%s\n' "$DIFF" | awk '
 
   END { exit (blockers > 0 ? 2 : 0) }
 '
-exit $?
+RC=$?
+
+# --- patrones extra del repo (markers prohibidos del stack) --------------------
+# Archivo: SDD/scripts/sdd-check.patterns (o SDD_CHECK_PATTERNS). Una regla por
+# línea: SEVERIDAD<TAB>nombre-regla<TAB>ERE — se aplica a las líneas AGREGADAS
+# del diff. Así doc_quality_gates.md §"Markers prohibidos" deja de ser prosa.
+PATTERNS_FILE="${SDD_CHECK_PATTERNS:-SDD/scripts/sdd-check.patterns}"
+if [ -f "$PATTERNS_FILE" ]; then
+  while IFS=$'\t' read -r sev rule ere; do
+    case "$sev" in BLOCKER|WARN) ;; *) continue ;; esac
+    [ -n "$ere" ] || continue
+    HITS="$(printf '%s\n' "$DIFF" | awk -F'\t' -v ere="$ere" '
+      /^\+\+\+ b\// { file = substr($0, 7); next }
+      /^\+/ && !/^\+\+\+/ { line = substr($0, 2); if (line ~ ere) { gsub(/\t/," ",line); if (length(line)>160) line=substr(line,1,157)"..."; printf "%s\t%s\n", file, line } }
+    ')"
+    if [ -n "$HITS" ]; then
+      printf '%s\n' "$HITS" | while IFS=$'\t' read -r f l; do printf '%s\t%s\t%s\t%s\n' "$sev" "$f" "$rule" "$l"; done
+      [ "$sev" = "BLOCKER" ] && RC=2
+    fi
+  done < "$PATTERNS_FILE"
+fi
+
+exit "$RC"

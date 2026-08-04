@@ -12,6 +12,7 @@ sdd-coordination/
     ├── status.md                            ← tabla de estado, una fila por agente
     ├── logs/AGENT_<slug>.md                 ← log append-only por agente
     ├── verification/AGENT_<slug>.md         ← evidencia de gates por agente (comando + exit code)
+    ├── fixtures/<interfaz>.json             ← pares ejemplo de interfaces compartidas (single-writer: planner)
     └── messages/AGENT_<a>__to__AGENT_<b>/   ← un dir por par direccional
         ├── NNN_<slug>.md                    ← mensajes activos (no procesados)
         └── archive/                         ← procesados
@@ -66,7 +67,7 @@ Todo lo demás es **read-only**. Editar el log, la fila de status o el outbox de
 
 ## Contract — single-writer
 
-- Solo el **planner** edita `contract.md`.
+- Solo el **planner** edita `contract.md` **y `fixtures/`** (los pares ejemplo de interfaces compartidas — cada agente los testea contra su lado, nunca los edita; desacuerdo con un fixture → `contract-change-request`).
 - Cualquier otro agente que necesite un cambio manda mensaje con slug `contract-change-request` describiendo el cambio exacto y por qué.
 - El planner ratifica (o rechaza por mensaje), edita el contract, bumpea versión (v1→v2→…) y anota el cambio en el `## Changelog` del contract.
 - Implementar contra una versión del contract distinta a la vigente = error del agente.

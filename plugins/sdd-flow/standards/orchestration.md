@@ -14,6 +14,7 @@ Vive en la raíz del repo donde corre `/sdd` (gitignoreado — es estado de runt
 {
   "version": 1,
   "task": "checkout-discounts",
+  "planner": { "session": "descripcion-o-id-de-esta-sesion", "claimed_at": "2026-08-04T17:30:00Z" },
   "phase": 4,
   "phases_total": 5,
   "phase_name": "ejecucion",
@@ -46,6 +47,7 @@ Vive en la raíz del repo donde corre `/sdd` (gitignoreado — es estado de runt
 ```
 
 Reglas:
+- **Lock de planner**: al asumir un ciclo escribís `planner` con un identificador de tu sesión. Si al arrancar encontrás un state con `planner` ajeno y `updated_at` reciente (< 2 h), **no asumas ownership** — puede haber otro planner vivo: preguntá al usuario antes de tocar nada. `updated_at` viejo = planner muerto, reclamalo escribiendo tu `planner` y anotándolo en el log.
 - `phase`, `phases_total`, `agents_active`, `blocked` son **planos y obligatorios** (la statusline los lee tal cual; no anidarlos).
 - `agents[].status`: `pending | spawned | working | blocked | review | done | failed`. `failed` = el subagente murió o devolvió basura no parseable — distinto de `blocked` (pidió una decisión).
 - `escalations[]`: una entrada por `ESCALATE` del reviewer (`{agent, round, reason, resolved}`) — es el insumo de la retro (§6).
@@ -83,6 +85,7 @@ Todo brief instruye al agente a **terminar su output con exactamente un bloque J
 
 - `status`: `done | blocked | failed`. Con `blocked`, `blockers[]` lleva la pregunta concreta al planner (`{question, needed_decision}`).
 - `acs[].state`: `pass | fail | manual | missing` — `missing` es admisión honesta de AC sin test; el orquestador lo trata como no-done.
+- `gates[]` tiene que ser **consistente con el reporte del runner** (`sdd-run-gates.sh` emite su propia línea `{"type":"sdd.gates",...}` y el archivo generado): si el `sdd.result` dice verde y el reporte generado dice rojo, gana el reporte y el `done` se rechaza.
 - El bloque **complementa** el Execution Report y `verification/` — no los reemplaza. Es el índice parseable; el detalle vive en los markdown.
 
 ## 3. Retorno del reviewer agent (`sdd.review`)

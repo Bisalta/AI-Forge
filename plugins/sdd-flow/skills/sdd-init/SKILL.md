@@ -67,7 +67,8 @@ Cómo llenarlo sin inventar:
 5. Anotá los **rojos preexistentes** si al correr la suite algo ya falla en la rama base — para que ningún agente cargue con una falla que no causó. Si no corriste la suite, decilo en lugar de dejar el placeholder.
 6. Anotá el **tiempo esperado** de la suite completa (aunque sea aproximado): evita que un agente interprete un test lento como un cuelgue.
 7. **Gate 9 (security)**: detectá qué hay para secret scan (gitleaks/trufflehog en devDeps, CI o pre-commit) y para audit (`npm audit`, `pip-audit`, `dotnet list package --vulnerable`). Si no hay nada, declarás el fallback del grep mínimo de `standards/security.md` §3 — ese siempre se puede correr.
-8. **Copiá `scripts/sdd-check.sh` del plugin a `SDD/scripts/sdd-check.sh`** (creando el dir): es el chequeo mecánico del review y el que CI puede correr — dentro del repo no depende de que el plugin esté instalado. Si ya existe, no lo pises sin avisar.
+8. **Copiá los scripts del plugin a `SDD/scripts/`** (creando el dir): `sdd-check.sh` (chequeo mecánico del diff), `sdd-run-gates.sh` (corre la escalera y genera la evidencia) y `sdd-lint-contract.sh` (closure del contract). Dentro del repo no dependen de que el plugin esté instalado, y CI puede correrlos. **Versionado**: cada script responde `--version`; si ya existen copias, compará — copia más vieja que la del plugin → actualizala avisando; jamás pises una copia modificada localmente sin mostrar el diff.
+9. **Emití `SDD/scripts/sdd-check.patterns`** con los markers prohibidos específicos del stack detectado (formato: `SEVERIDAD<TAB>regla<TAB>ERE`, una por línea — `sdd-check.sh` los aplica a las líneas agregadas del diff). Así la sección "Markers prohibidos" del doc deja de ser prosa y pasa a ser grep. Ejemplos: TS → `BLOCKER\tconsole-log\tconsole\.(log|debug)\(`; Python → `BLOCKER\tprint-debug\t^\s*print\(`. Solo patrones que el equipo de verdad prohíbe — un patterns ruidoso se ignora entero.
 
 En modo `greenfield` no hay comandos que verificar todavía: escribí los del stack elegido en la entrevista y marcá el archivo como *sin verificar — validar en el primer commit con código*.
 
@@ -76,7 +77,7 @@ En modo `greenfield` no hay comandos que verificar todavía: escribí los del st
 Los gates que corre el plugin y los que corre CI tienen que ser **los mismos comandos**, o "verde local" no significa nada. Después de escribir `doc_quality_gates.md`:
 
 1. **Si el repo ya tiene CI** (`.github/workflows/`, `.gitlab-ci.yml`, etc.): comparalo contra la escalera. Divergencias (CI corre algo que la escalera no, o al revés) → listalas y proponé alinear **la escalera hacia CI** primero (CI es lo que ya protege el repo); lo que CI no corre y la escalera sí, ofrecé agregarlo a CI.
-2. **Si no tiene CI y el remote es GitHub**: ofrecé generar `.github/workflows/sdd-gates.yml` — un job que corre la escalera en orden (mismos comandos del doc, fail-fast) + `bash SDD/scripts/sdd-check.sh origin/<base>` como paso final. Solo si el usuario acepta; no lo generes de oficio.
+2. **Si no tiene CI y el remote es GitHub**: ofrecé generar `.github/workflows/sdd-gates.yml` — un job que corre `bash SDD/scripts/sdd-run-gates.sh --keep-going` (la misma escalera, el mismo parser, el mismo reporte) + `bash SDD/scripts/sdd-check.sh origin/<base>` como paso final. Un solo lugar define los comandos: el doc de gates. Solo si el usuario acepta; no lo generes de oficio.
 3. Otro CI u otra plataforma: decí qué pasos equivalentes necesitaría y dejalo como pendiente anotado, no lo inventes.
 
 ## Paso 4 — Cierre
