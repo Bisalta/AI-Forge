@@ -11,6 +11,7 @@ sdd-coordination/
     ├── contract.md                          ← contrato técnico (single-writer: solo el planner)
     ├── status.md                            ← tabla de estado, una fila por agente
     ├── logs/AGENT_<slug>.md                 ← log append-only por agente
+    ├── verification/AGENT_<slug>.md         ← evidencia de gates por agente (comando + exit code)
     └── messages/AGENT_<a>__to__AGENT_<b>/   ← un dir por par direccional
         ├── NNN_<slug>.md                    ← mensajes activos (no procesados)
         └── archive/                         ← procesados
@@ -57,6 +58,7 @@ Snippets, referencias a mensajes previos, decisiones.
 Cada agente escribe SOLO:
 - sus outbox: `messages/AGENT_<self>__to__*/`
 - su log: `logs/AGENT_<self>.md` (append-only, líneas con timestamp UTC)
+- su evidencia: `verification/AGENT_<self>.md`
 - su fila en `status.md`
 - `archive/` de sus inbox (mover mensajes procesados)
 
@@ -86,6 +88,8 @@ Si una decisión necesaria no está en el contract: el agente pone su fila de `s
 
 Actualizar la propia fila (estado + timestamp UTC + nota corta) al final de cada turno de trabajo.
 
+**`done` tiene requisitos, no es autodeclarado**: cada AC del brief con su test en la tabla `AC ↔ test binding`, escalera de gates corrida y `verification/AGENT_<self>.md` con exit codes, review en `APPROVED`, integrado. Ver `standards/quality-gates.md` §1. Un `done` sin evidencia se trata como `working`.
+
 ## Branches y PRs (regla dura)
 
 - **Todo trabajo va en branch propia — NUNCA commits directos a ramas normales** (`main`, `dev`, `qa`, …).
@@ -110,10 +114,11 @@ Si hay dependencias entre repos, el contract declara orden de **merge de PRs** (
 1. Leer inbox (`messages/*__to__AGENT_<self>/`, sin archive) — procesar en orden de secuencia.
 2. Leer `contract.md` (verificar versión) y `status.md`.
 3. Investigar/implementar en su propio repo, según convenciones de ese repo — **siempre en su branch de trabajo, integrando vía PR**.
-4. Responder con mensaje(s) numerado(s) — batchear: un mensaje por destinatario por turno, no spamear.
-5. Archivar los mensajes procesados.
-6. Apendear resumen del turno a su log.
-7. Actualizar su fila de `status.md`.
+4. Correr la escalera de gates y actualizar `verification/AGENT_<self>.md` con comando + exit code (`standards/quality-gates.md` §4-§5).
+5. Responder con mensaje(s) numerado(s) — batchear: un mensaje por destinatario por turno, no spamear.
+6. Archivar los mensajes procesados.
+7. Apendear resumen del turno a su log.
+8. Actualizar su fila de `status.md`.
 
 ## Anti-patrones
 
@@ -123,3 +128,5 @@ Si hay dependencias entre repos, el contract declara orden de **merge de PRs** (
 - Mutar `contract.md` sin ser el planner.
 - Dejar mensajes procesados sin archivar (el otro agente los re-procesa infinitamente).
 - Adivinar ante ambigüedad en vez de bloquear y preguntar.
+- Declararse `done` sin evidencia de gates con exit codes, o con un AC sin test.
+- Ablandar un test, skipearlo o silenciar el type-checker para pasar un gate (`quality-gates.md` §6) — eso es `blocked` + pregunta al planner, no un atajo.

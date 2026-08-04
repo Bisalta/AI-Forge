@@ -16,7 +16,7 @@ Luego tipeá `/` y vas a ver los comandos de cada plugin (`/sdd-flow:sdd`, `/pro
 
 | Plugin | Versión | Qué hace |
 |---|---|---|
-| [**sdd-flow**](./plugins/sdd-flow) | 0.7.0 | Spec-Driven Development multi-agente: planner Opus 4.8 cierra decisiones y corta tareas, subagentes Sonnet/Haiku ejecutan, coordinación file-based `AGENT_{uuid}`. |
+| [**sdd-flow**](./plugins/sdd-flow) | 0.8.0 | Spec-Driven Development multi-agente: planner Opus 4.8 cierra decisiones y corta tareas, subagentes Sonnet/Haiku ejecutan con quality gates verificables (AC numerados, binding AC↔test, evidencia con exit codes), coordinación file-based `AGENT_{uuid}`. |
 | [**project-foundation**](./plugins/project-foundation) | 0.1.0 | Crea o back-fillea los seis documentos fundacionales de un proyecto (PRD, TRD, UI/UX Brief, App Flow, Backend Schema, Implementation Plan) desde cero o derivando de un codebase existente. Interopera con `sdd-flow` si ambos están instalados. |
 
 ## Estructura
@@ -47,11 +47,12 @@ ai-forge/
 
 | Comando | Cuándo usarlo |
 |---|---|
-| `/sdd-init` | Bootstrapea (o llena) `SDD/docs/doc_architecture.md` y `doc_verification_guide.md` — derivando de un codebase existente o entrevistando en greenfield. Corrélo si `/sdd-enrich` frena por falta de estos docs, o al arrancar sdd-flow en un repo nuevo. |
+| `/sdd-init` | Bootstrapea (o llena) `SDD/docs/doc_architecture.md`, `doc_verification_guide.md` y `doc_quality_gates.md` — derivando de un codebase existente o entrevistando en greenfield. Corrélo si `/sdd-enrich` frena por falta de estos docs, o al arrancar sdd-flow en un repo nuevo. |
 | `/sdd <idea>` | Ciclo SDD completo: refinement → contract → specs → ejecución multi-agente. Usalo cuando tenés una tarea nueva. |
 | `/sdd-enrich <idea>` | Solo la fase de refinement. Útil para cerrar decisiones antes de planear o cuando la tarea es compleja y querés separar el "qué" del "cómo". |
 | `/sdd-contract <slug>` | Genera o actualiza el High-Level Technical Contract (HLTC). Útil si ya tenés el requerimiento cerrado y querés planear sin ejecutar. |
-| `/sdd-status` | Tablero de estado: tareas activas, bloqueos, mensajes sin procesar entre agentes, versión de contract. Solo lectura. |
+| `/sdd-verify` | Corre la escalera de gates (format → lint → type-check → tests → build → cobertura del diff) y escribe la evidencia con comando + exit code. Usalo antes de declarar algo terminado o de abrir el PR. |
+| `/sdd-status` | Tablero de estado: tareas activas, estado de gates por agente, ACs sin test, bloqueos, mensajes sin procesar, versión de contract. Solo lectura. |
 | `/sdd-pr` | Genera la descripción del Pull Request a partir de los cambios del repo. Usalo antes de abrir el PR. |
 | `/sdd-agents` | Bootstrapea coordinación file-based multi-agente (`AGENT_<slug>`) para una task que cruza varios repos. |
 | `/sdd-fixes` | Estructura una tanda de fixes/ajustes sueltos en `fixes.md`, con triage automático (trivial/mediano/ambiguo). |
@@ -64,6 +65,16 @@ El **planner (Opus 4.8)** toma la idea, cierra decisiones en 6 dimensiones (solu
 ### Closure rules (el contract es innegociable)
 
 El pipeline corre sin aprobación humana, por eso el contract debe ser preciso: **prohibido** "if needed / or / prefer / may be / when available". Si dos ingenieros lo implementarían distinto, la spec es inválida y el agente frena.
+
+### Quality gates (probado, no "declarado como probado")
+
+Misma lógica aplicada a la calidad del código, en `standards/quality-gates.md`:
+
+- El contract emite **acceptance criteria numerados** (`AC1..ACn`) y cada uno tiene que quedar atado a un test concreto (`archivo::"caso"`). **AC sin test no se aprueba**, aunque la suite esté verde.
+- La **escalera de gates** corre siempre antes de declarar algo terminado, con los comandos reales del repo (`SDD/docs/doc_quality_gates.md`, lo genera `/sdd-init`) — ningún agente inventa comandos.
+- Cada `done` deja **evidencia con exit codes**; el reviewer re-corre el subset barato y compara en vez de creerle al reporte.
+- **Prohibido ablandar el gate** (skipear un test, `@ts-ignore`, bajar un threshold, `--no-verify`). Si un gate no pasa, el agente se bloquea y pregunta — no toma el atajo. Tres de esas prohibiciones las bloquea un hook, no un prompt.
+- Review con severidades y **cota de 3 rondas**: si no cierra, escala en vez de degradar los tests para salir del loop.
 
 ---
 

@@ -7,15 +7,23 @@ Single source of truth para todos los agentes del ciclo SDD. (Condensado de `Con
 2. Hacer exactamente lo pedido. Nada más.
 3. Cero secretos en código.
 4. Solo queries parametrizadas. Nada de concatenación de strings en SQL.
-5. Validar todo input en los bordes del sistema (Zod / equivalente).
-6. Sin `any` en TypeScript.
-7. Tests deben pasar antes de cualquier PR.
-8. Tareas chicas, una a la vez. TDD. Cambios incrementales.
+5. Validar todo input en los bordes del sistema (Zod / Pydantic / equivalente del stack).
+6. Sin escapes del type-checker: `any`, `dynamic`, `interface{}`, `@ts-ignore`, `# type: ignore` (ver perfiles, `quality-gates.md` §9).
+7. **Cada acceptance criterion tiene un test.** "Tests verdes" sin tests nuevos no es cobertura — ver `standards/quality-gates.md`.
+8. **Nada se declara `done` sin evidencia**: comando + exit code registrados. Escalera de gates en `quality-gates.md` §4-§5.
+9. **Reuse antes de crear**: buscar lo existente (grep) antes de escribir una función/servicio nuevo. Duplicar lógica es un rechazo de review.
+10. Tareas chicas, una a la vez. Cambios incrementales. Bugfix = test rojo primero.
+
+## Calidad verificable
+`standards/quality-gates.md` es la fuente normativa: Definition of Done, acceptance criteria numerados, binding AC↔test, escalera de gates, contrato de evidencia, **mitigaciones prohibidas** (nunca ablandar un test o silenciar el linter para pasar un gate — eso es BLOCKED y pregunta al planner) y el modelo de severidades del review con cota de 3 rondas.
+
+Los **comandos concretos** de cada repo viven en `SDD/docs/doc_quality_gates.md` (lo genera `/sdd-init`). Ningún agente inventa comandos de verificación.
 
 ## Áreas (detalle en el repo standard de la empresa)
 - `000-core-principles` · `001-code-quality` · `002-security` · `003-git-workflow`
 - `004-testing` · `005-typescript` · `006-react-nextjs` · `007-api-design`
 - `008-performance` · `009-ai-agent-behavior`
+- **Calidad y testing**: `standards/quality-gates.md` (ship con el plugin — no depende del repo de la empresa).
 - **SEO (frontend)**: ver `standards/seo-frontend.md`. Advisory; aplica solo si el contract trae `seo.applies == true`.
 
 ## Capas de integración (degradación por entorno)

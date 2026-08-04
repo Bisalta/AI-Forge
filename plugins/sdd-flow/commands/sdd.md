@@ -40,16 +40,22 @@ Invocá el skill **`sdd-plan`** para producir el HLTC con *Architectural Delta*,
 - Si hay dependencias entre repos, definí **orden de integración** (ej. BE -> FE -> mobile).
 - Creá la estructura de coordinación file-based (ver protocolo del repo `cross_agent_implementations`): `contract.md`, `status.md`, `messages/AGENT_a__to__AGENT_b/`.
 
-### 4. EJECUCIÓN
-Spawneá un subagente por task brief con su modelo asignado (`implementing-agent`). Para cada output, corré `reviewer-agent` (Opus, sin sesgo) sobre la spec/diff. Loop hasta cumplir acceptance criteria.
-- Agente bloqueado (decisión no resuelta) → **BLOCKED → te pregunta, no adivina** → actualizás contract/spec → desbloqueás.
+### 4. EJECUCIÓN + GATES
+Spawneá un subagente por task brief con su modelo asignado (`implementing-agent`). Para cada output, corré `reviewer-agent` (Opus, sin sesgo) sobre la spec/diff.
+- **Loop acotado a 3 rondas** por brief (`standards/quality-gates.md` §7.4). Si la ronda 3 no cierra en `APPROVED`, el reviewer emite `ESCALATE` y vos decidís: ratificar contract (bump de versión), cortar scope, o elevar al gate humano. No dejes el loop abierto — es donde el agente empieza a ablandar tests para salir.
+- **Ningún brief cierra sin evidencia**: escalera de gates corrida (`quality-gates.md` §4) y `verification.md` escrito con comando + exit code por gate. Un `done` sin evidencia lo tratás como no hecho, aunque el Execution Report diga verde.
+- **Ningún AC sin test**: la tabla `AC ↔ test binding` del brief tiene que estar completa, con nombres de test que existen literal.
+- Agente bloqueado (decisión no resuelta, o un gate que no pasa sin ablandar un test) → **BLOCKED → te pregunta, no adivina** → actualizás contract/spec → desbloqueás.
 - Si `seo.applies == true`, el reviewer-agent adjunta una sección **SEO (advisory)** al testing/PR report. No bloquea Feature Ready.
 
 ### 5. FEATURE READY → PARÁ
 Cuando todas las tareas estén `done` y validadas: **parate y pingueá al humano** con resumen. NO sigas a PR sin revisión humana.
+- **Checklist de Feature Ready** (si algo falla, no es Feature Ready — es trabajo en curso): todos los ACs del HLTC con test verde o smoke `manual-only` ejecutado · suite completa corrida al menos una vez · `verification.md` de cada agente con exit codes · cero mitigaciones prohibidas en el diff · veredicto `APPROVED` de cada brief · docs delta aplicado.
+- El resumen al humano incluye: ACs cubiertos (con su test), gates corridos, `MINOR` conocidos que quedaron abiertos, rojos preexistentes de la base, y `ADVISORY` de SEO si aplica.
 - **Cierre Proxima por integración**: Feature Ready NO cierra la tarea. Cada subtask pasa a `done` (con `proxima_set_status` por su `id` — las subtasks no tienen key) **solo cuando se integra** (PR mergeado con remote, o merge local `--no-ff` sin remote). Cuando TODAS las subtasks están `done` → marcá la **tarea madre** `done` (por su `key`). Logueá milestones con `proxima_log_progress` (PR abierto/CI verde/merge, o review ok/merge local).
 
 ## Reglas
-- Leé `SDD/docs/doc_architecture.md` y `SDD/docs/doc_verification_guide.md` de cada repo antes de planear.
-- Seguí `standards/base-standards.md` del plugin.
-- Validación no es opcional: cada task brief lleva al menos un check ejecutable.
+- Leé `SDD/docs/doc_architecture.md`, `doc_verification_guide.md` y `doc_quality_gates.md` de cada repo antes de planear. Si falta alguno → `/sdd-init` (no inventes comandos de validación).
+- Seguí `standards/base-standards.md` y `standards/quality-gates.md` del plugin.
+- Validación no es opcional y no es declarativa: cada task brief lleva la escalera de gates con comandos reales, y cada `done` deja evidencia con exit codes.
+- Los ACs del HLTC son la unidad de verdad de "está probado": numerados, asignados a un brief, con un test cada uno.

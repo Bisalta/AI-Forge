@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# sdd-flow — PreToolUse guard sobre Bash.
+#
+# Bloquea las tres cosas que el plugin declara regla dura y que un agente apurado
+# hace igual: commit directo a una rama protegida, bypass de hooks/CI, y push
+# destructivo. Todo lo demás pasa sin tocarse.
+#
+# Diseño: FAIL-OPEN. Cualquier cosa inesperada (sin jq, sin git, JSON raro,
+# working dir desconocido) => exit 0 y el flujo sigue normal. Un guard que
+# rompe sesiones es peor que no tener guard.
+#
+# Escape hatch: SDD_ALLOW_BASE_COMMIT=1 desactiva el chequeo de rama protegida
+# (para repos donde commitear a la default es legítimo).
+
+set -uo pipefail
+
+allow() { exit 0; }
+
+deny() {
+  # permissionDecision=deny: Claude recibe la razón y no ejecuta el comando.
+  local reason="$1"
+  if command -v jq >/dev/null 2>&1; then
+    jq -n --arg r "$reason" '{
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: $r
+      }
+    }'
+    exit 0
+  fi
+  echo "$reason" >&2
+  exit 2
+}
+
+command -v jq >/dev/null 2>&1 || allow
+
+INPUT="$(cat)" || allow
+[ -n "$INPUT" ] || allow
+
+TOOL="$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)" || allow
+[ "$TOOL" = "Bash" ] || allow
+
+CMD="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)" || allow
+[ -n "$CMD" ] || allow
+
+CWD="$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null)"
+[ -n "$CWD" ] || CWD="$PWD"
+
+# Reconoce `git <subcomando>` tolerando flags globales con y sin valor:
+#   git commit · git -C /path commit · git -c user.email=x commit · git --git-dir=/x commit
+git_subcommand() {
+  printf '%s' "$CMD" | grep -qE "(^|[;&|[:space:]])git([[:space:]]+(-[cC][[:space:]]+[^[:space:]]+|--(git-dir|work-tree|namespace|exec-path)=[^[:space:]]+|-[^[:space:]]+))*[[:space:]]+$1(\$|[[:space:]])"
+}
+
+# --- 1. Bypass de hooks / CI --------------------------------------------------
+if printf '%s' "$CMD" | grep -qE '(^|[[:space:]])--no-verify([[:space:]]|$)'; then
+  deny "sdd-flow: --no-verify saltea los hooks del repo. Es una mitigación prohibida (standards/quality-gates.md §6). Arreglá lo que el hook detecta, o marcá BLOCKED y preguntá al planner."
+fi
+
+# --- 2. Push destructivo (--force-with-lease sí está permitido) ---------------
+if git_subcommand push; then
+  if printf '%s' "$CMD" | grep -qE '(^|[[:space:]])(--force|-f)([[:space:]]|$)' \
+     && ! printf '%s' "$CMD" | grep -qE '(^|[[:space:]])--force-with-lease'; then
+    deny "sdd-flow: 'git push --force' puede borrar trabajo de otro agente. Usá --force-with-lease si el rewrite es intencional (quality-gates.md §6)."
+  fi
+fi
+
+# --- 3. Commit directo a rama protegida --------------------------------------
+if [ "${SDD_ALLOW_BASE_COMMIT:-0}" = "1" ]; then
+  allow
+fi
+
+git_subcommand commit || allow
+
+command -v git >/dev/null 2>&1 || allow
+git -C "$CWD" rev-parse --git-dir >/dev/null 2>&1 || allow
+
+BRANCH="$(git -C "$CWD" rev-parse --abbrev-ref HEAD 2>/dev/null)" || allow
+[ -n "$BRANCH" ] || allow
+[ "$BRANCH" != "HEAD" ] || allow   # detached HEAD: rebase/bisect en curso, no molestar
+
+case "$BRANCH" in
+  main|master|dev|develop|qa|test|staging|stage|pre-prod|preprod|prod|production|release)
+    deny "sdd-flow: '$BRANCH' es una rama protegida y todo trabajo nace en branch propia (standards/base-standards.md). Creá la branch desde la base confirmada (con Proxima: {action}-{KEY}-{desc}; sin Proxima: <MODULO>-<TICKET>) y commiteá ahí; la integración va por PR o merge --no-ff. Si commitear acá es legítimo en este repo, corré con SDD_ALLOW_BASE_COMMIT=1."
+    ;;
+esac
+
+allow

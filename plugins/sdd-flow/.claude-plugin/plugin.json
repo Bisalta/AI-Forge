@@ -1,10 +1,19 @@
 {
   "name": "sdd-flow",
-  "version": "0.7.0",
-  "description": "Spec-Driven Development flow para Claude Code. Planner Opus 4.8 cierra decisiones y corta tareas; subagentes Sonnet/Haiku ejecutan; coordinacion file-based multi-repo con topologia AGENT_{uuid}. Standard de empresa (opcional).",
+  "version": "0.8.0",
+  "description": "Spec-Driven Development flow para Claude Code. Planner Opus 4.8 cierra decisiones y corta tareas; subagentes Sonnet/Haiku ejecutan con quality gates verificables (acceptance criteria numerados, binding AC-test, evidencia con exit codes); coordinacion file-based multi-repo con topologia AGENT_{uuid}. Standard de empresa (opcional).",
   "author": {
     "name": "Bisalta Ltda",
     "url": "https://github.com/Bisalta"
   },
-  "keywords": ["sdd", "spec-driven", "multi-agent", "planning", "opus", "orchestration"]
+  "keywords": [
+    "sdd",
+    "spec-driven",
+    "multi-agent",
+    "planning",
+    "opus",
+    "orchestration",
+    "quality-gates",
+    "testing"
+  ]
 }
