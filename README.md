@@ -27,6 +27,26 @@ Notas:
 - Podés activar **auto-update** para este marketplace: `/plugin` → tab **Marketplaces** → `ai-forge` → *Enable auto-update* (los marketplaces de terceros vienen con auto-update apagado por default). Con eso Claude Code refresca catálogo y plugins solo, y te avisa cuándo correr `/reload-plugins`.
 - Verificá qué versión te quedó: `/plugin` → tab **Installed** → `sdd-flow` (compará contra el `CHANGELOG.md` de este repo).
 
+### Entornos sin `/plugin` (Claude Code web / sesiones cloud)
+
+En sesiones remotas el panel `/plugin` no existe (`/plugin isn't available in this environment`) — es un comando de la CLI de terminal y de la app de escritorio. Para que los plugins estén disponibles en sesiones web/cloud, declaralos en el `.claude/settings.json` **del repo donde trabajás**:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "ai-forge": {
+      "source": { "source": "github", "repo": "Bisalta/AI-Forge" }
+    }
+  },
+  "enabledPlugins": {
+    "sdd-flow@ai-forge": true,
+    "project-foundation@ai-forge": true
+  }
+}
+```
+
+Bonus: con eso commiteado, cualquier dev que abra ese repo (local o web) recibe el prompt para instalar los plugins — es la vía recomendada para adoptarlos como standard del equipo, sin que cada uno corra comandos a mano.
+
 ## Plugins disponibles
 
 | Plugin | Versión | Qué hace |
