@@ -4,6 +4,13 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ## sdd-flow
 
+### 0.7.0 — 2026-08-03
+- **Nuevo comando + skill `/sdd-init`**: bootstrapea `SDD/docs/doc_architecture.md` y `SDD/docs/doc_verification_guide.md` — derivando de un codebase existente o entrevistando en greenfield — en vez de dejarlos como esqueleto `[PLACEHOLDER]`. Cierra el punto de entrada bloqueado: hasta ahora, si esos dos archivos no existían llenos, `enrich-user-story` frenaba antes de la primera pregunta sin ninguna ruta de recuperación dentro del propio plugin.
+- **Interoperabilidad con `docs/foundation/`**: si el repo ya tiene los seis documentos fundacionales de un day-zero externo (PRD/TRD/UI-UX/App Flow/Backend Schema/Implementation Plan — convención del skill `project-foundation`), `/sdd-init` referencia `02-trd.md`/`05-backend-schema.md` en vez de duplicar su contenido en `doc_architecture.md`. `doc_verification_guide.md` siempre se genera fresco (ningún equivalente en esos seis documentos).
+- **`enrich-user-story` lee el PRD si existe** (`docs/foundation/01-prd.md`, opcional, no bloqueante): las dimensiones *actor y contexto de uso* y *success criteria* ahora pueden anclarse en personas/jobs-to-be-done/métricas de producto reales, en vez de fundamentarse solo en arquitectura de código.
+- **`sdd-plan` chequea el roadmap si existe** (`docs/foundation/06-implementation-plan.md`, opcional): antes de cerrar el alcance del HLTC, señala si el scope propuesto choca con una fase declarada como futura, en vez de aceptarlo en silencio.
+- Spec en `docs/specs/2026-08-03-foundation-docs-bootstrap-design.md`.
+
 ### 0.6.0 — 2026-06-22
 - **SEO frontend advisory**: concern SEO agregado al flujo SDD para proyectos con front. Es **advisory** — nunca bloquea Feature Ready. Activación explícita en `enrich-user-story` (pregunta al usuario si aplica SEO); resultado persiste como bloque `seo: { applies, indexable, locales }` en el contract.
 - **Checklist 2 tiers en `standards/seo-frontend.md`**: tier Universal (aplica a todo proyecto con front: meta tags, og/twitter cards, canonical, robots, sitemap básico) y tier Indexable (solo cuando `seo.indexable: true`: structured data, hreflang, Core Web Vitals, lazy-load, preload LCP).

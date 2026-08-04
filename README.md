@@ -15,7 +15,7 @@ Luego tipeá `/` y vas a ver los comandos del plugin (`/sdd-flow:sdd`, etc).
 
 | Plugin | Versión | Qué hace |
 |---|---|---|
-| [**sdd-flow**](./plugins/sdd-flow) | 0.1.0 | Spec-Driven Development multi-agente: planner Opus 4.8 cierra decisiones y corta tareas, subagentes Sonnet/Haiku ejecutan, coordinación file-based `AGENT_{uuid}`. |
+| [**sdd-flow**](./plugins/sdd-flow) | 0.7.0 | Spec-Driven Development multi-agente: planner Opus 4.8 cierra decisiones y corta tareas, subagentes Sonnet/Haiku ejecutan, coordinación file-based `AGENT_{uuid}`. |
 
 ## Estructura
 
@@ -44,11 +44,15 @@ ai-forge/
 
 | Comando | Cuándo usarlo |
 |---|---|
+| `/sdd-init` | Bootstrapea (o llena) `SDD/docs/doc_architecture.md` y `doc_verification_guide.md` — derivando de un codebase existente o entrevistando en greenfield. Corrélo si `/sdd-enrich` frena por falta de estos docs, o al arrancar sdd-flow en un repo nuevo. |
 | `/sdd <idea>` | Ciclo SDD completo: refinement → contract → specs → ejecución multi-agente. Usalo cuando tenés una tarea nueva. |
 | `/sdd-enrich <idea>` | Solo la fase de refinement. Útil para cerrar decisiones antes de planear o cuando la tarea es compleja y querés separar el "qué" del "cómo". |
 | `/sdd-contract <slug>` | Genera o actualiza el High-Level Technical Contract (HLTC). Útil si ya tenés el requerimiento cerrado y querés planear sin ejecutar. |
 | `/sdd-status` | Tablero de estado: tareas activas, bloqueos, mensajes sin procesar entre agentes, versión de contract. Solo lectura. |
 | `/sdd-pr` | Genera la descripción del Pull Request a partir de los cambios del repo. Usalo antes de abrir el PR. |
+| `/sdd-agents` | Bootstrapea coordinación file-based multi-agente (`AGENT_<slug>`) para una task que cruza varios repos. |
+| `/sdd-fixes` | Estructura una tanda de fixes/ajustes sueltos en `fixes.md`, con triage automático (trivial/mediano/ambiguo). |
+| `/sdd-seo` | Auditoría SEO advisory on-demand del frontend actual contra `standards/seo-frontend.md`. |
 
 ### Cómo funciona internamente
 
