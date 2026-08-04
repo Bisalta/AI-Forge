@@ -11,7 +11,8 @@ sdd-coordination/
     ├── contract.md                          ← contrato técnico (single-writer: solo el planner)
     ├── status.md                            ← tabla de estado, una fila por agente
     ├── logs/AGENT_<slug>.md                 ← log append-only por agente
-    ├── verification/AGENT_<slug>.md         ← evidencia de gates por agente (comando + exit code)
+    ├── verification/AGENT_<slug>.md         ← verification report por agente (juicio: impact set, repro, smoke)
+    ├── verification/AGENT_<slug>-gates.md   ← reporte de gates GENERADO por sdd-run-gates.sh (no editar)
     ├── fixtures/<interfaz>.json             ← pares ejemplo de interfaces compartidas (single-writer: planner)
     └── messages/AGENT_<a>__to__AGENT_<b>/   ← un dir por par direccional
         ├── NNN_<slug>.md                    ← mensajes activos (no procesados)

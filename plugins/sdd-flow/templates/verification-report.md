@@ -9,39 +9,19 @@ Evidencia de la escalera de gates (`standards/quality-gates.md` §4-§5). Lo esc
 
 ---
 
-## Gates
+## Gates — evidencia GENERADA (no la escribas a mano)
 
-| # | Gate | Comando exacto | Exit code | Timestamp UTC | Resultado |
-|---|---|---|---|---|---|
-| 1 | format | `<cmd>` | 0 | 2026-08-04T14:02:11Z | verde |
-| 2 | lint | `<cmd>` | 0 | … | verde |
-| 3 | type-check | `<cmd>` | 0 | … | verde |
-| 4 | unit | `<cmd>` | 1 → 0 | … | rojo, arreglado (ver abajo) |
-| 5 | integration | `<cmd>` | 0 | … | verde |
-| 6 | build | `<cmd>` | 0 | … | verde |
-| 7 | e2e | — | — | — | N/A — ningún AC lo exige |
-| 8 | cobertura del diff | `<cmd>` | 0 | … | 3 archivos tocados, 3 cubiertos |
-| 9 | security (secret scan + audit) | `<cmd>` | 0 | … | sin secretos en el diff; 0 critical/high directas |
-| — | suite completa | `<cmd>` | 0 | … | verde antes de integrar |
+La tabla de gates la produce el runner. Corré:
 
-Estados válidos: `verde` · `rojo, arreglado` · `[SKIPPED] <prereq faltante>` · `N/A — <razón>`.
-**Prohibido** escribir `verde` sin haber corrido el comando.
-
----
-
-## Output (últimas líneas por gate no trivial)
-
-### Gate 4 — unit (primera corrida, exit 1)
-
-```
-<pegar ~15 últimas líneas: qué test falló y por qué>
+```bash
+bash SDD/scripts/sdd-run-gates.sh --full -o <este-dir>/AGENT_<slug>-gates.md
 ```
 
-### Gate 4 — unit (después del fix, exit 0)
+- **Reporte generado**: `<ruta>/AGENT_<slug>-gates.md` (mismo directorio que este archivo — el path COMMITEADO, no `.sdd/` que está gitignoreado y no viaja en el PR)
+- **Resumen** (línea `sdd.gates` del runner): `{"green": N, "red": 0, "skipped": M}`
+- Corridas rojas intermedias: los reportes previos no se borran ni se editan — se genera uno nuevo; la historia de rojos es señal.
 
-```
-<pegar el resumen del runner: N passed, 0 failed>
-```
+**Solo si el runner no pudo correr** (razón obligatoria: `<cuál>`), la tabla va a mano con el formato del reporte generado — comando exacto · exit code · timestamp UTC · resultado — sabiendo que el reviewer la tratará con el escepticismo que merece una evidencia manuscrita.
 
 ---
 

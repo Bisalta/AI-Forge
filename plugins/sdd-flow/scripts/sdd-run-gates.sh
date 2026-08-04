@@ -46,13 +46,23 @@ done
 [ -f "$DOC" ] || { echo "ERROR: no existe $DOC — corré /sdd-init para generarlo (no inventes comandos)" >&2; exit 3; }
 
 # --- parsear la tabla: | # | Gate | Comando | Obligatorio | Notas | -----------
-# Filas de datos: empiezan con "| <num> |". Comando = 3ra celda, entre backticks.
+# Filas de datos: empiezan con "| <num> |". El comando vive entre backticks en la
+# 3ra celda. Cuidado con dos trampas reales:
+#  - un comando CON pipes (`cmd | grep x`) parte la celda al splitear por "|":
+#    se recupera tomando el primer span `...` de la línea completa (el comando es
+#    la primera celda backtickeada del template);
+#  - una celda sin backticks (N/A, —, PLACEHOLDER) NO debe robar backticks de la
+#    columna Notas: se pasa cruda y run_gate la trata como SKIPPED.
 GATES_TSV="$(awk -F'|' '
   /^\| *[0-9]+ *\|/ {
-    num=$2; gate=$3; cmd=$4
-    gsub(/^ +| +$/, "", num); gsub(/^ +| +$/, "", gate); gsub(/^ +| +$/, "", cmd)
-    # extraer contenido entre backticks si los hay
-    if (match(cmd, /`[^`]+`/)) cmd = substr(cmd, RSTART+1, RLENGTH-2)
+    num=$2; gate=$3; cell=$4
+    gsub(/^ +| +$/, "", num); gsub(/^ +| +$/, "", gate); gsub(/^ +| +$/, "", cell)
+    cmd = cell
+    if (cell ~ /^`.*`$/ && cell !~ /`.*`.*`/) {
+      cmd = substr(cell, 2, length(cell) - 2)          # celda backtickeada completa
+    } else if (cell ~ /^`/) {                          # cortada por un pipe interno
+      if (match($0, /`[^`]+`/)) cmd = substr($0, RSTART+1, RLENGTH-2)
+    }
     printf "%s\t%s\t%s\n", num, gate, cmd
   }' "$DOC")"
 
@@ -72,12 +82,15 @@ run_cmd() { # respeta timeout si existe
 
 GREEN=0; RED=0; SKIPPED=0; STOPPED=""
 ROWS=""; DETAILS=""
+NL=$'\n'
 
+# Nota: nada de printf %b sobre contenido de comandos — un comando con backslashes
+# (grep '\d', awk '\t') se manglaría en el reporte. Newlines reales, printf %s.
 run_gate() { # $1=num $2=nombre $3=cmd
   local num="$1" gate="$2" cmd="$3" ts ec tail_out tmp
   # sin comando corrible → SKIPPED con razón (el doc manda)
   if [ -z "$cmd" ] || printf '%s' "$cmd" | grep -qiE '^(n/?a|—|-|\[PLACEHOLDER\])' || printf '%s' "$cmd" | grep -q 'PLACEHOLDER'; then
-    ROWS="${ROWS}| ${num} | ${gate} | — | — | $(now) | [SKIPPED] sin comando en el doc (${cmd:-vacío}) |\n"
+    ROWS="${ROWS}| ${num} | ${gate} | — | — | $(now) | [SKIPPED] sin comando en el doc (${cmd:-vacío}) |${NL}"
     SKIPPED=$((SKIPPED+1)); return 0
   fi
   ts="$(now)"
@@ -85,11 +98,11 @@ run_gate() { # $1=num $2=nombre $3=cmd
   run_cmd "$cmd" >"$tmp" 2>&1; ec=$?
   tail_out="$(tail -n 15 "$tmp")"; rm -f "$tmp"
   if [ "$ec" -eq 0 ]; then
-    ROWS="${ROWS}| ${num} | ${gate} | \`${cmd}\` | 0 | ${ts} | verde |\n"; GREEN=$((GREEN+1))
+    ROWS="${ROWS}| ${num} | ${gate} | \`${cmd}\` | 0 | ${ts} | verde |${NL}"; GREEN=$((GREEN+1))
   else
-    ROWS="${ROWS}| ${num} | ${gate} | \`${cmd}\` | ${ec} | ${ts} | **rojo** |\n"; RED=$((RED+1))
+    ROWS="${ROWS}| ${num} | ${gate} | \`${cmd}\` | ${ec} | ${ts} | **rojo** |${NL}"; RED=$((RED+1))
   fi
-  DETAILS="${DETAILS}### Gate ${num} — ${gate} (exit ${ec})\n\n\`\`\`\n${tail_out}\n\`\`\`\n\n"
+  DETAILS="${DETAILS}### Gate ${num} — ${gate} (exit ${ec})${NL}${NL}\`\`\`${NL}${tail_out}${NL}\`\`\`${NL}${NL}"
   return "$ec"
 }
 
@@ -111,10 +124,10 @@ COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo '-')"
   printf -- '- **Branch**: `%s` · **Commit**: `%s` · **Doc**: `%s` · **Fecha**: %s\n' "$BRANCH" "$COMMIT" "$DOC" "$(now)"
   printf -- '- Este archivo lo escribió el runner, no un modelo. Editarlo a mano invalida la evidencia.\n\n'
   printf '| # | Gate | Comando | Exit | Timestamp UTC | Resultado |\n|---|---|---|---|---|---|\n'
-  printf '%b' "$ROWS"
+  printf '%s' "$ROWS"
   [ -n "$STOPPED" ] && printf '\n> ⛔ %s\n' "$STOPPED"
   printf '\n## Output por gate (últimas 15 líneas)\n\n'
-  printf '%b' "$DETAILS"
+  printf '%s' "$DETAILS"
 } > "$OUT"
 
 cat "$OUT"

@@ -74,9 +74,25 @@ fi
 git_subcommand commit || allow
 
 command -v git >/dev/null 2>&1 || allow
-git -C "$CWD" rev-parse --git-dir >/dev/null 2>&1 || allow
 
-BRANCH="$(git -C "$CWD" rev-parse --abbrev-ref HEAD 2>/dev/null)" || allow
+# El repo target puede no ser el cwd de la sesión: `git -C /path commit` y
+# `cd /path && git commit` son evasiones reales. Resolución best-effort:
+# 1) -C explícito gana; 2) el último `cd <path>` del comando compuesto gana;
+# 3) fallback: cwd de la sesión. Path inexistente → fallback al cwd.
+TARGET="$CWD"
+C_PATH="$(printf '%s' "$CMD" | grep -oE '(^|[;&|[:space:]])git[[:space:]]+-C[[:space:]]+[^[:space:]]+' | tail -1 | sed -E 's/.*-C[[:space:]]+//')"
+if [ -n "$C_PATH" ]; then
+  TARGET="$C_PATH"
+else
+  CD_PATH="$(printf '%s' "$CMD" | grep -oE '(^|[;&|[:space:]])cd[[:space:]]+[^;&|[:space:]]+' | tail -1 | sed -E 's/.*cd[[:space:]]+//' | tr -d '"'"'"'')"
+  [ -n "$CD_PATH" ] && TARGET="$CD_PATH"
+fi
+case "$TARGET" in /*) ;; "~"*) TARGET="${HOME}${TARGET#\~}" ;; *) TARGET="$CWD/$TARGET" ;; esac
+[ -d "$TARGET" ] || TARGET="$CWD"
+
+git -C "$TARGET" rev-parse --git-dir >/dev/null 2>&1 || allow
+
+BRANCH="$(git -C "$TARGET" rev-parse --abbrev-ref HEAD 2>/dev/null)" || allow
 [ -n "$BRANCH" ] || allow
 [ "$BRANCH" != "HEAD" ] || allow   # detached HEAD: rebase/bisect en curso, no molestar
 

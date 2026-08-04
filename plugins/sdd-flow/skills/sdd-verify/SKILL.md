@@ -17,7 +17,9 @@ Normativa: `standards/quality-gates.md`. Comandos del repo: `SDD/docs/doc_qualit
 
 ## Paso 1 — Correr la escalera en orden
 
-**Preferí el runner**: `bash SDD/scripts/sdd-run-gates.sh -o .sdd/gates-run.md` (con `--full` antes de integrar). Corre la escalera de `quality-gates.md` §4 en orden, corta al primer rojo y **genera el reporte con exit codes él mismo** — evidencia que ningún modelo escribió. Su última línea `{"type":"sdd.gates",...}` es el resumen parseable.
+**Preferí el runner**: `bash SDD/scripts/sdd-run-gates.sh` (con `--full` antes de integrar). Corre la escalera de `quality-gates.md` §4 en orden, corta al primer rojo y **genera el reporte con exit codes él mismo** — evidencia que ningún modelo escribió. Su última línea `{"type":"sdd.gates",...}` es el resumen parseable.
+
+**El `-o` depende del propósito**: chequeo ad-hoc → default `.sdd/gates-run.md` (local, gitignoreado). Evidencia de una tarea que va a integrar → **path commiteado junto al verification report** (`tasks/<slug>/verification/AGENT_<slug>-gates.md`, o `SDD/verification/<branch>-gates.md` single-repo) — lo que queda en `.sdd/` no viaja en el PR y desaparece del review.
 
 Sin el runner (no instalado, o el doc de gates no parsea): corré la escalera a mano en el mismo orden — format → lint → type-check → unit → integration → build → e2e → cobertura del diff → security — registrando comando exacto, exit code, timestamp UTC y últimas ~15 líneas por gate, y **declarando en el reporte que la evidencia es manual y por qué**. Corta al primer rojo: arreglá o reportá, y reiniciá desde ese escalón.
 

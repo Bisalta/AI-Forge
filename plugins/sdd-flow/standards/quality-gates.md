@@ -92,6 +92,8 @@ Un gate que el repo no tiene (`doc_quality_gates.md` lo declara ausente) se regi
 
 **Regla de oro: la tabla de gates la genera `scripts/sdd-run-gates.sh`** (lee `doc_quality_gates.md`, corre la escalera en orden, emite el reporte con exit codes y timestamps él mismo — `SDD/scripts/sdd-run-gates.sh` si `/sdd-init` lo instaló). El agente **referencia** ese archivo generado; no lo transcribe ni lo edita — editarlo a mano invalida la evidencia. Evidencia narrada a mano solo como fallback cuando el runner no puede correr (y el reporte declara por qué), porque una tabla escrita por el mismo agente que hizo el trabajo vale lo que vale la palabra del interesado.
 
+**El reporte generado se commitea**: `-o` apunta junto al verification report (`verification/AGENT_<slug>-gates.md`), nunca a `.sdd/` — ese directorio está gitignoreado y la evidencia que queda ahí no viaja en el PR: invisible para el humano de Feature Ready y para CI.
+
 Lo que sí escribe el agente (las partes que requieren juicio) va en su verification report con `templates/verification-report.md`:
 
 - multi-agente: `tasks/<task-slug>/verification/AGENT_<slug>.md` — un archivo por agente, para no romper el ownership 1-way del protocolo de coordinación;
