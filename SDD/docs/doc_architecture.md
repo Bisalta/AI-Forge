@@ -158,7 +158,8 @@ N/A — no hay API. La única "interfaz pública" de este repo es el árbol de a
 - Sin `.env`: no hay secretos de aplicación (este repo no corre un servicio).
 - Variables de entorno que sí importan, todas opcionales con default seguro:
   - `SDD_GATE_TIMEOUT` (`sdd-run-gates.sh`): segundos por gate, default 1800, requiere `timeout`/`gtimeout` (no instalado en la máquina de referencia — ver `doc_quality_gates.md`, sección Prerequisitos).
-  - `SDD_ALLOW_BASE_COMMIT`, `SDD_PROTECTED_BRANCHES` (`guard-git.sh`): escape hatches del guard de rama protegida.
+  - `SDD_ALLOW_BASE_COMMIT`, `SDD_PROTECTED_BRANCHES` (`guard-git.sh`): escape hatches del chequeo de rama protegida — **no** afectan el chequeo de identidad de agente, que es independiente (ver fila siguiente).
+  - `SDD_AGENT_ENFORCE` (`guard-git.sh`, default `0` = sin efecto), `SDD_AGENT_NAME` (default `sdd-agent`), `SDD_AGENT_EMAIL` (default `sdd-agent@users.noreply.github.com`): identidad de agente exigida en los commits (contract R2), activa únicamente con `SDD_AGENT_ENFORCE=1` — no se desactiva con `SDD_ALLOW_BASE_COMMIT` ni con `HEAD` detached (AC36, AC37).
   - `SDD_CHECK_PATTERNS` (`sdd-check.sh`): archivo de patrones prohibidos extra por repo.
 
 ---

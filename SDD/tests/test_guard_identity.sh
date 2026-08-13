@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-# SDD/tests/test_guard_identity.sh — AC14 a AC18 del contract R2
+# SDD/tests/test_guard_identity.sh — AC14 a AC18, AC36 y AC37 del contract R2
 # (SDD/contracts/2026-08-13-sicop-hardening.md): identidad propia del agente
 # en los commits, exigida por plugins/sdd-flow/hooks/guard-git.sh SOLO cuando
 # el repo exporta SDD_AGENT_ENFORCE=1 (AC14, AC15, AC17); sin la variable el
-# hook no opina (AC16 — par de deteccion de AC14). AC18 prueba el mecanismo
-# de la decision #2 del contract (`git -c user.name=... -c user.email=...
-# commit`), sin pasar por el hook: es la prueba de que la guarda de autoria
-# de un archivo (`git log -1 --format='%an'`) deja de ser tautologica.
+# hook no opina (AC16 — par de deteccion de AC14). AC36 y AC37 (ratificacion
+# v5, ronda 2, tras el ESCALATE de la ronda 1) prueban que el chequeo de
+# identidad NO se apaga de contrabando por otras dos salidas tempranas del
+# hook — el hatch de rama (AC36) y HEAD detached (AC37) — que en v4 vivian
+# aguas arriba del bloque y lo bypaseaban sin que ninguna de las dos tenga
+# relacion con identidad. AC18 prueba el mecanismo de la decision #2 del
+# contract (`git -c user.name=... -c user.email=... commit`), sin pasar por
+# el hook: es la prueba de que la guarda de autoria de un archivo
+# (`git log -1 --format='%an'`) deja de ser tautologica.
 #
 # Corrida contra guard-git.sh SIN el bloque de identidad (T1.2 del brief):
 # tiene que salir en rojo, porque AC14 no puede denegar todavia — el hook no
@@ -38,7 +43,7 @@ TMP_BASE="$SCRIPT_DIR/.tmp/test_guard_identity-$$"
 # shellcheck disable=SC2329  # invocada por trap EXIT
 cleanup() {
   rm -rf "$TMP_BASE"
-  unset SDD_AGENT_ENFORCE SDD_AGENT_NAME SDD_AGENT_EMAIL
+  unset SDD_AGENT_ENFORCE SDD_AGENT_NAME SDD_AGENT_EMAIL SDD_ALLOW_BASE_COMMIT
   return 0
 }
 trap cleanup EXIT
@@ -145,6 +150,42 @@ unset SDD_AGENT_ENFORCE SDD_AGENT_NAME
 assert_eq "$(is_denied "$out17")" "no" "AC17 SDD_AGENT_NAME=otro-agente con user.name=otro-agente declarado - el hook permite"
 
 # =========================================================================
+# AC36 — enforce=1 Y SDD_ALLOW_BASE_COMMIT=1 a la vez, commit SIN identidad:
+# sigue denegado. Ratificacion v5 (ESCALATE ronda 1): v4 ubicaba el bloque
+# de identidad aguas abajo del hatch de rama, así que el hatch lo bypaseaba
+# de contrabando. El hatch de rama NUNCA desactiva el chequeo de identidad
+# — son dos guardas independientes.
+# =========================================================================
+AC36_DIR="$TMP_BASE/ac36"
+new_repo "$AC36_DIR"
+
+export SDD_AGENT_ENFORCE=1
+export SDD_ALLOW_BASE_COMMIT=1
+unset SDD_AGENT_NAME SDD_AGENT_EMAIL
+out36="$(run_hook "$AC36_DIR" 'git commit -m "sin identidad, con hatch de rama"')"
+unset SDD_AGENT_ENFORCE SDD_ALLOW_BASE_COMMIT
+
+assert_eq "$(is_denied "$out36")" "si" "AC36 enforce=1 + SDD_ALLOW_BASE_COMMIT=1 sin identidad - sigue denegado"
+
+# =========================================================================
+# AC37 — enforce=1 con HEAD detached, commit SIN identidad: sigue denegado.
+# Ratificacion v5: v4 ubicaba el bloque de identidad aguas abajo del
+# chequeo de HEAD detached (`rev-parse --abbrev-ref HEAD` != "HEAD"), así
+# que un rebase/bisect en curso lo bypaseaba de contrabando. El chequeo de
+# identidad no depende de la resolucion de rama.
+# =========================================================================
+AC37_DIR="$TMP_BASE/ac37"
+new_repo "$AC37_DIR"
+( cd "$AC37_DIR" && git checkout -q --detach )
+
+export SDD_AGENT_ENFORCE=1
+unset SDD_AGENT_NAME SDD_AGENT_EMAIL
+out37="$(run_hook "$AC37_DIR" 'git commit -m "sin identidad, HEAD detached"')"
+unset SDD_AGENT_ENFORCE
+
+assert_eq "$(is_denied "$out37")" "si" "AC37 enforce=1 con HEAD detached sin identidad - sigue denegado"
+
+# =========================================================================
 # AC18 — mecanismo de la decision #2 del contract (no pasa por el hook): un
 # commit real con -c user.name=sdd-agent -c user.email=... deja
 # `git log -1 --format='%an'` en "sdd-agent". Es la prueba de que la guarda
@@ -164,6 +205,28 @@ PREV_AUTHOR18="$(cd "$AC18_DIR" && git log -1 --format='%an' HEAD~1)"
 
 assert_eq "$AUTHOR18" "sdd-agent" "AC18 commit con -c user.name=sdd-agent - git log -1 %an devuelve sdd-agent"
 assert_eq "$PREV_AUTHOR18" "human" "AC18 el commit humano anterior conserva su propio autor - la guarda ya distingue"
+
+# =========================================================================
+# AC38 — los tres textos normativos que describen el alcance del hatch
+# SDD_ALLOW_BASE_COMMIT dicen la verdad: ninguno afirma que desactiva
+# UNICAMENTE el chequeo de rama sin aclarar que el de identidad sigue
+# activo, y doc_architecture.md lista las 3 variables nuevas con su
+# default. Grep sobre el contenido real (no manual-only: es texto
+# versionado, se verifica igual que R3/R4/R5 verifican su propio contract).
+# =========================================================================
+QG_FILE="$REPO_ROOT/plugins/sdd-flow/standards/quality-gates.md"
+ARCH_FILE="$REPO_ROOT/SDD/docs/doc_architecture.md"
+
+guard_text="$(cat "$GUARD")"
+qg_text="$(cat "$QG_FILE")"
+arch_text="$(cat "$ARCH_FILE")"
+
+assert_contains "$guard_text" "NUNCA el chequeo de" "AC38 header de guard-git.sh - aclara que el hatch no apaga identidad"
+assert_contains "$qg_text" "el chequeo de identidad de agente" "AC38 quality-gates.md - aclara que el hatch no apaga identidad"
+assert_contains "$arch_text" "afectan el chequeo de identidad de agente" "AC38 doc_architecture.md - aclara que el hatch no apaga identidad"
+assert_contains "$arch_text" "SDD_AGENT_ENFORCE" "AC38 doc_architecture.md - lista SDD_AGENT_ENFORCE con su default"
+assert_contains "$arch_text" "SDD_AGENT_NAME" "AC38 doc_architecture.md - lista SDD_AGENT_NAME con su default"
+assert_contains "$arch_text" "SDD_AGENT_EMAIL" "AC38 doc_architecture.md - lista SDD_AGENT_EMAIL con su default"
 
 test_summary
 exit $?

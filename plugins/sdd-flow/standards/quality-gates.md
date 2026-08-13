@@ -179,7 +179,7 @@ Este archivo es prompt: describe qué tiene que pasar y confía en que el agente
 
 El hook es **fail-open**: sin `jq`, sin git, JSON inesperado o cwd desconocido → deja pasar. Un guard que rompe sesiones es peor que no tener guard. Detección best-effort: si el comando hace `cd` a otro repo antes del commit, el chequeo de rama mira la rama del cwd de la sesión.
 
-Escape hatch: `SDD_ALLOW_BASE_COMMIT=1` desactiva sólo el chequeo de rama protegida, para repos donde commitear a la default es legítimo.
+Escape hatch: `SDD_ALLOW_BASE_COMMIT=1` desactiva el chequeo de rama protegida, para repos donde commitear a la default es legítimo — **nunca** el chequeo de identidad de agente (`SDD_AGENT_ENFORCE=1`, contract R2): son dos guardas independientes, cada una con su propia variable, y el hatch de rama no es un hatch general del hook (ratificación v5 tras el `ESCALATE` de la ronda 1 de R2, AC36/AC38 — la v4 los dejaba interferir porque el bloque de identidad vivía aguas abajo del hatch).
 
 Todo lo demás de §6 (tests aflojados, `@ts-ignore`, thresholds bajados) se detecta en el chequeo mecánico del review (§7.1), que es donde el grep tiene el diff completo a la vista.
 
