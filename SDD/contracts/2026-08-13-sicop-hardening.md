@@ -1,5 +1,6 @@
 # HLTC — sdd-flow v0.11.0 · hardening desde el análisis de SICOP
 
+- **Contract version**: v3 — ratificado el 13-ago-2026 tras el `REJECTED` de la ronda 2 de R0. Cambio respecto de v2: los cuatro literales de credencial de AC6bis se escriben con clave y valor en spans separados, para que el contract deje de disparar su propio detector. Verificado con el patrón de `SDD/tests/secret-scan.sh`: cero coincidencias en este archivo. Con eso, la exclusión de `SDD/contracts/` queda **prohibida** y se elimina.
 - **Contract version**: v2 — ratificado por el planner el 13-ago-2026 tras el `ESCALATE` de la ronda 1 de R0. Cambios respecto de v1: threat model y bloque `concerns:` agregados (eran un BLOCKER de contract); AC3 reescrito con la severidad de `shellcheck` adentro; AC5 reescrito para apuntar a `SDD/verification/` en vez de `.sdd/`; AC6bis nuevo para cubrir `secret-scan.sh`. Los IDs de AC existentes no se reciclaron.
 - **Tarea madre Proxima**: `GEN-94`
 - **Repo**: `Bisalta/AI-Forge` · **Rama base**: `prod` · **Branch**: `feat-GEN-94-sicop-hardening`
@@ -74,11 +75,13 @@ Cerrar cuatro huecos del ciclo SDD que el proyecto SICOP midió en producción, 
 - **AC5** — `sdd-run-gates.sh -d SDD/docs/doc_quality_gates.md -o SDD/verification/feat-GEN-94-sicop-hardening-R0-gates.md` termina con `red: 0` en su línea JSON `sdd.gates`, y ningún gate queda `[SKIPPED]` por comando inexistente. **Ratificación v2**: el destino es `SDD/verification/`, no `.sdd/`. La v1 contradecía `plugins/sdd-flow/standards/quality-gates.md:95`, que prohíbe `.sdd/` para evidencia que se commitea porque ese directorio está gitignoreado y no viaja en el PR. `.sdd/gates-run.md` queda para corridas exploratorias.
 - **AC6** — `SDD/tests/test_run_gates.sh` ejercita `sdd-run-gates.sh` sobre un repo git creado en `SDD/tests/.tmp/`, y asserta el campo `green` de la línea JSON `sdd.gates`. El directorio temporal se borra al terminar, incluso si el test falla.
 - **AC6bis** — `SDD/tests/secret-scan.sh` detecta, cada uno en su propio caso de test en `SDD/tests/test_secret_scan.sh` (NEW), las cinco formas siguientes plantadas en un repo git temporal, y sale limpio sobre un árbol sin secretos:
-  1. `api_key=sk_live_51H8xQ2abcdefg` — valor **sin comillas**, clave en minúscula;
-  2. `PASSWORD="hunter2xyz"` — clave en `SCREAMING_SNAKE`;
-  3. `AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG` — sin comillas y en mayúsculas;
-  4. `GITHUB_TOKEN: ghp_16CharactersLongToken00` — separador `:` en vez de `=`;
-  5. una clave privada PEM (`-----BEGIN … PRIVATE KEY-----`).
+  1. clave `api_key`, separador `=`, valor `sk_live_51H8xQ2abcdefg` — valor **sin comillas**, clave en minúscula;
+  2. clave `PASSWORD`, separador `=`, valor `"hunter2xyz"` — clave en `SCREAMING_SNAKE`, valor entre comillas;
+  3. clave `AWS_SECRET_ACCESS_KEY`, separador `=`, valor `wJalrXUtnFEMI/K7MDENG` — sin comillas y en mayúsculas;
+  4. clave `GITHUB_TOKEN`, separador `:` en vez de `=`, valor `ghp_16CharactersLongToken00`;
+  5. una clave privada PEM (la línea de apertura `BEGIN` … `PRIVATE KEY` entre guiones).
+
+  **Ratificación v3**: los cuatro literales de arriba se escriben con la clave y el valor en spans separados, deliberadamente. En v2 estaban contiguos, y eso hacía que este mismo contract disparara el detector — un falso positivo que el implementador resolvió excluyendo `SDD/contracts/` entero del escaneo, dejando el gate 9 ciego en un directorio completo. La causa raíz era del plan, no del código: es el planner el que tiene que escribir las fixtures de credencial partidas, igual que `plant_kv` en `SDD/tests/test_secret_scan.sh` las parte para que el archivo de test pueda escanearse a sí mismo. **Ninguna exclusión por path está autorizada en `secret-scan.sh`**: la única exclusión admitida es la del propio script, que contiene el patrón literalmente.
 
   **AC6bis es un AC de detección**: se prueba por mutación, con las cinco formas plantadas y removidas, y el par verde→rojo→verde registrado por caso. **Ratificación v2**: la ronda 1 midió que la implementación entregada detecta sólo las formas 5 y `password = "x"`, y deja pasar las cuatro primeras. Un gate de seguridad obligatorio que no puede ponerse rojo frente a un secreto real es precisamente el modo de falla que este contract ataca, y por eso deja de ser un detalle de implementación para volverse un AC del contract.
 
