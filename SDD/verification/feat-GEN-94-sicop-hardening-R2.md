@@ -186,7 +186,12 @@ bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -d SDD/docs/doc_quality_ga
 ```
 
 - **Reporte generado**: `SDD/verification/feat-GEN-94-sicop-hardening-R2-gates.md` (mismo directorio que este archivo)
-- **Resultado real de esa corrida**: <SE_COMPLETA_TRAS_EL_COMMIT_1 — ver `sdd.result` de esta ronda para el valor real; no transcribo a mano lo que el runner ya deja escrito>
+- **Resultado real de esa corrida** (post-commit `1a0a249`, árbol limpio): exit `0` — `{"type":"sdd.gates","green":4,"red":0,"skipped":7,"report":"SDD/verification/feat-GEN-94-sicop-hardening-R2-gates.md"}`. Encabezado: `**Commit**: \`1a0a249\`` y `Tree: \`1466cb67628a0dc7a4932b8444ac5cd5c8115714\` — LIMPIO`. Verificado que coincide exactamente con el árbol real de ese commit:
+```
+$ git rev-parse HEAD^{tree}
+1466cb67628a0dc7a4932b8444ac5cd5c8115714
+```
+Los 4 gates con comando (`lint`, `unit tests`, `security`, `suite completa`) salieron verdes; los 6 restantes (`format/style`, `type-check`, `integration`, `build`, `e2e`, `smoke manual`) están `[SKIPPED]` con razón `N/A` declarada en `doc_quality_gates.md` — ninguno por comando inexistente sin razón (AC4/AC5 de R0, que R2 no reabre).
 
 ---
 
