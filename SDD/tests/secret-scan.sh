@@ -63,43 +63,30 @@ SELF_ABS="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 #    sdd-agents.md:12` ("Primer token: `<task-slug>`", un placeholder de
 #    documentación entre backticks) matcheaba como si fuera un secreto real.
 #    Un valor real de credencial nunca lleva backtick ni `<`/`>` adentro.
-PATTERN="AKIA[0-9A-Z]{16}|-----BEGIN [A-Za-z ]*PRIVATE KEY-----|[A-Za-z0-9_]*(password|secret|token|api[_-]?key)[A-Za-z0-9_]*[[:space:]]*[:=][[:space:]]*[\"']?[A-Za-z0-9_./+=-]{4,}[\"']?"
-
-# Exclusiones por PATH, con razón (no un "ignorar para pasar" — ninguna es
-# código productivo ni un secreto real, y las dos vienen del mismo problema
-# autorreferencial que ya motivó la auto-exclusión del script de abajo):
 #
-# - SDD/contracts/: por diseño de este mismo contract (AC6bis es el ejemplo:
-#   un AC de detección declara EN EL CONTRACT el valor literal que hay que
-#   plantar para probarlo), un contract que describe un AC de detección de
-#   secretos necesariamente cita las cinco formas completas como texto. Es
-#   prosa que ESPECIFICA qué detectar, no un secreto embebido en config. No
-#   se excluye SDD/briefs/ ni SDD/verification/: esos los escribe este mismo
-#   agente, que puede (y debe) describir las formas sin re-citarlas literales.
-EXCLUDE_PATH_PREFIXES="SDD/contracts/"
-
-is_excluded_path() {
-  local path="$1" prefix
-  local old_ifs="$IFS"
-  IFS=' '
-  for prefix in $EXCLUDE_PATH_PREFIXES; do
-    case "$path" in
-      "$prefix"*) IFS="$old_ifs"; return 0 ;;
-    esac
-  done
-  IFS="$old_ifs"
-  return 1
-}
+#    Punto ciego conocido, registrado como deuda `D6` (no se corrige acá: el
+#    trade-off contra el falso positivo de `sdd-agents.md:12` de arriba está
+#    aceptado, y ensanchar el charset lo reabre): el valor exige 4 caracteres
+#    del charset **arrancando justo después del separador** — un valor cuyo
+#    primer carácter no pertenece a `[A-Za-z0-9_./+=-]` no matchea, aunque el
+#    resto sí sea un secreto real. `password = "p@ssw0rd!"` (arranca con `p`
+#    pero el charset se corta en el `@` antes de llegar a 4) y
+#    `SMTP_PASSWORD=$ecret123` (arranca con `$`, fuera del charset) pasan sin
+#    detectarse.
+PATTERN="AKIA[0-9A-Z]{16}|-----BEGIN [A-Za-z ]*PRIVATE KEY-----|[A-Za-z0-9_]*(password|secret|token|api[_-]?key)[A-Za-z0-9_]*[[:space:]]*[:=][[:space:]]*[\"']?[A-Za-z0-9_./+=-]{4,}[\"']?"
 
 FOUND=0
 SCANNED=0
 EXCLUDED=0
 while IFS= read -r f; do
   [ -f "$REPO_ROOT/$f" ] || continue
-  # Se excluye a sí mismo: el patrón de arriba queda escrito literalmente en
-  # este archivo, así que grepearlo contra sí mismo es el mismo falso
-  # positivo autorreferencial que motivó el cierre "-----" de arriba.
-  if [ "$REPO_ROOT/$f" = "$SELF_ABS" ] || is_excluded_path "$f"; then
+  # Única exclusión admitida (contract v3): a sí mismo. El patrón de arriba
+  # queda escrito literalmente en este archivo, así que grepearlo contra sí
+  # mismo es el mismo falso positivo autorreferencial que motivó el cierre
+  # "-----" de la nota 1. NINGUNA exclusión por path está autorizada —
+  # excluir un directorio entero (ej. SDD/contracts/, como en v2) deja el
+  # gate ciego ahí para siempre, no sólo para el literal que la motivó.
+  if [ "$REPO_ROOT/$f" = "$SELF_ABS" ]; then
     EXCLUDED=$((EXCLUDED + 1))
     continue
   fi
@@ -122,5 +109,5 @@ if [ "$FOUND" -eq 1 ]; then
   exit 1
 fi
 
-echo "secret-scan: sin hallazgos sobre $SCANNED archivos versionados ($EXCLUDED excluidos: self + SDD/contracts/)"
+echo "secret-scan: sin hallazgos sobre $SCANNED archivos versionados ($EXCLUDED excluido: self)"
 exit 0

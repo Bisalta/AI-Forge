@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SDD/tests/test_secret_scan.sh — AC6bis (contract v2, ronda 2 de R0):
+# SDD/tests/test_secret_scan.sh — AC6bis (contract v2/v3, rondas 2-3 de R0):
 # secret-scan.sh detecta las cinco formas reales de secreto, cada una en su
 # propio caso, probada por mutación (plantar -> rojo -> remover -> verde).
 #
@@ -8,14 +8,23 @@
 # en SCREAMING_SNAKE, AWS_SECRET_ACCESS_KEY= sin comillas y GITHUB_TOKEN
 # con separador ":". Este archivo prueba las cinco explícitamente.
 #
+# forma 6 (ronda 3): un secreto plantado bajo SDD/contracts/ DENTRO DEL REPO
+# TEMPORAL tiene que poner el scan rojo. En v2, secret-scan.sh excluía
+# SDD/contracts/ del repo REAL entero (por un falso positivo del propio
+# contract, ya corregido en v3 partiendo sus literales) — v3 prohíbe
+# cualquier exclusión por path. Este caso es el AC de detección aplicado a
+# la exclusión misma: si alguien reintroduce un path a una lista de
+# exclusión, este caso se pone rojo.
+#
 # plant_kv arma "<clave><separador><valor>" a partir de TRES argumentos bash
 # separados a propósito: si la cadena completa quedara contigua en ESTE
 # archivo fuente, secret-scan.sh se autodetectaría al escanearse a sí mismo
 # (test_secret_scan.sh no está en su lista de exclusión — sólo secret-scan.sh
-# y SDD/contracts/ lo están, por la misma razón autorreferencial). Cada
-# argumento queda separado por un espacio+comillas en el CÓDIGO FUENTE (no
-# hay forma de que "clave<separador>" aparezca contiguo en el archivo), pero
-# bash los concatena en un solo string al ejecutar `printf '%s%s%s'`.
+# lo está, por la misma razón autorreferencial; ninguna exclusión por path
+# existe desde v3). Cada argumento queda separado por un espacio+comillas en
+# el CÓDIGO FUENTE (no hay forma de que "clave<separador>" aparezca contiguo
+# en el archivo), pero bash los concatena en un solo string al ejecutar
+# `printf '%s%s%s'`.
 
 set -uo pipefail
 
@@ -127,6 +136,25 @@ assert_contains "$out5_red" "form5.pem" "forma5 clave privada PEM - rojo al plan
 remove_fixture "form5.pem"
 run_scan >/dev/null 2>&1; ec5_after=$?
 assert_exit 0 "$ec5_after" "forma5 clave privada PEM - verde tras remover"
+
+# --- forma 6 (ronda 3): secreto bajo SDD/contracts/ tiene que dar rojo -----
+# Regresión exacta que motivó esta ronda: v2 excluía SDD/contracts/ entero
+# del escaneo. v3 prohíbe cualquier exclusión por path — este caso planta un
+# secreto en un archivo bajo SDD/contracts/ DENTRO DEL REPO TEMPORAL (nunca
+# toca el SDD/contracts/ real) y exige rojo. Si mañana alguien reintroduce
+# una exclusión por path en secret-scan.sh, este caso la atrapa.
+run_scan >/dev/null 2>&1; ec6_before=$?
+assert_exit 0 "$ec6_before" "forma6 secreto bajo SDD-contracts - verde antes de plantar"
+
+mkdir -p "$TMP_DIR/SDD/contracts"
+plant_kv "SDD/contracts/2026-09-01-nueva-feature.md" "api_key" "=" "sk_live_51H8xQ2abcdefg"
+out6_red="$(run_scan 2>&1)"; ec6_red=$?
+assert_exit 1 "$ec6_red" "forma6 secreto bajo SDD-contracts - rojo al plantar"
+assert_contains "$out6_red" "SDD/contracts/2026-09-01-nueva-feature.md" "forma6 secreto bajo SDD-contracts - rojo al plantar"
+
+remove_fixture "SDD/contracts/2026-09-01-nueva-feature.md"
+run_scan >/dev/null 2>&1; ec6_after=$?
+assert_exit 0 "$ec6_after" "forma6 secreto bajo SDD-contracts - verde tras remover"
 
 test_summary
 exit $?

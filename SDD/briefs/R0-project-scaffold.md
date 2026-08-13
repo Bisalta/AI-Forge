@@ -1,7 +1,7 @@
 # Task brief — R0 · project-scaffold: escalera de gates viva para AI-Forge
 
 - **Agente**: `AGENT_r0` · **Modelo**: `sonnet`
-- **Contract**: `SDD/contracts/2026-08-13-sicop-hardening.md` **v2** (bumpeado por el planner tras el `ESCALATE` de la ronda 1 — ver "Ronda 2" abajo), sección `R0`
+- **Contract**: `SDD/contracts/2026-08-13-sicop-hardening.md` **v3** (bumpeado por el planner tras el `ESCALATE` de la ronda 1 — ver "Ronda 2" y "Ronda 3" abajo), sección `R0`
 - **Arquetipo**: `project-scaffold`
 - **Repo**: `.` (AI-Forge) · **Branch**: `feat-GEN-94-sicop-hardening` (ya creada desde `prod`; NO crear otra, NO commitear a `prod`)
 - **Proxima subtask id**: `f7d63c89-3acd-423b-bb32-8e234630ca95` (informativo — **vos no tocás Proxima**)
@@ -92,7 +92,19 @@ El planner cerró los dos defectos de plan (threat model + concerns; AC3/AC5 ree
 - [x] T5.7 Actualizar `SDD/docs/doc_quality_gates.md` (notas de gate 2 y 9, timing con 3 archivos de test, convención de fixtures que parecen un secreto) y regenerar `SDD/verification/feat-GEN-94-sicop-hardening-R0-gates.md`.
 - [x] T5.8 Segundo commit `[FIX] [GEN-94] [sdd-flow] ...` sobre la misma branch.
 
-## Acceptance criteria (IDs del contract v2 — no los renumeres)
+### Ronda 3 — última ronda (cap de `quality-gates.md` §7.4): la exclusión de ronda 2 era la mitigación equivocada
+
+El reviewer midió que la exclusión de `SDD/contracts/` de ronda 2 dejaba el gate 9 ciego a todo el directorio: un secreto real ahí salía `exit 0`. La causa raíz era del contract (literales de `AC6bis` contiguos en v2), no del scanner — el planner corrigió los literales en v3 y prohibió toda exclusión por path. Tareas de este agente:
+
+- [x] T6.1 Verificación obligatoria: tras borrar la exclusión (T6.2), correr `bash SDD/tests/secret-scan.sh` sobre el repo real y confirmar `exit 0` — si hubiera salido `1`, tocaba `BLOCKED` y reportar qué archivo matchea, no tapar el hallazgo. El estado "con la exclusión puesta" ya está registrado como corrida real en la ronda 2 (`SDD/verification/feat-GEN-94-sicop-hardening-R0.md`, ahí también salía `0` porque la exclusión tapaba cualquier hallazgo en `SDD/contracts/`, no porque no lo hubiera).
+- [x] T6.2 Borrar `EXCLUDE_PATH_PREFIXES` e `is_excluded_path()` de `SDD/tests/secret-scan.sh`; el chequeo del loop vuelve a comparar sólo contra `$SELF_ABS`. Actualizar el mensaje de salida final (ya no dice "2 excluidos").
+- [x] T6.3 (AC6bis, detección aplicada a la exclusión misma) Agregar forma 6 a `SDD/tests/test_secret_scan.sh`: secreto plantado bajo `SDD/contracts/` **dentro del repo git temporal** tiene que dar rojo. Probado por mutación: reintroducir temporalmente la exclusión por path en `secret-scan.sh`, confirmar que el caso nuevo (y sólo ese) se pone rojo, revertir.
+- [x] T6.4 (MINOR, deuda `D6` ya registrada por el planner) Documentar en `secret-scan.sh:59-75` el punto ciego del charset (el valor necesita 4 caracteres del charset arrancando justo después del separador). No cambiar el charset.
+- [x] T6.5 (MINOR) Corregir la fila de `lib.sh` en el Impact set del verification report: son tres `test_*.sh`, no dos.
+- [x] T6.6 Actualizar `SDD/docs/doc_quality_gates.md` (gate 9 sin exclusión por path, convención de fixtures partidas ampliada a prosa/markdown) y regenerar `SDD/verification/feat-GEN-94-sicop-hardening-R0-gates.md`.
+- [x] T6.7 Tercer commit `[FIX] [GEN-94] [sdd-flow] ...` sobre la misma branch.
+
+## Acceptance criteria (IDs del contract v3 — no los renumeres)
 
 - **AC1** — `SDD/tests/run.sh` sale 0 cuando todos los `test_*.sh` pasan.
 - **AC2** — `SDD/tests/run.sh` sale 1 cuando al menos un `test_*.sh` falla, y su salida nombra el archivo que falló.
@@ -101,11 +113,11 @@ El planner cerró los dos defectos de plan (threat model + concerns; AC3/AC5 ree
 - **AC4** — `SDD/docs/doc_quality_gates.md` tiene la tabla en el formato que parsea el runner, y cada fila con comando declarado ejecuta un binario presente en la máquina. Las filas sin comando llevan `N/A — <razón>`.
 - **AC5** — `sdd-run-gates.sh -d SDD/docs/doc_quality_gates.md -o SDD/verification/feat-GEN-94-sicop-hardening-R0-gates.md` termina con `red: 0` en su línea JSON `sdd.gates`, sin gates `[SKIPPED]` por comando inexistente. **Ratificación v2**: destino `SDD/verification/`, no `.sdd/`.
 - **AC6** — `SDD/tests/test_run_gates.sh` ejercita el runner sobre un repo git en `SDD/tests/.tmp/` y assertea el campo `green` del JSON. El temporal se borra al terminar incluso si el test falla.
-- **AC6bis** *(nuevo v2)* — `SDD/tests/secret-scan.sh` detecta, cada una en su propio caso de `SDD/tests/test_secret_scan.sh`, las cinco formas: `api_key=` sin comillas minúscula, `PASSWORD="..."` SCREAMING_SNAKE, `AWS_SECRET_ACCESS_KEY=` sin comillas mayúscula, `GITHUB_TOKEN:` separador dos puntos, y clave privada PEM. Sale limpio sobre un árbol sin secretos.
+- **AC6bis** *(nuevo v2, ratificado v3)* — `SDD/tests/secret-scan.sh` detecta, cada una en su propio caso de `SDD/tests/test_secret_scan.sh`, las cinco formas: `api_key=` sin comillas minúscula, `PASSWORD="..."` SCREAMING_SNAKE, `AWS_SECRET_ACCESS_KEY=` sin comillas mayúscula, `GITHUB_TOKEN:` separador dos puntos, y clave privada PEM. Sale limpio sobre un árbol sin secretos. **Ratificación v3**: los cuatro literales de arriba van con clave y valor en spans separados en el propio contract (para que el contract no dispare el detector); y **ninguna exclusión por path está autorizada en `secret-scan.sh`** — la única exclusión admitida es la del propio script sobre sí mismo.
 
 **AC2 es un AC de detección**: su condición de aprobación es "el harness se pone rojo cuando un test falla". No alcanza con verlo verde. Probalo rompiendo a propósito: generá un test que falle, verificá que `run.sh` sale 1, y revertí. Registrá las tres corridas (verde → rojo → verde) con comando y exit code en el verification report. Un harness que reporta éxito sin haber detectado el fallo es exactamente el modo de falla que este contract ataca.
 
-**AC6bis también es un AC de detección**: se prueba por mutación (plantar cada forma → rojo → remover → verde), cinco veces, una por forma. Ver `SDD/verification/feat-GEN-94-sicop-hardening-R0.md` sección "AC6bis" para las cinco corridas.
+**AC6bis también es un AC de detección**: se prueba por mutación (plantar cada forma → rojo → remover → verde), seis veces desde ronda 3 (las cinco formas de credencial + la forma 6, que prueba que ninguna exclusión por path vuelve a colarse). Ver `SDD/verification/feat-GEN-94-sicop-hardening-R0.md` sección "AC6bis" para las seis corridas.
 
 ## AC ↔ test binding (llenalo vos)
 
@@ -118,7 +130,7 @@ El planner cerró los dos defectos de plan (threat model + concerns; AC3/AC5 ree
 | AC4 | `doc_quality_gates.md` con tabla parseable y comandos reales; filas sin comando llevan `N/A — <razón>` | gate-evidence: el runner parseó `SDD/docs/doc_quality_gates.md` sin `exit 3` y corrió los 3 gates con comando declarado (2, 4, 9) contra binarios presentes — ver `SDD/verification/feat-GEN-94-sicop-hardening-R0-gates.md` | gate | [x] |
 | AC5 | `sdd-run-gates.sh -d ... -o SDD/verification/...-gates.md` termina `red: 0`, sin `[SKIPPED]` por comando inexistente | gate-evidence: línea `{"type":"sdd.gates","green":4,"red":0,"skipped":7,...}` en `SDD/verification/feat-GEN-94-sicop-hardening-R0-gates.md` (los 7 skipped son las filas `N/A` declaradas, no comandos faltantes; destino ya no es `.sdd/`, ratificación v2) | gate | [x] |
 | AC6 | `test_run_gates.sh` ejercita el runner sobre un repo git temporal, asserta `green`, y limpia incluso si falla | `SDD/tests/test_run_gates.sh::"el JSON sdd.gates reporta green:2"` (+ `"sdd-run-gates.sh sale 0 con dos gates que salen 0"`, `"el JSON sdd.gates reporta red:0 con dos gates verdes"`); limpieza-en-fallo verificada empíricamente, ver `SDD/verification/feat-GEN-94-sicop-hardening-R0.md` sección AC6 | integration | [x] |
-| AC6bis | `secret-scan.sh` detecta las 5 formas reales, cada una por mutación | `SDD/tests/test_secret_scan.sh::"forma1 api_key sin comillas - rojo al plantar"`, `"forma2 PASSWORD screaming-snake con comillas - rojo al plantar"`, `"forma3 AWS_SECRET_ACCESS_KEY sin comillas - rojo al plantar"`, `"forma4 GITHUB_TOKEN separador dos puntos - rojo al plantar"`, `"forma5 clave privada PEM - rojo al plantar"` (+ sus pares verde antes/después) — 22 asserts, salida completa en `SDD/verification/feat-GEN-94-sicop-hardening-R0.md` sección AC6bis | unit + mutación ×5 | [x] |
+| AC6bis | `secret-scan.sh` detecta las 5 formas reales + la exclusión por path no puede volver, cada una por mutación | `SDD/tests/test_secret_scan.sh::"forma1 api_key sin comillas - rojo al plantar"`, `"forma2 PASSWORD screaming-snake con comillas - rojo al plantar"`, `"forma3 AWS_SECRET_ACCESS_KEY sin comillas - rojo al plantar"`, `"forma4 GITHUB_TOKEN separador dos puntos - rojo al plantar"`, `"forma5 clave privada PEM - rojo al plantar"`, `"forma6 secreto bajo SDD-contracts - rojo al plantar"` (+ sus pares verde antes/después) — 26 asserts, salida completa en `SDD/verification/feat-GEN-94-sicop-hardening-R0.md` sección AC6bis | unit + mutación ×6 | [x] |
 
 ## Reglas innegociables
 
@@ -129,26 +141,26 @@ El planner cerró los dos defectos de plan (threat model + concerns; AC3/AC5 ree
 
 ## Rollback
 
-`git revert` de los commits de R0 (ronda 1 + ronda 2). No hay migración ni estado externo.
+`git revert` de los commits de R0 (ronda 1 + ronda 2 + ronda 3). No hay migración ni estado externo.
 
 ## Done criteria
 
-Los ocho ACs (AC1-AC6, AC3bis, AC6bis) con test verde o gate-evidence, `SDD/tests/run.sh` verde con los 3 archivos de test, `sdd-run-gates.sh` con `red: 0` apuntando a `SDD/verification/` (no `.sdd/`), verification report escrito, binding completo, dos commits en la branch (ronda 1 `[ADD]`, ronda 2 `[FIX]`).
+Los ocho ACs (AC1-AC6, AC3bis, AC6bis) con test verde o gate-evidence, `SDD/tests/run.sh` verde con los 3 archivos de test, `sdd-run-gates.sh` con `red: 0` apuntando a `SDD/verification/` (no `.sdd/`), `secret-scan.sh` sin ninguna exclusión por path, verification report escrito, binding completo, tres commits en la branch (ronda 1 `[ADD]`, rondas 2 y 3 `[FIX]`).
 
 ## Execution Report
 
-- **Summary**: Ronda 1 dejó la escalera de gates viva (harness, primer test real, gate de seguridad, docs) pero el reviewer emitió `ESCALATE`: `secret-scan.sh` no detectaba 4 de 5 formas reales de secreto (AC6bis nuevo), la evidencia de mutación de AC2 estaba stale, los `SC2329` propios no tenían justificación inline (AC3bis nuevo), y una cifra del Impact set no tenía corrida detrás. Ronda 2 corrige los cuatro puntos sobre el contract v2 (que también ratificó AC3/AC5 y agregó threat model — trabajo del planner, no de este agente), más dos falsos positivos nuevos que el patrón ampliado de AC6bis introdujo (medidos y corregidos en la misma ronda: un placeholder de doc en `plugins/` y la propia prosa de `SDD/contracts/`).
-- **Task status**: ronda 1, 13/13 (T1.1-T1.4, T2.1-T2.2, T3.1-T3.4, T4.1-T4.3). Ronda 2, 8/8 (T5.1-T5.8). 0 bloqueadas, 0 skipped en ambas rondas.
-- **Validation executed** (comando · exit code) — ronda 2, la vigente:
-  - `bash SDD/tests/test_secret_scan.sh` · `0` (22 asserts — AC6bis, las 5 formas por mutación)
-  - `bash SDD/tests/test_harness.sh` · `0` (y `1` durante la mutación deliberada de AC2 **re-corrida fresca**, revertida)
-  - `bash SDD/tests/test_run_gates.sh` · `0` (y `1` durante el fallo forzado deliberado de la prueba de limpieza de AC6, revertido)
-  - `bash SDD/tests/run.sh` · `0` (`3 passed, 0 failed (3 total)`, ~2s)
-  - `bash SDD/tests/secret-scan.sh` · `0` (`75` archivos escaneados, `2` excluidos: self + `SDD/contracts/`)
+- **Summary**: Ronda 1 dejó la escalera viva; ronda 2 corrigió la detección de `secret-scan.sh` pero introdujo una exclusión por path (`SDD/contracts/`) para tapar un falso positivo del propio contract. El reviewer midió, en ronda 3, que esa exclusión dejaba el gate 9 ciego a todo el directorio — un secreto real ahí no se detectaba. La causa raíz era del contract (literales de `AC6bis` contiguos), no del scanner: el planner la corrigió en v3 y prohibió toda exclusión por path. Esta ronda borra la exclusión, verifica que el contract corregido ya no dispara el detector, agrega una sexta forma de test que prueba por mutación que la exclusión no vuelve, documenta el punto ciego del charset (deuda `D6`), y corrige un dato desactualizado del Impact set.
+- **Task status**: ronda 1, 13/13 (T1.1-T1.4, T2.1-T2.2, T3.1-T3.4, T4.1-T4.3). Ronda 2, 8/8 (T5.1-T5.8). Ronda 3, 7/7 (T6.1-T6.7). 0 bloqueadas, 0 skipped en las tres rondas.
+- **Validation executed** (comando · exit code) — ronda 3, la vigente:
+  - `bash SDD/tests/secret-scan.sh` sobre el repo real, **exclusión ya borrada** (verificación obligatoria exigida antes de cerrar la ronda) · `0` — `sin hallazgos sobre 77 archivos versionados (1 excluido: self)`. El fix del planner en el contract v3 alcanzó; no hubo que reportar `BLOCKED` ni encontrar otro literal contiguo.
+  - `bash SDD/tests/test_secret_scan.sh` · `0` (26 asserts — AC6bis, 6 formas por mutación, incluida la forma 6 nueva)
+  - Mutación de la forma 6: `bash SDD/tests/test_secret_scan.sh` con la exclusión por path reintroducida temporalmente en `secret-scan.sh` · `1` (`FAIL — 2 assert(s) fallaron`, exactamente los 2 de la forma 6) → revertido → `0` de nuevo
+  - `bash SDD/tests/run.sh` · `0` (`3 passed, 0 failed (3 total)`)
   - `git ls-files -z -- '*.sh' | xargs -0 shellcheck --severity=warning` · `0`
-  - `git ls-files -z -- '*.sh' | xargs -0 shellcheck` (default) · `1` — exactamente los 3 `SC2016` de `plugins/` (`D4`), cero `SC2329` (AC3bis verificado)
-  - `bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -d SDD/docs/doc_quality_gates.md -o SDD/verification/feat-GEN-94-sicop-hardening-R0-gates.md` · `0` (`green:4,red:0,skipped:7`) — evidencia oficial commiteada, reemplaza la de ronda 1
-  - Detalle completo, con las corridas rojas intermedias y los dos falsos positivos medidos, en `SDD/verification/feat-GEN-94-sicop-hardening-R0.md`.
-- **Blockers**: ninguno.
-- **Files changed en ronda 2**: `SDD/tests/secret-scan.sh` (mod — patrón AC6bis + exclusión `SDD/contracts/` + salida redactada), `SDD/tests/test_secret_scan.sh` (new — AC6bis), `SDD/tests/test_harness.sh` (mod — `disable=SC2329` inline), `SDD/tests/test_run_gates.sh` (mod — `disable=SC2329` inline), `SDD/tests/run.sh` (mutado y revertido para la corrida de AC2, sin diff neto), `SDD/docs/doc_quality_gates.md` (mod — notas AC3bis/AC6bis, timing), `SDD/verification/feat-GEN-94-sicop-hardening-R0.md` (mod — reescrito con la ronda 2), `SDD/verification/feat-GEN-94-sicop-hardening-R0-gates.md` (mod, regenerado por el runner), `SDD/briefs/R0-project-scaffold.md` (este archivo). Cero cambios en `plugins/` (verificado: `git diff origin/prod -- plugins/` vacío) y cero cambios en `SDD/contracts/`, `SDD/debt.md`, `.sdd/state.json`.
-- **Final statement**: Done. Los ocho ACs (AC1-AC6, AC3bis, AC6bis) tienen test verde o gate-evidence, `SDD/tests/run.sh` sale 0 con 3 archivos de test, `sdd-run-gates.sh` termina `red: 0` apuntando a `SDD/verification/` sin `[SKIPPED]` por comando inexistente, verification report escrito y referenciado, binding completo, segundo commit `[FIX]` pendiente de crear sobre `feat-GEN-94-sicop-hardening`.
+  - `git ls-files -z -- '*.sh' | xargs -0 shellcheck` (default) · `1` — exactamente los 3 `SC2016` de `plugins/` (`D4`), cero `SC2329`
+  - `bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -d SDD/docs/doc_quality_gates.md -o SDD/verification/feat-GEN-94-sicop-hardening-R0-gates.md` · `0` (`green:4,red:0,skipped:7`) — evidencia oficial commiteada, reemplaza la de ronda 2
+  - `git diff origin/prod -- plugins/` · vacío (0 líneas)
+  - Detalle completo, con la verificación obligatoria post-fix y la corrida roja de la mutación de la forma 6, en `SDD/verification/feat-GEN-94-sicop-hardening-R0.md`.
+- **Blockers**: ninguno. La verificación obligatoria (`secret-scan.sh` sobre el repo real con la exclusión borrada) salió `0` — no quedó otro literal de credencial contiguo en el repo real.
+- **Files changed en ronda 3**: `SDD/tests/secret-scan.sh` (mod — exclusión por path borrada, comentario de deuda `D6`), `SDD/tests/test_secret_scan.sh` (mod — forma 6), `SDD/docs/doc_quality_gates.md` (mod — gate 9 sin exclusión, convención de fixtures ampliada), `SDD/verification/feat-GEN-94-sicop-hardening-R0.md` (mod — sección Ronda 3, AC6bis reescrita, Impact set corregido), `SDD/verification/feat-GEN-94-sicop-hardening-R0-gates.md` (mod, regenerado por el runner), `SDD/briefs/R0-project-scaffold.md` (mod, este archivo). Cero cambios en `plugins/`, `SDD/contracts/`, `SDD/debt.md`, `.sdd/state.json` (verificado, no tocados).
+- **Final statement**: Done. Los ocho ACs (AC1-AC6, AC3bis, AC6bis) tienen test verde o gate-evidence, `SDD/tests/run.sh` sale 0 con 3 archivos de test (26 asserts en `test_secret_scan.sh`), `sdd-run-gates.sh` termina `red: 0` apuntando a `SDD/verification/` sin `[SKIPPED]` por comando inexistente, `secret-scan.sh` no tiene ninguna exclusión por path, verification report escrito y referenciado, binding completo, tercer commit `[FIX]` pendiente de crear sobre `feat-GEN-94-sicop-hardening`.
