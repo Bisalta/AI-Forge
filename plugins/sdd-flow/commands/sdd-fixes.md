@@ -29,6 +29,7 @@ Parseá la lista cruda del usuario. Cada item → bloque:
 - Repo: front | back | ambos
 - Triage: trivial | mediano | ambiguo
 - Estado: pendiente
+- Mutación: <sólo si el item es un control de detección — qué se rompe · dónde · qué queda revertido>
 - Detalle: <repro / esperado vs actual / descripción>
 ```
 
@@ -36,6 +37,7 @@ Reglas:
 - IDs `F-01, F-02, …` secuenciales. Si ya hay items, continuá desde el máximo existente. NUNCA renumeres items existentes — re-invocación = append.
 - **Triage**: `trivial` = fix directo en un repo, sin diagnóstico. `mediano` = requiere diagnóstico o toca varias piezas de un repo. `ambiguo` = decisiones de diseño abiertas O acoplado front+back (cambio de contrato/endpoint).
 - A cada item `ambiguo` agregale: `- Sugerencia: cerrar con /sdd-enrich antes de implementar`.
+- **Item que es un control de detección** (arregla o agrega una guarda, una validación, un chequeo que tiene que poder ponerse rojo — el criterio está en `standards/quality-gates.md` §10 «Prueba por mutación (AC de detección)»): llenale el campo `Mutación:` acá, en el triage. La vía corta no tiene contract, así que **el declarante es el intake**: es el único momento en que alguien mira el item antes de arreglarlo.
 - Si un item no da info para clasificar Tipo/Repo, poné tu mejor inferencia — no interrogues al usuario por cada item.
 
 ## 3. Abrir visualizador
@@ -56,7 +58,7 @@ Terminá mostrando: tabla resumen (ID, título, triage, repo) + conteo por triag
 - **Proxima (opcional)**: al arrancar la tanda, si el MCP `proxima` está disponible, ofrecé crear tareas. Recomendado: **una tarea madre por la tanda** + subtask por item (la madre tiene key, las subtasks solo UUID). La branch usa el **key de la madre** + el id del item (`F-NN`). Si el usuario acepta, creás la tarea ANTES de la branch. Solo vos llamás al MCP; la subtask pasa a `done` cuando el item se integra.
 - **Rama base**: al arrancar el primer item de la tanda, proponé la base (`dev` si existe, sino la default del repo) y confirmala con el usuario UNA vez. Esa queda para toda la tanda salvo que el usuario diga otra cosa.
 - **Branch por item — NUNCA commits directos a ramas normales**: por cada item creá branch desde la base confirmada: con Proxima `{action}-{KEY_MADRE}-{f-nn}-{desc}` (ej. `fix-GEN-30-f03-dropdown-filtros`); sin Proxima `<MODULO>-<TICKET>` o `<MODULO>-<f-nn-desc-corta>` (ej. `COMPRAS-f-03-dropdown-filtros`). Commits del item van ahí, convención `[FIX] [TICKET] [Módulo] [Descripción]` (o `[IMP]` para mejoras).
-- **Mini-DoD por item (la vía corta no es la vía sin calidad)**: antes de marcar `hecho` — (1) el cambio tiene su test (bugfix: test que reproducía el fallo, corrida roja registrada antes del fix); (2) `bash SDD/scripts/sdd-run-gates.sh` verde (o la escalera a mano si el runner no está, declarándolo); (3) cero mitigaciones prohibidas (`quality-gates.md` §6 — nada de skipear tests ni `@ts-ignore` para que pase). Sin ceremonia de contract/reviewer, pero con evidencia. Un fix que no puede cumplir esto no era `trivial` → reclasificá a `ambiguo` y cerralo con `/sdd-enrich`.
+- **Mini-DoD por item (la vía corta no es la vía sin calidad)**: antes de marcar `hecho` — (1) el cambio tiene su test (bugfix: test que reproducía el fallo, corrida roja registrada antes del fix); (1b) si el item es un **control de detección**, la mutación **la declara el propio ítem de `fixes.md` en el triage** (campo `Mutación:`) y **las tres corridas van en la evidencia de ese ítem**, con comando y exit code — la vía corta **no** está exceptuada de `quality-gates.md` §10: lo único que cambia es quién escribe la mutación, porque acá no hay contract que la declare; (2) `bash SDD/scripts/sdd-run-gates.sh` verde (o la escalera a mano si el runner no está, declarándolo); (3) cero mitigaciones prohibidas (`quality-gates.md` §6 — nada de skipear tests ni `@ts-ignore` para que pase). Sin ceremonia de contract/reviewer, pero con evidencia. Un fix que no puede cumplir esto no era `trivial` → reclasificá a `ambiguo` y cerralo con `/sdd-enrich`.
 - **Integración según capa**: item verificado → con remote: push + PR contra la base (`Estado: hecho` + link del PR en `Detalle`); sin remote: review + merge local `--no-ff` (`Estado: hecho` + hash en `Detalle`); repo no-git: aplicá el fix sin branch y anotalo. La branch se borra tras integrar.
 - Antes de arrancar un item: `Estado: en-curso` en `fixes.md`.
 - Bloqueado: `Estado: bloqueado` + nota del motivo en `Detalle`.

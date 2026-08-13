@@ -9,8 +9,16 @@
 # working dir desconocido) => exit 0 y el flujo sigue normal. Un guard que
 # rompe sesiones es peor que no tener guard.
 #
+# Contrato de señalización: con `jq` presente, `deny()` Y `allow()` salen
+# LOS DOS con exit 0 — la única diferencia observable es el JSON
+# `permissionDecision` en stdout. Sin `jq`, `deny()` degrada a texto plano
+# en stderr con exit 2. Medir este hook sólo por exit code hace que un
+# `allow` y un `deny` con `jq` se vean IGUALES (contract R5).
+#
 # Escape hatch: SDD_ALLOW_BASE_COMMIT=1 desactiva el chequeo de rama protegida
-# (para repos donde commitear a la default es legítimo).
+# (para repos donde commitear a la default es legítimo) — NUNCA el chequeo de
+# identidad de agente (sección 3 más abajo): son dos guardas independientes,
+# activadas por variables distintas (ratificación v5 del contract, AC36/AC38).
 
 set -uo pipefail
 
@@ -66,12 +74,40 @@ if git_subcommand push; then
   fi
 fi
 
-# --- 3. Commit directo a rama protegida --------------------------------------
+# --- 3. Identidad de agente en el autor del commit (contract R2) -------------
+# Ratificación v5 (ESCALATE ronda 1 de R2): este bloque tiene que evaluarse
+# ANTES del hatch de rama protegida y de toda resolución de rama (sección 4
+# de abajo) — sólo parsea $CMD, no llama a git ni depende de en qué rama
+# está el repo. Ubicarlo "después" del chequeo de rama (v4) lo dejaba aguas
+# abajo de cuatro salidas tempranas ajenas a identidad (el propio hatch,
+# `command -v git`, `rev-parse --git-dir` y HEAD detached), así que
+# SDD_ALLOW_BASE_COMMIT=1 (AC36) o un HEAD detached (AC37) apagaban el
+# chequeo de identidad de contrabando — exactamente la guarda tautológica
+# que R2 existe para matar (quality-gates.md, regla del AC de autoría).
+git_subcommand commit || allow
+
+# Opt-in por repo: sin SDD_AGENT_ENFORCE=1 en el entorno este bloque no
+# deniega y un humano commiteando en el mismo repo no queda bloqueado (AC16,
+# par de detección con AC14). Con la variable en 1, el mecanismo de
+# identidad es `git -c user.name=... -c user.email=...` (decisión cerrada
+# del contract: nunca GIT_AUTHOR_*/--author) — un commit que no declara las
+# dos flags con el valor esperado se deniega con el mismo deny() que usa el
+# chequeo de rama protegida de abajo (mismo código de denegación, AC14),
+# sin importar el hatch de rama ni si HEAD está detached (AC36, AC37).
+if [ "${SDD_AGENT_ENFORCE:-0}" = "1" ]; then
+  EXPECTED_NAME="${SDD_AGENT_NAME:-sdd-agent}"
+  EXPECTED_EMAIL="${SDD_AGENT_EMAIL:-sdd-agent@users.noreply.github.com}"
+  GOT_NAME="$(printf '%s' "$CMD" | grep -oE '\-c[[:space:]]+user\.name=[^[:space:]]+' | tail -1 | sed -E 's/^-c[[:space:]]+user\.name=//')"
+  GOT_EMAIL="$(printf '%s' "$CMD" | grep -oE '\-c[[:space:]]+user\.email=[^[:space:]]+' | tail -1 | sed -E 's/^-c[[:space:]]+user\.email=//')"
+  if [ "$GOT_NAME" != "$EXPECTED_NAME" ] || [ "$GOT_EMAIL" != "$EXPECTED_EMAIL" ]; then
+    deny "sdd-flow: este repo exige identidad de agente en los commits (SDD_AGENT_ENFORCE=1). Esperada: user.name=${EXPECTED_NAME} user.email=${EXPECTED_EMAIL}. Recibida: user.name=${GOT_NAME:-<ninguna>} user.email=${GOT_EMAIL:-<ninguna>}. Commiteá con: git -c user.name=${EXPECTED_NAME} -c user.email=${EXPECTED_EMAIL} commit ... (standards/base-standards.md, sección Git)."
+  fi
+fi
+
+# --- 4. Commit directo a rama protegida --------------------------------------
 if [ "${SDD_ALLOW_BASE_COMMIT:-0}" = "1" ]; then
   allow
 fi
-
-git_subcommand commit || allow
 
 command -v git >/dev/null 2>&1 || allow
 

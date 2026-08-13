@@ -58,6 +58,14 @@ Forbidden:
 - Referencing local environment issues
 - Saying "based on execution report" or naming internal artifacts
 
+### 3bis. Every figure carries the output that produced it
+
+A number in a PR report is a measurement, not a phrase. If you write a figure — tests passed, files scanned, findings, coverage, timing — attach the output of the command that produced it, verbatim, and keep the figure identical to that output. A figure copied from another document (an earlier report, the contract, a message) is a quote, not a measurement: re-run the command and paste its output, or drop the figure and describe the result in words.
+
+This is the only exception to "no raw commands" in rule 3, and it is narrow: it covers the output block that backs a figure, never a list of the commands you ran. That block does not count toward the 150-300 word target, so length is never a reason to publish a bare number.
+
+A validation claim that rests on a detection AC — a guard, a constraint, a check that has to be able to go red — is already backed by its recorded runs in the verification evidence: state the outcome and do not restate the rule here, it is written once in `standards/quality-gates.md` §10 «Prueba por mutación (AC de detección)».
+
 ### 4. Language constraints
 
 - Use simple, direct English

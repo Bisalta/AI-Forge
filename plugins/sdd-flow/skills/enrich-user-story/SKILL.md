@@ -89,8 +89,9 @@ Your questions MUST collectively cover these dimensions:
    (how we know this is correctly implemented — if `docs/foundation/01-prd.md` exists, align with its stated success metrics/KPIs where relevant)
 
 7. **Archetype** (`standards/archetypes.md`)  
-   Exactamente uno: `api-endpoint · ui-feature · data-migration · background-job · third-party-integration · bugfix · refactor · infra · project-scaffold`. Inferilo del pedido y **confirmalo** (no preguntes en abierto si es obvio — proponé y validá). Si el trabajo parece dos arquetipos, son dos requerimientos: decilo y cerrá el primero. El arquetipo determina qué preguntas NFR siguen.
+   Exactamente uno: `api-endpoint · ui-feature · data-migration · background-job · third-party-integration · bugfix · refactor · infra · project-scaffold · analysis`. Inferilo del pedido y **confirmalo** (no preguntes en abierto si es obvio — proponé y validá). Si el trabajo parece dos arquetipos, son dos requerimientos: decilo y cerrá el primero. El arquetipo determina qué preguntas NFR siguen.
    - **Repo sin escalera funcional** (sin runner de tests, `doc_quality_gates.md` todo `N/A`): avisá que la primera task va a ser `project-scaffold` — el requerimiento funcional viene después, con gates vivos.
+   - **El entregable es una conclusión o una cifra que alimenta una decisión** (backtest, barrido, estimación — producto en documentos o notebooks en vez de código de aplicación): es `analysis`. Sus NFR obligatorias son `observability` — la corrida que produce la cifra tiene que ser **reproducible por otro**, y esa es la respuesta que buscás, no "queda el notebook" — y `data-privacy` cuando el dataset tiene PII.
    - **Trabajo trivial** (cambio localizado, sin superficie nueva, sin schema, sin decisión de diseño): proponé la **vía corta** — `/sdd-fixes` con su mini-DoD — en vez de este pipeline. No infles un typo a ceremonia completa.
 
 8. **NFR — solo las dimensiones que el arquetipo marca obligatorias** (ver la sección "NFR obligatorias" de cada arquetipo). Cada una se cierra con valor concreto, no con adjetivo:

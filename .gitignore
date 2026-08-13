@@ -2,3 +2,4 @@
 node_modules/
 .sdd/
 *.log
+SDD/tests/.tmp/

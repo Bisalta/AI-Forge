@@ -6,30 +6,71 @@
 # timestamp UTC y las últimas líneas de output por gate. La evidencia deja de
 # ser algo que un modelo declara y pasa a ser algo que este script produce.
 #
+# El reporte sella el HASH DEL ÁRBOL REALMENTE VERIFICADO (working tree +
+# índice), no sólo el commit de HEAD: HEAD puede diferir del working tree en
+# dos direcciones (cambios sin commitear al correr los gates, o commits
+# posteriores a que el reporte se escribiera), y un reporte que sólo nombra
+# HEAD se puede presentar como evidencia de un commit que no es el código que
+# realmente corrió (contract R1, SDD/contracts/2026-08-13-sicop-hardening.md).
+#
 # Uso:
-#   sdd-run-gates.sh [-d SDD/docs/doc_quality_gates.md] [-o reporte.md] [--keep-going] [--full]
+#   sdd-run-gates.sh [-d SDD/docs/doc_quality_gates.md] [-o reporte.md] [--keep-going] [--full] [--allow-dirty]
 #
 #   -d            doc de gates (default: SDD/docs/doc_quality_gates.md)
 #   -o            archivo del reporte (default: .sdd/gates-run.md; se sobreescribe)
 #   --keep-going  no cortar al primer rojo (default: corta, regla de la escalera)
 #   --full        además de la escalera, correr la "Suite completa" declarada
+#   --allow-dirty escribir evidencia con árbol sucio aunque -o apunte fuera de
+#                 .sdd/ (evidencia que se commitea); el encabezado marca
+#                 ARBOL SUCIO y lista los archivos sin commitear
 #
 # Salida por stdout: el reporte + una última línea JSON parseable:
 #   {"type":"sdd.gates","green":N,"red":N,"skipped":N,"report":"<path>"}
-# Exit: 0 = todo verde · 1 = hubo rojo · 3 = no pude leer/parsear el doc de gates
+# Exit: 0 = todo verde · 1 = hubo rojo · 3 = no pude leer/parsear el doc de
+#       gates · 4 = árbol sucio y -o apunta fuera de .sdd/ sin --allow-dirty
+#       (esa evidencia se commitea y exige árbol limpio; no se escribe nada)
 #
 # Env: SDD_GATE_TIMEOUT (segundos por gate, default 1800, requiere `timeout`).
+#
+# Sellado del árbol (además de Commit, siempre en el encabezado del reporte):
+#   - árbol limpio  → Tree: hash de `git rev-parse HEAD^{tree}`.
+#   - árbol sucio   → Tree: hash de `git stash create` (objeto que representa
+#     working tree + índice, sin tocar la branch ni el stash log). NUNCA
+#     `git write-tree` (descartado por el contract: sólo ve el índice, así
+#     que un cambio sin `git add` no quedaría representado). Límite conocido
+#     heredado de esa misma decisión: `git stash create` sólo ve contenido
+#     que alguna vez pasó por `git add` — un archivo sin trackear nunca
+#     queda representado en el hash, aunque `DIRTY_FILES` sí lo liste. Si
+#     TODO el árbol sucio es sin trackear, no hay nada que stashear y Tree
+#     cae a `-` en vez de reusar el hash de HEAD, que mentiría igual que el
+#     bug que este sellado arregla.
+#   - sin repo git  → Tree: `-`. El sellado NUNCA aborta la corrida por no
+#     poder sellar: degrada y la escalera sigue (mismo criterio que el resto
+#     del runner).
+#
+# Sellado del doc (identidad de CONTENIDO, no sólo de ruta — contract R5,
+# SDD/contracts/2026-08-13-sicop-hardening.md): el encabezado también
+# estampa el hash sha256 (primeros 16 hex) del doc de gates que se acaba de
+# leer, junto a su ruta. Una ruta no dice qué texto había adentro cuando
+# corrieron los gates — el doc de gates cambia varias veces por día durante
+# el propio ciclo SDD (medido: 31 cambios en 8 días, 8 en un solo día) — y
+# el commit del doc tampoco alcanza: un archivo modificado sin commitear
+# hace que ese sha mienta igual que HEAD mentía antes del sellado de árbol
+# de arriba. `shasum -a 256` primero (macOS), `sha256sum` si no está; sin
+# ninguno de los dos, `sha256:-` y la corrida sigue — el sellado de hash
+# NUNCA aborta, misma política que el sellado de árbol.
 #
 # Qué NO hace: no decide qué gates aplican (eso lo declara el doc — fila sin
 # comando o con N/A se reporta [SKIPPED]), no arregla nada, no reintenta.
 
 set -uo pipefail
 
-VERSION="0.10.0"
+VERSION="0.12.0"
 DOC="SDD/docs/doc_quality_gates.md"
 OUT=".sdd/gates-run.md"
 KEEP_GOING=0
 RUN_FULL=0
+ALLOW_DIRTY=0
 TIMEOUT_S="${SDD_GATE_TIMEOUT:-1800}"
 
 while [ $# -gt 0 ]; do
@@ -38,12 +79,104 @@ while [ $# -gt 0 ]; do
     -o) OUT="$2"; shift 2 ;;
     --keep-going) KEEP_GOING=1; shift ;;
     --full) RUN_FULL=1; shift ;;
+    --allow-dirty) ALLOW_DIRTY=1; shift ;;
     --version) echo "sdd-run-gates $VERSION"; exit 0 ;;
     *) echo "arg desconocido: $1" >&2; exit 3 ;;
   esac
 done
 
 [ -f "$DOC" ] || { echo "ERROR: no existe $DOC — corré /sdd-init para generarlo (no inventes comandos)" >&2; exit 3; }
+
+# --- sellado: hash del árbol REALMENTE verificado, no sólo HEAD -----------
+# HEAD identifica un commit; el working tree puede diferir de él en dos
+# direcciones (cambios sin commitear ahora, o commits posteriores a que el
+# reporte se escriba). Sellar sólo HEAD deja el reporte listo para mentir
+# sobre qué código se corrió — bug medido en SICOP (contract R1). Se calcula
+# ACÁ, antes de correr ningún gate, porque la estrictez de abajo puede
+# cortar la corrida entera sin gastar tiempo en la escalera.
+BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'no-git')"
+COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo '-')"
+TREE="-"
+TREE_STATE="sin repo git"
+DIRTY=0
+DIRTY_FILES=""
+
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  DIRTY_FILES="$(git status --porcelain 2>/dev/null)"
+  if [ -n "$DIRTY_FILES" ]; then
+    DIRTY=1
+    TREE_STATE="ARBOL SUCIO"
+    # git stash create: objeto commit con working tree + índice, SIN tocar
+    # la branch ni el stash log (a diferencia de `git stash push`) y sin
+    # depender sólo del índice (a diferencia de `git write-tree`, que el
+    # contract descarta: un cambio sin `git add` no quedaría representado).
+    STASH_OBJ="$(git stash create 2>/dev/null)"
+    if [ -n "$STASH_OBJ" ]; then
+      TREE="$(git rev-parse "${STASH_OBJ}^{tree}" 2>/dev/null || echo '-')"
+    fi
+    # Límite conocido de `git stash create` (heredado de la decisión del
+    # contract, no algo que este script pueda resolver sin `write-tree`):
+    # SÓLO ve contenido trackeado (índice + working tree de archivos que ya
+    # pasaron por `git add` alguna vez). Un archivo sin trackear nunca queda
+    # representado en el hash de Tree, DIRTY_FILES sí lo lista igual —
+    # aunque haya OTROS cambios trackeados que sí entran en el stash. Caso
+    # límite: si TODO el árbol sucio es sin trackear, $STASH_OBJ queda vacío
+    # (no hay nada trackeado que stashear) y Tree cae a "-" en vez de reusar
+    # el hash de HEAD, que mentiría igual que el bug que este sellado
+    # arregla.
+    #
+    # Ese límite hay que decirlo en el propio encabezado, no sólo acá:
+    # alguien leyendo el reporte generado (no este script) no tiene forma de
+    # saber que un `??` de la lista de abajo no está en el hash de arriba.
+    UNTRACKED_COUNT="$(printf '%s\n' "$DIRTY_FILES" | grep -c '^??')"
+    if [ "$UNTRACKED_COUNT" -gt 0 ]; then
+      TREE_STATE="ARBOL SUCIO (el hash no incluye ${UNTRACKED_COUNT} archivo(s) sin trackear)"
+    fi
+  else
+    TREE_STATE="LIMPIO"
+    TREE="$(git rev-parse 'HEAD^{tree}' 2>/dev/null || echo '-')"
+  fi
+fi
+
+# --- helper de hash portable: identidad de CONTENIDO del doc de gates -----
+# Contract R5: una RUTA no identifica un CONTENIDO. sha256, primeros 16 hex:
+# `shasum -a 256` primero (default de macOS), `sha256sum` si no está
+# (Linux/CI), y si ninguno de los dos está en PATH, `sha256:-` — el sellado
+# de hash NUNCA aborta la corrida, misma política que el sellado de árbol.
+doc_hash() { # $1=path del doc de gates
+  local f="$1" raw
+  if command -v shasum >/dev/null 2>&1; then
+    raw="$(shasum -a 256 "$f" 2>/dev/null | awk '{print $1}')"
+  elif command -v sha256sum >/dev/null 2>&1; then
+    raw="$(sha256sum "$f" 2>/dev/null | awk '{print $1}')"
+  else
+    raw=""
+  fi
+  if [ -n "$raw" ]; then
+    printf 'sha256:%s' "${raw:0:16}"
+  else
+    printf 'sha256:-'
+  fi
+}
+DOC_HASH="$(doc_hash "$DOC")"
+
+# La estrictez se deriva del destino del reporte, no de una bandera que hay
+# que acordarse de pasar: -o dentro de .sdd/ es uso ad-hoc (nunca se
+# commitea); -o fuera de .sdd/ es evidencia que sí se commitea y por eso
+# exige árbol limpio, salvo escape hatch explícito (--allow-dirty).
+UNDER_SDD_DIR=0
+case "$OUT" in
+  .sdd|.sdd/*|*/.sdd|*/.sdd/*) UNDER_SDD_DIR=1 ;;
+esac
+
+if [ "$DIRTY" = 1 ] && [ "$UNDER_SDD_DIR" = 0 ] && [ "$ALLOW_DIRTY" = 0 ]; then
+  {
+    printf 'ERROR: arbol sucio y -o "%s" queda fuera de .sdd/ — es evidencia que se commitea y exige arbol limpio.\n' "$OUT"
+    printf 'Commiteá los cambios, o corré de nuevo con --allow-dirty. Archivos sin commitear:\n'
+    printf '%s\n' "$DIRTY_FILES"
+  } >&2
+  exit 4
+fi
 
 # --- parsear la tabla: | # | Gate | Comando | Obligatorio | Notas | -----------
 # Filas de datos: empiezan con "| <num> |". El comando vive entre backticks en la
@@ -116,12 +249,20 @@ if [ -n "$FULL_CMD" ] && [ "$RED" -eq 0 ]; then
   run_gate "—" "suite completa" "$FULL_CMD" || true
 fi
 
-BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'no-git')"
-COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo '-')"
-
 {
   printf '# Gates run — generado por sdd-run-gates.sh v%s\n\n' "$VERSION"
-  printf -- '- **Branch**: `%s` · **Commit**: `%s` · **Doc**: `%s` · **Fecha**: %s\n' "$BRANCH" "$COMMIT" "$DOC" "$(now)"
+  printf -- '- **Branch**: `%s` · **Commit**: `%s` · **Doc**: `%s` (`%s`) · **Fecha**: %s\n' "$BRANCH" "$COMMIT" "$DOC" "$DOC_HASH" "$(now)"
+  if [ "$DIRTY" = 1 ]; then
+    # shellcheck disable=SC2016  # backtick literal para markdown (mismo patron que Branch/Commit/Doc arriba), no es expansion querida
+    printf -- '- Tree: `%s` — %s. Archivos sin commitear:\n' "$TREE" "$TREE_STATE"
+    while IFS= read -r dirty_line; do
+      # shellcheck disable=SC2016  # backtick literal para markdown, no es expansion querida
+      printf '  - `%s`\n' "$dirty_line"
+    done <<< "$DIRTY_FILES"
+  else
+    # shellcheck disable=SC2016  # backtick literal para markdown, no es expansion querida
+    printf -- '- Tree: `%s` — %s\n' "$TREE" "$TREE_STATE"
+  fi
   printf -- '- Este archivo lo escribió el runner, no un modelo. Editarlo a mano invalida la evidencia.\n\n'
   printf '| # | Gate | Comando | Exit | Timestamp UTC | Resultado |\n|---|---|---|---|---|---|\n'
   printf '%s' "$ROWS"

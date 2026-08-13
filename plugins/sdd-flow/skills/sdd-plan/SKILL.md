@@ -40,6 +40,10 @@ Los IDs son estables entre versiones: un AC retirado se marca `AC4 — retirado 
 
 Un AC que sólo se puede verificar a mano se declara explícito `manual-only: <razón>` y el brief lleva los pasos exactos de smoke. `manual-only` sin razón = contract inválido. Detalle en `standards/quality-gates.md` §2.
 
+**Evidencia del arquetipo `analysis`** (`standards/archetypes.md`): cuando el requerimiento es de ese arquetipo, la columna «Test» del binding AC↔test se llena con la evidencia que corresponde a lo que el AC afirma, y no con un test unitario. El AC que afirma una cifra se bindea a **la salida de la consulta que re-deriva la cifra** desde su fuente; el AC que afirma la conclusión se bindea a **la corrida del test estadístico que falsaría la conclusión**, con su valor. Cada AC sigue teniendo exactamente una fila de binding, y esa evidencia se pega en el verification report con el comando que la produjo (`standards/quality-gates.md` §5). Fila de binding vacía porque "acá no hay test unitario" = AC sin test.
+
+**AC de detección** — el que afirma que algo falla cuando X está mal (guarda, validación, chequeo de ausencia, sensibilidad; el criterio de clasificación y la evidencia que exige están cerrados en `standards/quality-gates.md` §10 «Prueba por mutación (AC de detección)», no los reescribas acá): debajo de cada uno, el contract escribe la mutación que lo prueba, en la forma `Mutación: <qué se rompe · dónde · qué queda revertido>`. La escribís vos, en el mismo acto en que escribís el AC — el implementador la ejecuta, no la elige. No la delegues al brief ni la dejes implícita: un AC de detección sin mutación declarada deja al agente `BLOCKED` y cuesta una ronda entera. Si dudás de la clasificación, el AC está mal escrito: partilo en dos ACs, uno por condición de aprobación, en vez de clasificarlo a ojo.
+
 ### SEO (si el contract trae `seo.applies == true`)
 Cuando el requerimiento incluye el bloque `seo:` con `applies: true`, agregá al HLTC una sección **aparte** `## SEO criteria (advisory)` con criterios **decision-closed** (sin "if needed / may / prefer"), tomados de `standards/seo-frontend.md`.
 
@@ -121,6 +125,7 @@ Después releé como agente sin contexto previo:
 - ¿el task brief introduce decisiones nuevas no aprobadas en el HLTC?
 - ¿**cada AC del HLTC está asignado a exactamente un brief**, y ninguno quedó huérfano?
 - ¿cada AC es verificable por un test, o está declarado `manual-only` con razón?
+- ¿cada AC de detección tiene declarada su mutación debajo, y ninguno de los que quedaron sin mutación entra en el criterio de `quality-gates.md` §10?
 - ¿los comandos de validación **existen** en `doc_quality_gates.md`, o inventé alguno?
 - ¿algún brief puede declararse `done` sin evidencia con exit codes?
 
