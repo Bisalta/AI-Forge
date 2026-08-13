@@ -36,7 +36,7 @@ Núcleo SDD adaptado de [`Construplaza/TemplateNewRepository`](https://github.co
 
 ## Qué exige cada tipo de requerimiento
 
-- **`standards/archetypes.md`** — 9 arquetipos (`api-endpoint · ui-feature · data-migration · background-job · third-party-integration · bugfix · refactor · infra · project-scaffold`), cada uno con NFR obligatorias, tests exigidos y checklist que entra al contract como ACs. Exactamente uno por requerimiento; repo sin gates → `project-scaffold` primero; trabajo trivial → vía corta `/sdd-fixes` con mini-DoD.
+- **`standards/archetypes.md`** — 10 arquetipos (`api-endpoint · ui-feature · data-migration · background-job · third-party-integration · bugfix · refactor · infra · project-scaffold · analysis`), cada uno con NFR obligatorias, tests exigidos y checklist que entra al contract como ACs. Exactamente uno por requerimiento; repo sin gates → `project-scaffold` primero; trabajo trivial → vía corta `/sdd-fixes` con mini-DoD; entregable que es una conclusión o una cifra → `analysis`.
 - **`standards/concerns.md`** — cualidades transversales activadas en el refinement y declaradas blocking/advisory por adelantado: `security` y `observability` siempre; `a11y`/`design` con UI; `data-privacy`, `api-compat`, `i18n` por flag; `performance` blocking solo con presupuesto numérico; `seo` advisory.
 - **`standards/security.md`** — threat model de 4 preguntas en el contract, tests negativos obligatorios (403/401/IDOR/input hostil), gate de secret scan + audit de dependencias, y toda dependencia nueva como decisión del contract.
 

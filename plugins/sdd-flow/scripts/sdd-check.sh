@@ -61,7 +61,11 @@ printf '%s\n' "$DIFF" | awk '
       report("BLOCKER", "test-skipeado", line)
 
     # supresores de linter / type-checker
-    if (line ~ /(@ts-ignore|@ts-expect-error|eslint-disable|# *type: *ignore|# *noqa|\/\/ *nolint|@SuppressWarnings|# *rubocop:disable)/)
+    # El guard de `.md` es el mismo que la regla de abajo ya tenía (contract
+    # R4/AC42): la prosa normativa que ENUMERA los supresores prohibidos no es
+    # un supresor. Sin él, este script levanta un BLOCKER sobre los documentos
+    # del propio plugin y entrena al equipo a ignorarlo.
+    if (file !~ /\.md$/ && line ~ /(@ts-ignore|@ts-expect-error|eslint-disable|# *type: *ignore|# *noqa|\/\/ *nolint|@SuppressWarnings|# *rubocop:disable)/)
       report("BLOCKER", "supresor", line)
 
     # any nuevo en TypeScript

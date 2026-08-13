@@ -111,6 +111,21 @@ El caso greenfield tiene una trampa: la escalera de gates nace toda `N/A` (no ha
   - Efecto sobre los devs declarado (¿cambia el comando local? → `doc_quality_gates.md` actualizado).
   - Cambio probado en entorno no productivo primero, con evidencia.
 
+## `analysis` — el entregable es una conclusión o una cifra que alimenta una decisión
+
+Cubre el trabajo cuyo entregable es una conclusión o una cifra que alimenta una decisión, con producto en documentos o notebooks en vez de código de aplicación: un backtest, un barrido, una estimación. No falla como falla el código: un análisis roto no tira una excepción, produce un número con cara de dato que cambia una decisión de producto. Por eso el checklist es el del método, no el del runtime.
+
+- **NFR obligatorias**: `observability` (la corrida que produce la cifra es reproducible por otro) · `data-privacy` cuando el dataset tiene PII.
+- **Tests exigidos**: el test estadístico que **falsaría** la conclusión, corrido y reportado con su valor; más la re-derivación de cada cifra citada desde su fuente.
+- **Checklist → ACs**:
+  - Hipótesis nula declarada antes de mirar el resultado.
+  - El test que falsaría la conclusión, nombrado y corrido; su resultado se reporta gane o pierda.
+  - Toda cifra re-derivada desde la fuente, con la salida de la consulta adjunta (`quality-gates.md` §5).
+  - Sensibilidad declarada: qué pasa con la conclusión al excluir las filas defectuosas, y si las exclusiones se concentran en pocas unidades.
+  - Unidad de análisis declarada, y el test a esa unidad cuando las observaciones se agrupan.
+  - Tamaño de muestra y potencia declarados, con el número.
+  - La conclusión se escribe con su incertidumbre, no como afirmación categórica.
+
 ---
 
 ## Cómo lo usa el pipeline
