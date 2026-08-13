@@ -361,7 +361,7 @@ Este ciclo aporta una razón más, medida por su cuenta y registrada en `SDD/ret
 
 | Capa | Cambio |
 |---|---|
-| Script | `plugins/sdd-flow/scripts/sdd-run-gates.sh` — helper de hash portable y estampado del doc en el encabezado (línea 220) |
+| Script | `plugins/sdd-flow/scripts/sdd-run-gates.sh` — helper de hash portable, estampado del doc en el encabezado (línea 220), y **bump de `VERSION` a `0.12.0`**. El bump arrastra el literal que AC11 de R1 assertea en `SDD/tests/test_run_gates_tree.sh`: se actualiza el valor esperado, nunca el assert |
 | Template | `plugins/sdd-flow/templates/verification-report.md` — el doc de gates se registra con su hash |
 | Skill | `plugins/sdd-flow/skills/sdd-init/SKILL.md` — escribe el manifiesto y protege los docs al regenerar |
 | Template | `plugins/sdd-flow/templates/doc-manifest.md` (NEW) |
