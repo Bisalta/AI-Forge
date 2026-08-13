@@ -1,7 +1,8 @@
 # HLTC — sdd-flow v0.11.0 · hardening desde el análisis de SICOP
 
 - **Contract version**: v3 — ratificado el 13-ago-2026 tras el `REJECTED` de la ronda 2 de R0. Cambio respecto de v2: los cuatro literales de credencial de AC6bis se escriben con clave y valor en spans separados, para que el contract deje de disparar su propio detector. Verificado con el patrón de `SDD/tests/secret-scan.sh`: cero coincidencias en este archivo. Con eso, la exclusión de `SDD/contracts/` queda **prohibida** y se elimina.
-- **Contract version**: v5 — ratificado el 13-ago-2026 tras el `ESCALATE` de la ronda 1 de R2. La ubicación del bloque de identidad en `guard-git.sh` pasa de "tras el chequeo de rama protegida" a "por encima del escape hatch `SDD_ALLOW_BASE_COMMIT`", y entran **AC36, AC37 y AC38**. Detalle y medición en la ratificación de la sección R2.
+- **Contract version**: v6 — ratificado el 14-ago-2026 tras el review `APPROVED` de R3. Entran **AC39** y **AC40** (dos consumidores de la regla de mutación que faltaban en el Delta de R3) y **AC41** (cierre del hueco de closure en la forma "ausencia" de §10.1). Detalle en la ratificación de la sección R3.
+- **Historial de versiones**: v5 — ratificado el 13-ago-2026 tras el `ESCALATE` de la ronda 1 de R2. La ubicación del bloque de identidad en `guard-git.sh` pasa de "tras el chequeo de rama protegida" a "por encima del escape hatch `SDD_ALLOW_BASE_COMMIT`", y entran **AC36, AC37 y AC38**. Detalle y medición en la ratificación de la sección R2.
 - **Historial de versiones**: v4 — ampliado el 13-ago-2026 con **R5**, tras el consolidado externo `MD-consolidado.md` (13-ago) que reemplaza a los cinco documentos previos de SICOP. R5 es su propuesta 3 (identidad de contenido de los docs que gobiernan), que no estaba en v1-v3. Su propuesta 6 (gate mínimo portable) queda **fuera de este contract**: está planteada como oferta y necesita como insumo el script de `Bisalta/Odoo-Addons`, que este ciclo no tiene. Los ACs de R0-R4 no cambian.
 - **Historial de versiones**: v2 — ratificado por el planner el 13-ago-2026 tras el `ESCALATE` de la ronda 1 de R0. Cambios respecto de v1: threat model y bloque `concerns:` agregados (eran un BLOCKER de contract); AC3 reescrito con la severidad de `shellcheck` adentro; AC5 reescrito para apuntar a `SDD/verification/` en vez de `.sdd/`; AC6bis nuevo para cubrir `secret-scan.sh`. Los IDs de AC existentes no se reciclaron.
 - **Tarea madre Proxima**: `GEN-94`
@@ -250,6 +251,8 @@ La regla ya existe en el plugin con alcance angosto: `quality-gates.md:19` (DoD 
 | Agente | `plugins/sdd-flow/agents/implementing-agent.md` — produce el triple y adjunta la salida de cada cifra que reporta |
 | Agente | `plugins/sdd-flow/agents/reviewer-agent.md` — Fase 1: AC de detección sin triple es `BLOCKER`; cifra sin salida adjunta es `MAJOR` |
 | Skill | `plugins/sdd-flow/skills/write-pr-report/SKILL.md` — las cifras del PR report llevan su salida |
+| Template | `plugins/sdd-flow/templates/verification-report.md` — sección para el triple (**agregado en v6**) |
+| Command | `plugins/sdd-flow/commands/sdd-fixes.md` — quién declara la mutación en la vía corta (**agregado en v6**) |
 
 **Reuse statement**: la regla se escribe una sola vez en `quality-gates.md`; los otros cuatro archivos la referencian por sección, sin recopiar el texto normativo.
 
@@ -261,6 +264,14 @@ La regla ya existe en el plugin con alcance angosto: `quality-gates.md:19` (DoD 
 - **AC22** — `plugins/sdd-flow/agents/implementing-agent.md` y `plugins/sdd-flow/skills/write-pr-report/SKILL.md` exigen adjuntar la salida del comando de cada cifra reportada.
 - **AC23** — Los cinco archivos del Delta referencian la sección de `quality-gates.md` por su título, y ninguno recopia el texto normativo del triple. Verificable con grep del título en los cinco archivos.
 - **AC24** — `quality-gates.md` declara que un diff que corrige un artefacto ya aprobado vuelve al loop de review.
+- **AC39** — `plugins/sdd-flow/templates/verification-report.md` tiene una sección donde registrar el triple, con una fila por corrida (comando, exit code, resultado) y un campo para la mutación que declaró el contract.
+- **AC40** — `plugins/sdd-flow/commands/sdd-fixes.md` declara quién escribe la mutación en la vía corta: cuando un ítem de fix es un control de detección, la mutación la declara **el propio ítem de `fixes.md` en el triage**, y el triple va en la evidencia de ese ítem.
+- **AC41** — El criterio de §10.1 clasifica de forma cerrada el AC16 de R2 (*"un commit sin identidad de agente pasa: el hook **no** lo deniega"*): la forma "ausencia" queda acotada a la ausencia **sobre un conjunto que hay que recorrer**, y no cubre el desenlace negativo de un comportamiento que el propio test ejercita.
+
+**Ratificación v6** (tras el review de R3, que fue `APPROVED`). Tres correcciones, dos de ellas gaps de mi Architectural Delta:
+
+- **AC39 y AC40 son gaps del plan.** El Delta de R3 listó cinco consumidores de la regla y hay siete. R3 convierte "AC de detección sin las tres corridas" en `BLOCKER` que rechaza, mientras el template que el implementing agent tiene instrucción de usar no tiene dónde ponerlas — la asimetría fabrica rechazos evitables. Y `/sdd-fixes` es por diseño un carril sin contract, así que §10.2 se queda sin declarante y lo que queda escrito es que la vía corta está exceptuada de §10: el molde exacto de escape hatch que este contract viene encontrando en `D7`, `D8` y en el hatch de R2. El intake de `fixes.md` ya existe y puede ser el declarante, sin inventar un contract.
+- **AC41 cierra un hueco de closure medido.** El reviewer corrió el criterio de §10.1 contra nueve ACs reales del ciclo: ocho clasifican solos y coinciden con lo que el pipeline ya venía haciendo. El noveno, AC16 de R2, entra en la forma "ausencia" por su cláusula de entrada pero no por la justificación de esa misma viñeta —el día que el hook empieza a denegar, AC16 **falla**, lo cual quedó demostrado en R2 con la mutación "deniega siempre"— y la no-detección lo reclama por ser falsable por construcción. Dos ingenieros lo clasificarían distinto, que es exactamente el test que imponen las closure rules. El desempate lo atrapa y el error va en la dirección segura, pero rebota al planner un AC sano.
 
 ## Checklist del arquetipo `infra`
 
