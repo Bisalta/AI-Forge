@@ -319,7 +319,7 @@ El caso del barrido documental queda cubierto por la regla de correcciones post-
 | Skill | `plugins/sdd-flow/skills/enrich-user-story/SKILL.md:92` — `analysis` entra a la lista de arquetipos |
 | Skill | `plugins/sdd-flow/skills/sdd-plan/SKILL.md` — el binding AC↔test admite la forma de evidencia del arquetipo `analysis` |
 | Tests | `SDD/tests/test_analysis_archetype.sh` (NEW) |
-| Script | `plugins/sdd-flow/scripts/sdd-check.sh` — guard de `.md` en la regla de supresores (**agregado en v7**) |
+| Script | `plugins/sdd-flow/scripts/sdd-check.sh` — guard de `.md` en la regla de supresores (**agregado en v7**) **y en la de `test-skipeado`** (**ampliado en v8**). La fila describía de menos: AC42 exige las dos reglas desde v8, y el implementador lo señaló |
 
 ## Contenido normativo del arquetipo `analysis`
 
