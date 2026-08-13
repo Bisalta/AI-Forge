@@ -477,7 +477,12 @@ bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -d SDD/docs/doc_quality_ga
 ```
 
 - **Reporte generado**: `SDD/verification/feat-GEN-94-sicop-hardening-R2-gates.md`
-- **Resultado real de esa corrida**: <SE_COMPLETA_TRAS_EL_COMMIT_1_DE_RONDA_2 — ver `sdd.result` de esta ronda; no transcribo a mano lo que el runner ya deja escrito>
+- **Resultado real de esa corrida** (post-commit `2d159cf`, árbol limpio): exit `0` — `{"type":"sdd.gates","green":4,"red":0,"skipped":7,"report":"SDD/verification/feat-GEN-94-sicop-hardening-R2-gates.md"}`. Encabezado: `**Commit**: \`2d159cf\`` y `Tree: \`c0d823774ec1fd57d387a9e8b95d047bc3fe112c\` — LIMPIO`. Verificado que coincide exactamente con el árbol real de ese commit:
+```
+$ git rev-parse HEAD^{tree}
+c0d823774ec1fd57d387a9e8b95d047bc3fe112c
+```
+Mismos 4 gates verdes que ronda 1 (`lint`, `unit tests`, `security`, `suite completa`); mismos 6 `[SKIPPED]` con razón `N/A`. El archivo `SDD/verification/feat-GEN-94-sicop-hardening-R2-gates.md` quedó sobreescrito (mismo path que ronda 1) — la historia de las dos corridas vive en `git log -p` de ese path, no en copias paralelas.
 
 ---
 
