@@ -6,7 +6,7 @@ Evidencia de la escalera de gates (`standards/quality-gates.md` §4-§5) y de lo
 - **Ronda**: 2/3 — la ronda 1 salió `APPROVED` con tres `MINOR`; esta ronda los cierra (AC39, AC40, AC41 del contract ratificado a v6) más un ADVISORY del reviewer sobre su propio prompt.
 - **Contract**: `SDD/contracts/2026-08-13-sicop-hardening.md` **v6**, sección R3 (AC19-AC24 + AC39-AC41)
 - **Brief**: `SDD/briefs/R3-mutation-rule.md`
-- **Commit evaluado**: `d8c3b06` (ronda 2) — el commit del trabajo, sellado por el runner (R1). Ronda 1: `aa4242c`.
+- **Commit evaluado**: `c9d6115` (ronda 2, último commit de trabajo) — sellado por el runner (R1). Los dos archivos de evidencia se commitean **después** de esa corrida, como en cada ronda de este ciclo. Commits de la ronda 2: `d8c3b06` (AC39-AC41 + ADVISORY) y `c9d6115` (el hallazgo del impact set de AC39). Ronda 1: `aa4242c`.
 - **Doc de gates del repo**: `SDD/docs/doc_quality_gates.md` — el reporte generado lo registra con hash: `sha256:e96c7d0f61963400`. Copiado del encabezado del reporte, **no recalculado acá** (el reviewer lo recalcula por su cuenta, contract R5). Mismo hash que en la ronda 1: el doc de gates **no cambió** durante el ciclo, así que ninguna fila de la escalera se movió entre las dos corridas.
 - **Momento de captura**: todas las salidas pegadas abajo se capturaron **después** del último cambio a los seis archivos que describen (`RT7`). El último cambio a un archivo del Delta fue la reversión de la mutación de AC23; después de eso sólo se tocaron este reporte y el brief.
 
@@ -14,8 +14,14 @@ Evidencia de la escalera de gates (`standards/quality-gates.md` §4-§5) y de lo
 
 ## Gates — evidencia GENERADA (no escrita a mano)
 
-- **Reporte generado (ronda 2, el vigente)**: `SDD/verification/feat-GEN-94-sicop-hardening-R3-gates.md` — `sdd-run-gates.sh v0.12.0`, commit `d8c3b06`, tree `9b75911879b2ae92bfc742e61195b1fece1c1304` LIMPIO. Los 4 gates con comando en verde, 7 `[SKIPPED]` declarados `N/A` en el doc, 0 rojos.
-- **Comando**: `bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -d SDD/docs/doc_quality_gates.md -o SDD/verification/feat-GEN-94-sicop-hardening-R3-gates.md`
+- **Reporte generado (ronda 2, el vigente)**: `SDD/verification/feat-GEN-94-sicop-hardening-R3-gates.md` — `sdd-run-gates.sh v0.12.0`, 2026-08-13T20:35:15Z, commit `c9d6115`, tree `531ec83f553dce0723f60cbb06fdf212eabe1a03` LIMPIO. Los 4 gates con comando en verde, 7 `[SKIPPED]` declarados `N/A` en el doc, 0 rojos.
+- **Comando y exit code**, pegados tal cual:
+
+```
+$ bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -d SDD/docs/doc_quality_gates.md -o SDD/verification/feat-GEN-94-sicop-hardening-R3-gates.md
+RUNNER_EXIT=0
+{"type":"sdd.gates","green":4,"red":0,"skipped":7,"report":"SDD/verification/feat-GEN-94-sicop-hardening-R3-gates.md"}
+```
 - **Ronda 1** (sustituida, misma escalera): commit `aa4242c`, tree `b2183cf004c81af123aa8e87628acc4ec70298b7`, exit `0`, resumen pegado tal cual:
 
 ```
