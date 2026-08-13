@@ -169,8 +169,23 @@ assert_contains "$analysis_checklist" "su resultado se reporta gane o pierda" "A
 assert_contains "$analysis_checklist" "Toda cifra re-derivada desde la fuente, con la salida de la consulta adjunta" "AC26 item 3 - toda cifra re-derivada desde la fuente con la salida adjunta"
 assert_contains "$analysis_checklist" "Sensibilidad declarada: qué pasa con la conclusión al excluir las filas defectuosas" "AC26 item 4 - sensibilidad al excluir las filas defectuosas"
 assert_contains "$analysis_checklist" "si las exclusiones se concentran en pocas unidades" "AC26 item 4 - si las exclusiones se concentran en pocas unidades"
-assert_contains "$analysis_checklist" "Unidad de análisis declarada, y el test a esa unidad cuando las observaciones se agrupan" "AC26 item 5 - unidad de analisis declarada y el test a esa unidad"
-assert_contains "$analysis_checklist" "Tamaño de muestra y potencia declarados, con el número" "AC26 item 6 - tamano de muestra y potencia declarados con el numero"
+# Ítems 5 y 6 — redacción de v8. La de v1-v7 era autosatisfacible por el error
+# que el ítem previene (ronda 1 de R4), así que además del texto nuevo se
+# assertea la AUSENCIA del viejo: una reescritura que deja las dos redacciones
+# conviviendo deja el ítem tan ambiguo como antes.
+#
+# Los dos asserts de ausencia NO son tautológicos, y está medido: las dos
+# frases viejas existían en el árbol hasta la ronda 2, así que estos asserts
+# salen rojos contra el estado anterior. Queda en el verification report.
+assert_contains "$analysis_checklist" "Unidad de análisis y unidad de agrupamiento declaradas, con el número de grupos" "AC26 item 5 - unidad de analisis Y unidad de agrupamiento declaradas con el numero de grupos"
+assert_contains "$analysis_checklist" "la inferencia se hace a nivel del grupo" "AC26 item 5 - cuando las observaciones se agrupan la inferencia va a nivel del grupo"
+assert_contains "$analysis_checklist" "el reporte nombra la técnica usada" "AC26 item 5 - el reporte nombra la tecnica usada"
+assert_eq "$(has_text "$analysis_checklist" "Unidad de análisis declarada, y el test a esa unidad")" "no" "AC26 item 5 - la redaccion vieja autosatisfacible ya no esta"
+
+assert_contains "$analysis_checklist" "Tamaño de muestra (filas y grupos) y tamaño de efecto mínimo detectable declarados" "AC26 item 6 - tamano de muestra en filas y grupos y efecto minimo detectable"
+assert_contains "$analysis_checklist" "contra qué efecto, a qué α y a qué potencia" "AC26 item 6 - el numero se declara contra un efecto, un alfa y una potencia"
+assert_contains "$analysis_checklist" "La potencia calculada con el efecto observado no cuenta" "AC26 item 6 - la potencia observada no cuenta"
+assert_eq "$(has_text "$analysis_checklist" "Tamaño de muestra y potencia declarados, con el número")" "no" "AC26 item 6 - la redaccion vieja sin tamano de efecto ya no esta"
 assert_contains "$analysis_checklist" "La conclusión se escribe con su incertidumbre, no como afirmación categórica" "AC26 item 7 - la conclusion se escribe con su incertidumbre"
 
 # =========================================================================
@@ -253,13 +268,18 @@ SUP_ESLINT="$(printf '%s%s' 'eslint-' 'disable')"
 
 run_check() { ( cd "$TMP_DIR" && bash "$SDD_CHECK" "$BASE_SHA" 2>&1 ); }
 
+# reset_fixture — devuelve doc.md y code.ts al commit base, para que cada caso
+# tenga su propio diff y ninguno herede el hallazgo del anterior. Sin esto, el
+# exit code de un caso lo decide el hallazgo del caso previo y los
+# `assert_exit` dejan de medir lo que dicen medir.
+reset_fixture() { ( cd "$TMP_DIR" && git checkout -q -- . ); }
+
 # --- caso 1: el supresor aparece SOLO en un archivo `.md` -----------------
 # Es el caso que el reviewer midió sobre el repo real: `sdd-check.sh` salía 2
 # por el `@ts-`+`ignore` que enumera las mitigaciones PROHIBIDAS en
 # commands/sdd-fixes.md, sobre un texto que existía desde antes del diff.
-{
-  printf 'Mitigaciones prohibidas: %s y %s no se usan para pasar un gate.\n' "$SUP_TS" "$SUP_ESLINT"
-} >> "$TMP_DIR/doc.md"
+reset_fixture
+printf 'Mitigaciones prohibidas: %s y %s no se usan para pasar un gate.\n' "$SUP_TS" "$SUP_ESLINT" >> "$TMP_DIR/doc.md"
 
 out_md="$(run_check)"; ec_md=$?
 assert_eq "$(has_text "$out_md" "${TAB}doc.md${TAB}supresor${TAB}")" "no" "AC42 sdd-check.sh - no reporta supresor sobre un archivo .md"
@@ -268,23 +288,58 @@ assert_exit 0 "$ec_md" "AC42 sdd-check.sh - sale 0 cuando el unico supresor del 
 # --- caso 2: el mismo supresor en un archivo de código sigue siendo BLOCKER
 # T4.3 del brief: sin este caso, borrar la regla entera daría verde y el fix
 # sería un ablandamiento disfrazado de guard.
+reset_fixture
 printf '// %s\nexport const y = 2;\n' "$SUP_TS" >> "$TMP_DIR/code.ts"
 
 out_code="$(run_check)"; ec_code=$?
 assert_contains "$out_code" "BLOCKER${TAB}code.ts${TAB}supresor${TAB}" "AC42 sdd-check.sh - un supresor en un archivo de codigo sigue siendo BLOCKER"
 assert_exit 2 "$ec_code" "AC42 sdd-check.sh - sale 2 cuando hay un supresor en un archivo de codigo"
-assert_eq "$(has_text "$out_code" "${TAB}doc.md${TAB}supresor${TAB}")" "no" "AC42 sdd-check.sh - el .md sigue sin reportarse cuando el codigo si dispara"
 
-# --- caso 3: el guard es de la regla de supresores, no de todo el `.md` ---
-# Un `.md` que agrega un test skipeado sigue siendo BLOCKER: AC42 acota el
-# guard a UNA regla, y este caso se pone rojo si alguien lo ensancha a todas.
+# --- caso 3 (v8): el MISMO hueco en la regla `test-skipeado` -------------
+# Dirección 1 — la prosa normativa que enumera lo prohibido no es un test
+# skipeado. Medido en la ronda 1 sobre este repo: 2 hits, en
+# standards/quality-gates.md §6.1 y templates/doc_quality_gates.md.
 SKIP_LITERAL="$(printf '%s%s' 'it.' 'skip(')"
-printf '%s"caso"' "$SKIP_LITERAL" >> "$TMP_DIR/doc.md"
-printf ')\n' >> "$TMP_DIR/doc.md"
+reset_fixture
+printf 'Prohibido en §6.1: %s"caso") y sus variantes.\n' "$SKIP_LITERAL" >> "$TMP_DIR/doc.md"
 
-out_skip="$(run_check)"; ec_skip=$?
-assert_contains "$out_skip" "BLOCKER${TAB}doc.md${TAB}test-skipeado${TAB}" "AC42 sdd-check.sh - el guard no apaga las otras reglas sobre .md"
-assert_exit 2 "$ec_skip" "AC42 sdd-check.sh - sale 2 con un test skipeado agregado en un .md"
+out_skip_md="$(run_check)"; ec_skip_md=$?
+assert_eq "$(has_text "$out_skip_md" "${TAB}doc.md${TAB}test-skipeado${TAB}")" "no" "AC42 sdd-check.sh - no reporta test-skipeado sobre un archivo .md"
+assert_exit 0 "$ec_skip_md" "AC42 sdd-check.sh - sale 0 cuando el unico test skipeado del diff esta en un .md"
+
+# Dirección 2 — un test REALMENTE skipeado en un archivo de código sigue
+# siendo BLOCKER. Sin esta mitad, el guard es un ablandamiento disfrazado:
+# apagar la regla entera daría verde en la dirección 1.
+reset_fixture
+printf '%s"no corre", () => {});\n' "$SKIP_LITERAL" >> "$TMP_DIR/code.ts"
+
+out_skip_code="$(run_check)"; ec_skip_code=$?
+assert_contains "$out_skip_code" "BLOCKER${TAB}code.ts${TAB}test-skipeado${TAB}" "AC42 sdd-check.sh - un test skipeado en un archivo de codigo sigue siendo BLOCKER"
+assert_exit 2 "$ec_skip_code" "AC42 sdd-check.sh - sale 2 cuando hay un test skipeado en un archivo de codigo"
+
+# --- caso 4: el guard es de DOS REGLAS, no del archivo `.md` entero ------
+# La forma barata de "arreglar" AC42 es saltear los archivos `.md` antes de
+# evaluar ninguna regla. Con eso, todos los asserts de arriba pasan igual y el
+# checker se vuelve ciego a la prosa. Este caso lo distingue: un `catch`
+# silencioso agregado en un `.md` SIGUE reportándose (WARN, sin cambiar el
+# exit code), que es la prueba de que las líneas del `.md` se siguen leyendo.
+CATCH_LITERAL="$(printf '%s%s' 'catch (e) {' '}')"
+reset_fixture
+printf 'Ejemplo de lo que no se hace: try { f() } %s\n' "$CATCH_LITERAL" >> "$TMP_DIR/doc.md"
+
+out_warn="$(run_check)"; ec_warn=$?
+assert_contains "$out_warn" "WARN${TAB}doc.md${TAB}catch-silencioso${TAB}" "AC42 sdd-check.sh - el guard no saltea el archivo .md entero, solo las dos reglas"
+assert_exit 0 "$ec_warn" "AC42 sdd-check.sh - un WARN sobre .md no cambia el exit code"
+
+# --- caso 5: los dos literales prohibidos juntos en prosa normativa ------
+# Es la forma exacta en que aparece en el repo real: un documento que enumera
+# supresores Y tests skipeados en la misma lista de mitigaciones prohibidas.
+reset_fixture
+printf 'Mitigaciones prohibidas: %s, %s, %s"caso").\n' "$SUP_TS" "$SUP_ESLINT" "$SKIP_LITERAL" >> "$TMP_DIR/doc.md"
+
+out_both="$(run_check)"; ec_both=$?
+assert_eq "$(has_text "$out_both" "BLOCKER${TAB}doc.md")" "no" "AC42 sdd-check.sh - la prosa que enumera las mitigaciones prohibidas no levanta ningun BLOCKER"
+assert_exit 0 "$ec_both" "AC42 sdd-check.sh - sale 0 sobre un .md que enumera supresores y tests skipeados"
 
 test_summary
 exit $?

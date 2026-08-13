@@ -122,9 +122,11 @@ Cubre el trabajo cuyo entregable es una conclusión o una cifra que alimenta una
   - El test que falsaría la conclusión, nombrado y corrido; su resultado se reporta gane o pierda.
   - Toda cifra re-derivada desde la fuente, con la salida de la consulta adjunta (`quality-gates.md` §5).
   - Sensibilidad declarada: qué pasa con la conclusión al excluir las filas defectuosas, y si las exclusiones se concentran en pocas unidades.
-  - Unidad de análisis declarada, y el test a esa unidad cuando las observaciones se agrupan.
-  - Tamaño de muestra y potencia declarados, con el número.
+  - Unidad de análisis y unidad de agrupamiento declaradas, con el número de grupos. Cuando las observaciones se agrupan, la inferencia se hace a nivel del grupo, y el reporte nombra la técnica usada.
+  - Tamaño de muestra (filas y grupos) y tamaño de efecto mínimo detectable declarados, con el número: contra qué efecto, a qué α y a qué potencia. La potencia calculada con el efecto observado no cuenta.
   - La conclusión se escribe con su incertidumbre, no como afirmación categórica.
+
+**Por qué los ítems de agrupamiento y de potencia están escritos así** (no es estilo, es el defecto que ya cometieron): la primera redacción de este arquetipo pedía "unidad de análisis declarada, y el test a esa unidad" y "potencia declarada, con el número", y las dos eran **satisfacibles cometiendo el error que previenen**. Declarar "la unidad de análisis es la fila" cumplía la primera corriendo el test al nivel equivocado — que es el error que motivó el ítem —, porque nada obligaba a que la unidad declarada fuera aquella en la que las observaciones son independientes. Y la potencia calculada con el efecto observado es una transformación monótona del p-valor: declararla repite lo que el p-valor ya dijo. El tamaño de efecto mínimo detectable es lo único que separa "no hay efecto" de "no hay datos", que es la distinción por la que se pidió el análisis.
 
 ---
 
