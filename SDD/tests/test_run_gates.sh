@@ -18,6 +18,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 RUN_GATES="$REPO_ROOT/plugins/sdd-flow/scripts/sdd-run-gates.sh"
 
 TMP_DIR="$SCRIPT_DIR/.tmp/test_run_gates-$$"
+# shellcheck disable=SC2329  # invocada por trap EXIT
 cleanup() { rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
 

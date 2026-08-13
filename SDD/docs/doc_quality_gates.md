@@ -6,7 +6,7 @@ Diferencia con los otros docs de `SDD/docs/`:
 - `doc_architecture.md` → dónde va el código.
 - **este archivo** → la escalera obligatoria que corre siempre antes de declarar `done` (sin elección).
 
-Generado en R0 (`SDD/contracts/2026-08-13-sicop-hardening.md` v1) — primera escalera viva de este repo. Cada comando de acá fue corrido en esta máquina antes de escribirse (macOS, bash 3.2.57, shellcheck 0.11.0, git 2.50.1); ninguno es supuesto.
+Generado en R0 (`SDD/contracts/2026-08-13-sicop-hardening.md`, actualizado a v2 en la ronda 2 de review) — primera escalera viva de este repo. Cada comando de acá fue corrido en esta máquina antes de escribirse (macOS, bash 3.2.57, shellcheck 0.11.0, git 2.50.1); ninguno es supuesto.
 
 ---
 
@@ -24,19 +24,19 @@ Generado en R0 (`SDD/contracts/2026-08-13-sicop-hardening.md` v1) — primera es
 | # | Gate | Comando | Obligatorio | Notas |
 |---|---|---|---|---|
 | 1 | format / style | `N/A — shfmt no está instalado` | N/A | Verificado: `command -v shfmt` no encuentra el binario en esta máquina. Instalarlo sólo para este gate es una dependencia nueva fuera del scope de R0 (`security.md` §4) — queda para cuando el repo lo necesite de verdad. |
-| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh SDD/tests/*.sh` | sí | `--severity=warning` (no el default `style`) es una decisión de piso, no un ablandamiento posterior: este repo no tenía shellcheck configurado antes de R0. A severidad `style` (default), 3 scripts preexistentes de `plugins/sdd-flow/scripts/` disparan `SC2016` (info) por backticks literales dentro de strings de una comilla en plantillas markdown (`printf`/`grep` que arman celdas de tabla) — uso correcto, no bug; y los `cleanup()` de este propio repo invocados sólo vía `trap ... EXIT` disparan `SC2329` (info), limitación conocida de shellcheck para reconocer invocación por trap. Ninguno de los dos es un hallazgo real. `warning` es el piso verificado: cero hallazgos de severidad real hoy. |
+| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh SDD/tests/*.sh` | sí | `--severity=warning` (no el default `style`) es una decisión de piso, **ratificada en el contract v2 (AC3)**, no un ablandamiento posterior: este repo no tenía shellcheck configurado antes de R0. A severidad `style` (default) siguen existiendo 3 hallazgos `SC2016` (info) en `plugins/sdd-flow/scripts/` — backticks literales dentro de strings de una comilla en plantillas markdown, uso correcto, no bug, fuera de scope de R0 (registrados en `SDD/debt.md` como `D4`). Los `cleanup()` propios de `SDD/tests/` invocados sólo vía `trap ... EXIT` que también disparaban `SC2329` (info) **ya no dependen del piso**: cada uno lleva `# shellcheck disable=SC2329  # invocada por trap EXIT` inline (AC3bis), así que a severidad default sólo quedan los 3 `SC2016` preexistentes de `plugins/` — verificable: `shellcheck $(git ls-files -- '*.sh')` sin `--severity` no muestra ningún `SC2329`. |
 | 3 | type-check | `N/A — bash no es tipado` | N/A | |
 | 4 | unit tests | `bash SDD/tests/run.sh` | sí | Corre `SDD/tests/test_*.sh` cada uno en su propio proceso. Sale 1 si algún archivo falla o si no encuentra ninguno. |
 | 5 | integration | `N/A — los tests del harness ya ejercitan los scripts end-to-end` | N/A | `SDD/tests/test_run_gates.sh` corre el `sdd-run-gates.sh` real (no un mock) contra un repo git temporal — ya es integración, no unit puro. |
 | 6 | build | `N/A — el plugin no compila` | N/A | Markdown + bash, nada que bundlear/transpilar. |
 | 7 | e2e | `N/A` | N/A | Sin UI ni flujo de usuario con frontend. |
 | 8 | cobertura del diff | `N/A — sin reporte de coverage; se verifica con el binding AC↔test` | sí (política) | No hay herramienta de coverage para bash. La política de `quality-gates.md` §4 aplica igual: cada `.sh` nuevo queda ejercitado por el binding AC↔test del brief correspondiente. |
-| 9 | security | `bash SDD/tests/secret-scan.sh` | sí | Grep mínimo de `standards/security.md` §3 (`AKIA...`, header PEM `-----BEGIN...PRIVATE KEY-----`, `password\|secret\|token\|api_key` asignado a literal no vacío) sobre `git ls-files`. Se excluye a sí mismo (su propio archivo contiene el patrón como texto — falso positivo autorreferencial conocido de cualquier secret-scanner). Audit de dependencias: `N/A — no hay manifiesto de dependencias en este repo` (bash + markdown, sin package manager que auditar). |
+| 9 | security | `bash SDD/tests/secret-scan.sh` | sí | Grep mínimo de `standards/security.md` §3 sobre `git ls-files`, **AC6bis (contract v2)**: `AKIA...`, header PEM `-----BEGIN...PRIVATE KEY-----`, y `password\|secret\|token\|api_key` con o SIN comillas, `SCREAMING_SNAKE` incluido, separador `:` o `=` (case-insensitive). La ronda 1 exigía comillas y sólo la palabra exacta en minúscula — dejaba pasar 4 de 5 formas reales; corregido y probado por mutación en `SDD/tests/test_secret_scan.sh`. La salida nombra archivo y línea **sin imprimir el valor detectado** (threat model contract v2). Excluye: a sí mismo (contiene el patrón como texto) y `SDD/contracts/` (un contract que describe un AC de detección cita el valor literal a plantar — mismo problema autorreferencial, ver comentario en el script). Audit de dependencias: `N/A — no hay manifiesto de dependencias en este repo` (bash + markdown, sin package manager que auditar). |
 | 10 | smoke manual | `N/A` | N/A | Sin ACs `manual-only` declarados en R0. |
 
-**Suite completa** (obligatoria una vez antes de integrar): `bash SDD/tests/run.sh` — mismo comando que el gate 4: este repo no filtra tests por área, la suite entera corre siempre completa (2 archivos de test a la fecha de R0, ~0.6s).
+**Suite completa** (obligatoria una vez antes de integrar): `bash SDD/tests/run.sh` — mismo comando que el gate 4: este repo no filtra tests por área, la suite entera corre siempre completa (3 archivos de test tras la ronda 2 de R0: `test_harness.sh`, `test_run_gates.sh`, `test_secret_scan.sh`; el duplicado con el gate 4 está registrado como deuda `D5`, no se corrige en R0). Medido: ~2s.
 
-**Tiempo esperado de la suite completa**: menor a 2 segundos (medido: ~0.6s con 2 archivos de test). Un timeout acá es señal real, no ruido de entorno lento.
+**Tiempo esperado de la suite completa**: menor a 5 segundos (medido: ~2s con 3 archivos de test, `test_secret_scan.sh` corre 5 formas × repo git temporal). Un timeout acá es señal real, no ruido de entorno lento.
 
 ---
 
@@ -67,8 +67,9 @@ Si un prerequisito no está disponible, el gate se marca `[SKIPPED] <prereq falt
 - Ubicación de los tests: `SDD/tests/test_*.sh`, uno por unidad de comportamiento. Los helpers de assert viven únicamente en `SDD/tests/lib.sh` (Reuse statement del contract R0) — ningún `test_*.sh` define su propio `assert_*`.
 - Naming de casos: el mensaje literal pasado como último argumento a `assert_eq`/`assert_contains`/`assert_exit` (ej. `"run.sh sale 0 cuando todos los test_*.sh pasan"`). El binding AC↔test de cada brief usa ese string, literal y grepeable en el archivo — no hay framework con `it()`/`describe()` en bash puro.
 - Fixtures: se generan on-the-fly bajo `SDD/tests/.tmp/<nombre>-$$` (PID para evitar colisiones) con `trap ... EXIT` para limpieza garantizada, incluso si el test falla. Nunca versionadas (`SDD/tests/.tmp/` está en `.gitignore` desde R0).
-- Cómo se mockea I/O externo: N/A — no hay I/O externo que mockear. Cuando un test necesita un repo git real (`test_run_gates.sh`), usa uno de usar-y-tirar en `.tmp/`, nunca este repo.
+- Cómo se mockea I/O externo: N/A — no hay I/O externo que mockear. Cuando un test necesita un repo git real (`test_run_gates.sh`, `test_secret_scan.sh`), usa uno de usar-y-tirar en `.tmp/`, nunca este repo.
 - Tests que ya fallan en `prod`: N/A — el harness nace en R0, no hay corridas previas.
+- **Fixtures que parecen un secreto** (`test_secret_scan.sh`): un valor tipo `clave=valor` que quede contiguo y literal en el código fuente de un test de detección hace que `secret-scan.sh` se detecte a sí mismo al escanear ESE test (no está en la lista de exclusión — sólo el script y `SDD/contracts/` lo están). Convención: armar el string en piezas bash separadas (`printf '%s%s%s' "$clave" "$separador" "$valor"`, con cada pieza como argumento independiente) para que la unión sólo exista en memoria en tiempo de ejecución, nunca contigua en el archivo `.sh`. Aplica también a comentarios descriptivos: no escribir `clave=valor` literal ni siquiera en prosa.
 
 ---
 
@@ -76,7 +77,7 @@ Si un prerequisito no está disponible, el gate se marca `[SKIPPED] <prereq falt
 
 Además de los de `quality-gates.md` §6:
 
-- `# shellcheck disable=` genérico sin comentario en la misma línea que referencie la decisión que lo justifica (la única excepción hoy, `guard-git.sh:` `# shellcheck disable=SC2254` documentado inline, vive en `plugins/` y está fuera del scope de R0).
+- `# shellcheck disable=` genérico sin comentario en la misma línea que referencie la decisión que lo justifica. Excepciones documentadas hoy: `guard-git.sh` (`plugins/`, `# shellcheck disable=SC2254`, fuera del scope de R0) y, desde AC3bis, los `cleanup()` de `SDD/tests/test_harness.sh`, `test_run_gates.sh` y `test_secret_scan.sh` (`# shellcheck disable=SC2329  # invocada por trap EXIT`) — las tres únicas funciones de este repo invocadas exclusivamente por `trap`.
 - Bajar `--severity` de shellcheck por debajo de `warning`, o agregarle `-e <código>` para silenciar un hallazgo real, sin ratificación del planner.
 - `sleep`-loops para "esperar" en vez de asserts determinísticos sobre exit code/output.
 

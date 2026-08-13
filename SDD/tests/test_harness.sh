@@ -17,6 +17,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_SH="$SCRIPT_DIR/run.sh"
 WORK_DIR="$SCRIPT_DIR/.tmp/test_harness-$$"
 
+# shellcheck disable=SC2329  # invocada por trap EXIT
 cleanup() { rm -rf "$WORK_DIR"; }
 trap cleanup EXIT
 
