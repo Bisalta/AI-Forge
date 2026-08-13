@@ -1,6 +1,7 @@
 # HLTC — sdd-flow v0.11.0 · hardening desde el análisis de SICOP
 
 - **Contract version**: v3 — ratificado el 13-ago-2026 tras el `REJECTED` de la ronda 2 de R0. Cambio respecto de v2: los cuatro literales de credencial de AC6bis se escriben con clave y valor en spans separados, para que el contract deje de disparar su propio detector. Verificado con el patrón de `SDD/tests/secret-scan.sh`: cero coincidencias en este archivo. Con eso, la exclusión de `SDD/contracts/` queda **prohibida** y se elimina.
+- **Contract version**: v4 — ampliado el 13-ago-2026 con **R5**, tras el consolidado externo `MD-consolidado.md` (13-ago) que reemplaza a los cinco documentos previos de SICOP. R5 es su propuesta 3 (identidad de contenido de los docs que gobiernan), que no estaba en v1-v3. Su propuesta 6 (gate mínimo portable) queda **fuera de este contract**: está planteada como oferta y necesita como insumo el script de `Bisalta/Odoo-Addons`, que este ciclo no tiene. Los ACs de R0-R4 no cambian.
 - **Historial de versiones**: v2 — ratificado por el planner el 13-ago-2026 tras el `ESCALATE` de la ronda 1 de R0. Cambios respecto de v1: threat model y bloque `concerns:` agregados (eran un BLOCKER de contract); AC3 reescrito con la severidad de `shellcheck` adentro; AC5 reescrito para apuntar a `SDD/verification/` en vez de `.sdd/`; AC6bis nuevo para cubrir `secret-scan.sh`. Los IDs de AC existentes no se reciclaron.
 - **Tarea madre Proxima**: `GEN-94`
 - **Repo**: `Bisalta/AI-Forge` · **Rama base**: `prod` · **Branch**: `feat-GEN-94-sicop-hardening`
@@ -38,7 +39,7 @@ Cerrar cuatro huecos del ciclo SDD que el proyecto SICOP midió en producción, 
 
 ## Orden de integración
 
-`R0 → R1 → R2 → R3 → R4`, en serie sobre la misma branch. R0 crea el harness de tests del que dependen los ACs de R1 y R2. R3 y R4 tocan ambos `plugins/sdd-flow/skills/sdd-plan/SKILL.md`, por lo que no corren en paralelo.
+`R0 → R1 → R2 → R5 → R3 → R4`, en serie sobre la misma branch. R0 crea el harness de tests del que dependen los ACs de R1, R2 y R5. R5 va **antes** de R3 porque los dos tocan `plugins/sdd-flow/agents/reviewer-agent.md` y R3 construye sobre la sección que R5 agrega. R3 y R4 tocan ambos `plugins/sdd-flow/skills/sdd-plan/SKILL.md`, por lo que tampoco corren en paralelo.
 
 ---
 
@@ -319,6 +320,64 @@ El caso del barrido documental queda cubierto por la regla de correcciones post-
 | NFR `observability` | `N/A — cambio documental sin runtime` |
 
 ---
+
+# R5 — Identidad de contenido de los docs que gobiernan
+
+- **Arquetipo**: `infra`
+- **Origen**: propuesta 3 del consolidado externo `MD-consolidado.md` (13-ago-2026), la que más evidencia trae: cuatro documentos, cuatro repos, dos llegadas independientes más dos confirmaciones.
+
+## Problema
+
+El ciclo versiona el contract con rigor —se declara, se propaga y **se valida**, porque un `done` con `contract_version` viejo se rechaza— pero los tres documentos de `SDD/docs/` contra los que se escribe ese contract no declaran identidad ninguna. El runner estampa `**Doc**: <ruta>` (`plugins/sdd-flow/scripts/sdd-run-gates.sh:220`), y **una ruta no identifica un contenido**.
+
+La consecuencia no es perder historial: es que la afirmación "este ciclo cumplió" se queda sin sujeto. Como `.sdd/` está gitignoreado por diseño, el verification report es el único registro durable del ciclo, y es justo donde falta la identidad del doc que definió los gates.
+
+El sustituto razonable —"total está en git, y el contract tiene fecha"— quedó medido y no alcanza: en un repo de 8 días, `doc_quality_gates.md` acumuló 31 cambios, 8 de ellos en un solo día. Los contracts llevan fecha, no hora, así que "la guía como estaba el 12 de agosto" identifica ocho textos. Y no es patológico: desde la v0.7.0 el docs delta es parte del `done`, o sea **el ciclo modifica sus propios documentos de gobierno en cada vuelta, por diseño**. Cuanto mejor funciona el docs delta, menos identifica un texto la fecha del contract.
+
+Este ciclo aporta una razón más, medida por su cuenta y registrada en `SDD/retro.md` como `RT8`: fijar el **commit** del doc tampoco sirve, porque un archivo modificado sin commitear hace que el sha del último commit mienta. Es la misma clase que `HEAD` en R1, que `git ls-files` en `D8` y que `git stash create` en `D7`. El hash de contenido describe el texto que se leyó, commiteado o no.
+
+## Decisión de diseño (cerrada)
+
+1. **Función de hash**: `sha256`, estampado como `sha256:` seguido de los **primeros 16 caracteres hexadecimales**. Se calcula con `shasum -a 256`; si ese binario no está, con `sha256sum`. Si no está ninguno de los dos, se estampa `sha256:-` y la corrida sigue.
+2. **El sellado nunca aborta**: misma política que el sellado de árbol de R1. Un runner que no puede hashear reporta que no pudo, no falla.
+3. **Manifiesto de generación**: `sdd-init` escribe `SDD/docs/doc-manifest.md`, una fila por doc generado con su hash al momento de generarse. El hash **no** va dentro del propio documento, porque escribirlo ahí cambiaría el hash que declara.
+4. **Protección al regenerar**: `sdd-init` corrido de nuevo compara cada doc contra el manifiesto. Hash distinto significa que alguien trabajó ese documento a mano, y entonces no se sobrescribe sin mostrar el diff y pedir confirmación. Esto **no es una regla nueva**: `plugins/sdd-flow/skills/sdd-init/SKILL.md:70` ya la exige para los scripts. Lo que faltaba era la identidad que la regla necesita para poder correr.
+5. **La review compara**: el reviewer contrasta el hash del reporte contra el doc en el árbol. Hashes iguales y evidencia que no reproduce significa evidencia podrida. Hashes distintos significa que los gates se movieron durante el ciclo, y eso lleva un mensaje propio. Hoy los dos casos producen salida idéntica y el reviewer está obligado a leer el segundo como el primero.
+6. **Versión legible además del hash**: `N/A — el consolidado externo retiró su propio pedido de un campo de versión manual, porque un campo que se bumpea a mano se olvida y un campo desactualizado afirma algo falso con cara de dato. El hash no depende de que nadie se acuerde.`
+
+## Architectural Delta
+
+| Capa | Cambio |
+|---|---|
+| Script | `plugins/sdd-flow/scripts/sdd-run-gates.sh` — helper de hash portable y estampado del doc en el encabezado (línea 220) |
+| Template | `plugins/sdd-flow/templates/verification-report.md` — el doc de gates se registra con su hash |
+| Skill | `plugins/sdd-flow/skills/sdd-init/SKILL.md` — escribe el manifiesto y protege los docs al regenerar |
+| Template | `plugins/sdd-flow/templates/doc-manifest.md` (NEW) |
+| Agente | `plugins/sdd-flow/agents/reviewer-agent.md` — Fase 1: comparar hashes y distinguir los dos casos |
+| Tests | `SDD/tests/test_doc_hash.sh` (NEW) |
+
+**Reuse statement**: el helper de hash se define una sola vez en `sdd-run-gates.sh`. Ningún otro script recalcula hashes por su cuenta.
+
+## Acceptance criteria
+
+- **AC29** — El encabezado del reporte estampa el doc con su ruta **y** su hash, y ese hash coincide con los primeros 16 caracteres hexadecimales de `shasum -a 256 <doc>` sobre el mismo archivo.
+- **AC30** — Cambiar un byte del doc de gates entre dos corridas produce dos hashes distintos en los dos reportes. **Es un AC de detección**: se prueba por mutación, con el triple registrado.
+- **AC31** — Sin `shasum` ni `sha256sum` en el `PATH`, el runner estampa `sha256:-` y sale con el código que corresponde al resultado de los gates, sin abortar.
+- **AC32** — `plugins/sdd-flow/templates/verification-report.md` registra el doc de gates con hash, no sólo con ruta. Verificable con grep.
+- **AC33** — `plugins/sdd-flow/skills/sdd-init/SKILL.md` exige escribir `SDD/docs/doc-manifest.md` con el hash de cada doc generado, y exige comparar antes de sobrescribir, mostrando el diff cuando el hash difiere. Verificable con grep.
+- **AC34** — `plugins/sdd-flow/agents/reviewer-agent.md` distingue los dos casos con mensajes distintos: hashes iguales con evidencia que no reproduce es `BLOCKER` de evidencia podrida; hashes distintos es un hallazgo propio de que los gates cambiaron durante el ciclo. Verificable con grep.
+- **AC35** — `plugins/sdd-flow/templates/doc-manifest.md` existe y tiene una fila por cada uno de los tres docs de `SDD/docs/`.
+
+## Checklist del arquetipo `infra`
+
+| Ítem | Resolución |
+|---|---|
+| Reversible | `git revert`. El estampado es aditivo: un reporte sin hash sigue siendo legible |
+| Sin secretos nuevos | `N/A — sólo se hashean documentos versionados del propio repo` |
+| Efecto sobre los devs declarado | `sdd-init` deja de sobrescribir en silencio un doc trabajado a mano. Es un cambio de comportamiento visible y es el punto de la pieza 4 |
+| Probado en entorno no productivo | AC29-AC31 en repos temporales de `SDD/tests/.tmp/`; AC32-AC35 con grep |
+| NFR `rollout` | Aditivo. Los reportes viejos sin hash no se invalidan |
+| NFR `observability` | El hallazgo del reviewer nombra los dos hashes y el doc |
 
 ## Error / fallback behavior (global)
 
