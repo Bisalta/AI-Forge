@@ -49,8 +49,9 @@ AI-Forge/
 │   │   │                            concerns.md, orchestration.md, seo-frontend.md
 │   │   ├── templates/              ← doc_architecture.md, doc_quality_gates.md, doc_verification_guide.md,
 │   │   │                            verification-report.md, debt-ledger.md, adr.md, feature-ready-brief.md,
-│   │   │                            coordination-README.md — esqueletos que un repo QUE INSTALA el plugin
-│   │   │                            copia y llena; nunca se editan pensando en ESTE repo
+│   │   │                            coordination-README.md, doc-manifest.md (contract R5: hash de
+│   │   │                            contenido de los tres docs de SDD/docs/) — esqueletos que un repo QUE
+│   │   │                            INSTALA el plugin copia y llena; nunca se editan pensando en ESTE repo
 │   │   └── evals/                  ← golden-requirements.md (casos de referencia del propio plugin)
 │   └── project-foundation/         ← segundo plugin: documentos fundacionales de proyecto (PRD/TRD/etc.)
 │       ├── .claude-plugin/plugin.json

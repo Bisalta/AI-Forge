@@ -72,7 +72,21 @@ Cómo llenarlo sin inventar:
 
 En modo `greenfield` no hay comandos que verificar todavía: escribí los del stack elegido en la entrevista y marcá el archivo como *sin verificar — validar en el primer commit con código*.
 
-## Paso 3.6 — Paridad con CI (ofrecer, no imponer)
+## Paso 3.6 — Manifiesto de identidad y protección al regenerar
+
+Antes de escribir o reescribir cualquiera de los tres docs (Pasos 2, 3, 3.5), su identidad de **contenido** tiene que quedar registrada — una ruta no dice qué texto había adentro, y `sdd-run-gates.sh` ya depende de esto para estampar el doc de gates con hash en cada reporte (`standards/quality-gates.md` §5). **No es una regla nueva**: el punto 8 del Paso 3.5 (copiar los scripts del plugin) ya exige nunca pisar una copia modificada a mano sin mostrar el diff — esto es lo mismo, aplicado a los docs, con hash de contenido en vez de `--version` porque un doc no tiene ese flag.
+
+Por cada uno de los tres docs, antes de escribir:
+
+1. **¿Existe ya el doc Y una fila suya en `SDD/docs/doc-manifest.md`** (creado desde `templates/doc-manifest.md` si todavía no existe)? Si el doc no existe, o su fila todavía dice `[PLACEHOLDER]`, no hay nada que proteger — escribí normal y seguí al punto 3.
+2. **Si ya existe una fila con hash real**, calculá el hash actual del doc en el árbol (`sha256`, primeros 16 hex — el mismo helper portable de `sdd-run-gates.sh`: `shasum -a 256` primero, `sha256sum` si no está) y comparalo contra el hash de esa fila.
+   - **Coinciden**: nadie lo tocó desde la última generación — se sobreescribe normal.
+   - **Difieren**: alguien trabajó ese doc a mano desde la última generación. **No lo sobreescribas en silencio** — mostrale el diff entre el contenido actual del doc y el que estás a punto de escribir, y pedí confirmación explícita antes de pisarlo. Si no confirma, dejá ese doc como está y no le toques su fila del manifiesto.
+3. **Después de escribir** (o de que el usuario confirme el pisado), actualizá `SDD/docs/doc-manifest.md` con el hash nuevo del doc que acabás de escribir y la fecha UTC de esta generación, en la fila que le corresponde (`doc_architecture.md`, `doc_verification_guide.md` o `doc_quality_gates.md`).
+
+El hash de cada doc **nunca va dentro del propio documento que describe** — escribirlo ahí cambiaría el hash que declara; por eso vive aparte, en el manifiesto.
+
+## Paso 3.7 — Paridad con CI (ofrecer, no imponer)
 
 Los gates que corre el plugin y los que corre CI tienen que ser **los mismos comandos**, o "verde local" no significa nada. Después de escribir `doc_quality_gates.md`:
 
@@ -94,4 +108,5 @@ Reportá:
 - No dupliques contenido que ya vive en `docs/foundation/`; referencialo.
 - Nunca dejes `[PLACEHOLDER]` en el archivo final.
 - Nunca declares un comando de verificación que no confirmaste que existe en el repo. Un gate ausente se declara `N/A` con razón — es información útil; un comando inventado es una trampa para el próximo agente.
+- Nunca sobreescribas uno de los tres docs sin comparar su hash contra `SDD/docs/doc-manifest.md` primero (Paso 3.6) — un hash que difiere es un doc trabajado a mano, y se pisa sólo tras mostrar el diff y confirmar.
 - Respondé siempre en el idioma del usuario.

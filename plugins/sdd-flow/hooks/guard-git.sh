@@ -9,6 +9,12 @@
 # working dir desconocido) => exit 0 y el flujo sigue normal. Un guard que
 # rompe sesiones es peor que no tener guard.
 #
+# Contrato de señalización: con `jq` presente, `deny()` Y `allow()` salen
+# LOS DOS con exit 0 — la única diferencia observable es el JSON
+# `permissionDecision` en stdout. Sin `jq`, `deny()` degrada a texto plano
+# en stderr con exit 2. Medir este hook sólo por exit code hace que un
+# `allow` y un `deny` con `jq` se vean IGUALES (contract R5).
+#
 # Escape hatch: SDD_ALLOW_BASE_COMMIT=1 desactiva el chequeo de rama protegida
 # (para repos donde commitear a la default es legítimo) — NUNCA el chequeo de
 # identidad de agente (sección 3 más abajo): son dos guardas independientes,

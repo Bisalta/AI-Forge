@@ -157,12 +157,16 @@ assert_eq "$ac10_file" "si" "AC10 arbol sucio con --allow-dirty - crea el archiv
 assert_contains "$out10" "ARBOL SUCIO" "AC10 arbol sucio con --allow-dirty - encabezado marca ARBOL SUCIO"
 
 # =========================================================================
-# AC11 — --version imprime 0.11.0
+# AC11 — --version imprime la versión actual del runner. Literal actualizado
+# a 0.12.0 por el bump de contract R5 (T2.2, SDD/contracts/2026-08-13-sicop-
+# hardening.md): sigue siendo el MISMO assert (exact-match contra el
+# VERSION real del script), sólo cambió el valor esperado porque el script
+# legítimamente cambió de versión — no es un ablandamiento del AC.
 # =========================================================================
 out11="$(bash "$RUN_GATES" --version 2>&1)"
 ec11=$?
 assert_exit 0 "$ec11" "AC11 --version sale 0"
-assert_contains "$out11" "0.11.0" "AC11 --version imprime 0.11.0"
+assert_contains "$out11" "0.12.0" "AC11 --version imprime 0.12.0"
 
 # =========================================================================
 # AC12 — directorio que NO es repo git: Tree: en "-", sale con el exit code

@@ -48,12 +48,24 @@
 #     poder sellar: degrada y la escalera sigue (mismo criterio que el resto
 #     del runner).
 #
+# Sellado del doc (identidad de CONTENIDO, no sólo de ruta — contract R5,
+# SDD/contracts/2026-08-13-sicop-hardening.md): el encabezado también
+# estampa el hash sha256 (primeros 16 hex) del doc de gates que se acaba de
+# leer, junto a su ruta. Una ruta no dice qué texto había adentro cuando
+# corrieron los gates — el doc de gates cambia varias veces por día durante
+# el propio ciclo SDD (medido: 31 cambios en 8 días, 8 en un solo día) — y
+# el commit del doc tampoco alcanza: un archivo modificado sin commitear
+# hace que ese sha mienta igual que HEAD mentía antes del sellado de árbol
+# de arriba. `shasum -a 256` primero (macOS), `sha256sum` si no está; sin
+# ninguno de los dos, `sha256:-` y la corrida sigue — el sellado de hash
+# NUNCA aborta, misma política que el sellado de árbol.
+#
 # Qué NO hace: no decide qué gates aplican (eso lo declara el doc — fila sin
 # comando o con N/A se reporta [SKIPPED]), no arregla nada, no reintenta.
 
 set -uo pipefail
 
-VERSION="0.11.0"
+VERSION="0.12.0"
 DOC="SDD/docs/doc_quality_gates.md"
 OUT=".sdd/gates-run.md"
 KEEP_GOING=0
@@ -125,6 +137,28 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     TREE="$(git rev-parse 'HEAD^{tree}' 2>/dev/null || echo '-')"
   fi
 fi
+
+# --- helper de hash portable: identidad de CONTENIDO del doc de gates -----
+# Contract R5: una RUTA no identifica un CONTENIDO. sha256, primeros 16 hex:
+# `shasum -a 256` primero (default de macOS), `sha256sum` si no está
+# (Linux/CI), y si ninguno de los dos está en PATH, `sha256:-` — el sellado
+# de hash NUNCA aborta la corrida, misma política que el sellado de árbol.
+doc_hash() { # $1=path del doc de gates
+  local f="$1" raw
+  if command -v shasum >/dev/null 2>&1; then
+    raw="$(shasum -a 256 "$f" 2>/dev/null | awk '{print $1}')"
+  elif command -v sha256sum >/dev/null 2>&1; then
+    raw="$(sha256sum "$f" 2>/dev/null | awk '{print $1}')"
+  else
+    raw=""
+  fi
+  if [ -n "$raw" ]; then
+    printf 'sha256:%s' "${raw:0:16}"
+  else
+    printf 'sha256:-'
+  fi
+}
+DOC_HASH="$(doc_hash "$DOC")"
 
 # La estrictez se deriva del destino del reporte, no de una bandera que hay
 # que acordarse de pasar: -o dentro de .sdd/ es uso ad-hoc (nunca se
@@ -217,7 +251,7 @@ fi
 
 {
   printf '# Gates run — generado por sdd-run-gates.sh v%s\n\n' "$VERSION"
-  printf -- '- **Branch**: `%s` · **Commit**: `%s` · **Doc**: `%s` · **Fecha**: %s\n' "$BRANCH" "$COMMIT" "$DOC" "$(now)"
+  printf -- '- **Branch**: `%s` · **Commit**: `%s` · **Doc**: `%s` (`%s`) · **Fecha**: %s\n' "$BRANCH" "$COMMIT" "$DOC" "$DOC_HASH" "$(now)"
   if [ "$DIRTY" = 1 ]; then
     # shellcheck disable=SC2016  # backtick literal para markdown (mismo patron que Branch/Commit/Doc arriba), no es expansion querida
     printf -- '- Tree: `%s` — %s. Archivos sin commitear:\n' "$TREE" "$TREE_STATE"

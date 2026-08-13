@@ -5,7 +5,7 @@ Evidencia de la escalera de gates (`standards/quality-gates.md` §4-§5). Lo esc
 - **Branch**: `<branch>`
 - **Contract**: `contract.md` v<N>
 - **Commit evaluado**: `<sha>`
-- **Doc de gates del repo**: `SDD/docs/doc_quality_gates.md`
+- **Doc de gates del repo**: `SDD/docs/doc_quality_gates.md` — el reporte generado lo registra **con hash, no sólo con ruta** (`sha256:<16 hex>`, contract R5): una ruta no identifica un contenido, y este doc puede cambiar varias veces durante el propio ciclo. Copiá el hash del encabezado del reporte generado, no lo recalcules a mano acá.
 
 ---
 
