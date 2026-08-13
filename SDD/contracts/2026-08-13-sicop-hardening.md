@@ -1,9 +1,10 @@
 # HLTC — sdd-flow v0.11.0 · hardening desde el análisis de SICOP
 
-- **Contract version**: v3 — ratificado el 13-ago-2026 tras el `REJECTED` de la ronda 2 de R0. Cambio respecto de v2: los cuatro literales de credencial de AC6bis se escriben con clave y valor en spans separados, para que el contract deje de disparar su propio detector. Verificado con el patrón de `SDD/tests/secret-scan.sh`: cero coincidencias en este archivo. Con eso, la exclusión de `SDD/contracts/` queda **prohibida** y se elimina.
-- **Contract version**: v6 — ratificado el 14-ago-2026 tras el review `APPROVED` de R3. Entran **AC39** y **AC40** (dos consumidores de la regla de mutación que faltaban en el Delta de R3) y **AC41** (cierre del hueco de closure en la forma "ausencia" de §10.1). Detalle en la ratificación de la sección R3.
+- **Contract version**: v7 — ratificado el 14-ago-2026 tras la re-review de R3 por AC24. El reviewer encontró que este contract incumplía §10.2, la regla insignia que R3 introduce: ningún AC de detección declaraba su `Mutación:`. Agregadas las nueve. Además se corrige el encabezado, que había vuelto a tener dos líneas rotuladas `Contract version` — la misma regresión que el review de R0 ya había marcado una vez.
+- **Historial de versiones**: v6 — ratificado el 14-ago-2026 tras el review `APPROVED` de R3. Entran **AC39** y **AC40** (dos consumidores de la regla de mutación que faltaban en el Delta de R3) y **AC41** (cierre del hueco de closure en la forma "ausencia" de §10.1). Detalle en la ratificación de la sección R3.
 - **Historial de versiones**: v5 — ratificado el 13-ago-2026 tras el `ESCALATE` de la ronda 1 de R2. La ubicación del bloque de identidad en `guard-git.sh` pasa de "tras el chequeo de rama protegida" a "por encima del escape hatch `SDD_ALLOW_BASE_COMMIT`", y entran **AC36, AC37 y AC38**. Detalle y medición en la ratificación de la sección R2.
 - **Historial de versiones**: v4 — ampliado el 13-ago-2026 con **R5**, tras el consolidado externo `MD-consolidado.md` (13-ago) que reemplaza a los cinco documentos previos de SICOP. R5 es su propuesta 3 (identidad de contenido de los docs que gobiernan), que no estaba en v1-v3. Su propuesta 6 (gate mínimo portable) queda **fuera de este contract**: está planteada como oferta y necesita como insumo el script de `Bisalta/Odoo-Addons`, que este ciclo no tiene. Los ACs de R0-R4 no cambian.
+- **Historial de versiones**: v3 — ratificado el 13-ago-2026 tras el `REJECTED` de la ronda 2 de R0. Cambio respecto de v2: los cuatro literales de credencial de AC6bis se escriben con clave y valor en spans separados, para que el contract deje de disparar su propio detector. Verificado con el patrón de `SDD/tests/secret-scan.sh`: cero coincidencias en este archivo. Con eso, la exclusión de `SDD/contracts/` queda **prohibida** y se elimina.
 - **Historial de versiones**: v2 — ratificado por el planner el 13-ago-2026 tras el `ESCALATE` de la ronda 1 de R0. Cambios respecto de v1: threat model y bloque `concerns:` agregados (eran un BLOCKER de contract); AC3 reescrito con la severidad de `shellcheck` adentro; AC5 reescrito para apuntar a `SDD/verification/` en vez de `.sdd/`; AC6bis nuevo para cubrir `secret-scan.sh`. Los IDs de AC existentes no se reciclaron.
 - **Tarea madre Proxima**: `GEN-94`
 - **Repo**: `Bisalta/AI-Forge` · **Rama base**: `prod` · **Branch**: `feat-GEN-94-sicop-hardening`
@@ -72,12 +73,14 @@ Cerrar cuatro huecos del ciclo SDD que el proyecto SICOP midió en producción, 
 
 - **AC1** — `SDD/tests/run.sh` sale con código 0 cuando todos los `test_*.sh` pasan.
 - **AC2** — `SDD/tests/run.sh` sale con código 1 cuando al menos un `test_*.sh` falla, y su salida nombra el archivo que falló.
+  - **Mutación** (`quality-gates.md` §10.2): sacar el `exit 1` de `SDD/tests/run.sh` · revertir después.
 - **AC3** — `shellcheck --severity=warning` sale 0 sobre todos los `.sh` versionados del repo (`plugins/sdd-flow/scripts/`, `plugins/sdd-flow/hooks/`, `SDD/tests/`). **Ratificación v2**: el piso es `warning`, no el default `style`. Razón medida en la ronda 1: a severidad `style` salen 3 hallazgos `SC2016` (info) en scripts de `plugins/` que R0 tiene prohibido tocar, más `SC2329` (info) por funciones invocadas sólo vía `trap`. Ninguno es un defecto. Bajar el piso por debajo de `warning`, o agregar `-e <código>` para silenciar un hallazgo de severidad real, queda prohibido sin ratificación del planner. Los 3 `SC2016` de `plugins/` van al ledger de deuda.
 - **AC3bis** — Los hallazgos `SC2329` que son propios de archivos creados por R0 llevan `# shellcheck disable=SC2329` **inline con el comentario que lo justifica** en la misma línea, de modo que el piso `warning` quede justificado únicamente por los hallazgos preexistentes de `plugins/`.
 - **AC4** — `SDD/docs/doc_quality_gates.md` contiene la tabla de escalera en el formato que `plugins/sdd-flow/scripts/sdd-run-gates.sh` parsea (filas `| N | gate | \`cmd\` | ... |`), y cada fila con comando declarado ejecuta un binario presente en la máquina. Las filas sin comando llevan `N/A — <razón>`.
 - **AC5** — `sdd-run-gates.sh -d SDD/docs/doc_quality_gates.md -o SDD/verification/feat-GEN-94-sicop-hardening-R0-gates.md` termina con `red: 0` en su línea JSON `sdd.gates`, y ningún gate queda `[SKIPPED]` por comando inexistente. **Ratificación v2**: el destino es `SDD/verification/`, no `.sdd/`. La v1 contradecía `plugins/sdd-flow/standards/quality-gates.md:95`, que prohíbe `.sdd/` para evidencia que se commitea porque ese directorio está gitignoreado y no viaja en el PR. `.sdd/gates-run.md` queda para corridas exploratorias.
 - **AC6** — `SDD/tests/test_run_gates.sh` ejercita `sdd-run-gates.sh` sobre un repo git creado en `SDD/tests/.tmp/`, y asserta el campo `green` de la línea JSON `sdd.gates`. El directorio temporal se borra al terminar, incluso si el test falla.
 - **AC6bis** — `SDD/tests/secret-scan.sh` detecta, cada uno en su propio caso de test en `SDD/tests/test_secret_scan.sh` (NEW), las seis formas siguientes plantadas en un repo git temporal, y sale limpio sobre un árbol sin secretos:
+  - **Mutación** (`quality-gates.md` §10.2): plantar cada una de las seis formas por separado en el repo temporal y removerla · una mutación por forma.
   1. clave `api_key`, separador `=`, valor `sk_live_51H8xQ2abcdefg` — valor **sin comillas**, clave en minúscula;
   2. clave `PASSWORD`, separador `=`, valor `"hunter2xyz"` — clave en `SCREAMING_SNAKE`, valor entre comillas;
   3. clave `AWS_SECRET_ACCESS_KEY`, separador `=`, valor `wJalrXUtnFEMI/K7MDENG` — sin comillas y en mayúsculas;
@@ -145,6 +148,7 @@ Esta derivación path→estrictez es deliberada: el modo de falla que se ataca e
 - **AC7** — Con árbol limpio, el encabezado del reporte incluye una línea con `Tree:` seguida del hash que devuelve `git rev-parse HEAD^{tree}` en ese repo, y el runner sale 0.
 - **AC8** — Con árbol sucio y `-o .sdd/gates-run.md`, el reporte se escribe, su encabezado marca el árbol como sucio, el hash de `Tree:` difiere de `git rev-parse HEAD^{tree}`, y el runner sale 0.
 - **AC9** — Con árbol sucio y `-o SDD/verification/x-gates.md`, el runner no crea el archivo y sale 4.
+  - **Mutación** (`quality-gates.md` §10.2): quitar el `exit 4` del bloque de estrictez de `sdd-run-gates.sh` · revertir después.
 - **AC10** — Con árbol sucio, `-o SDD/verification/x-gates.md` y `--allow-dirty`, el archivo se crea, su encabezado contiene la marca `ARBOL SUCIO`, y el runner sale 0.
 - **AC11** — `sdd-run-gates.sh --version` imprime `0.11.0`.
 - **AC12** — En un directorio que no es repo git, el runner escribe el reporte con `Tree:` en `-` y sale con el código que corresponde al resultado de los gates, sin abortar por el sellado.
@@ -195,12 +199,15 @@ El punto 3 es enforcement opt-in por repo. La alternativa de detectar al subagen
 ## Acceptance criteria
 
 - **AC14** — Con `SDD_AGENT_ENFORCE=1` y un `git commit` sin `-c user.name`/`-c user.email`, `guard-git.sh` sale con el código de denegación que ya usa para rama protegida, y su mensaje nombra la identidad esperada.
+  - **Mutación** (`quality-gates.md` §10.2): neutralizar el bloque de identidad de `guard-git.sh` para que nunca deniegue (`if false`) · revertir después.
 - **AC15** — Con `SDD_AGENT_ENFORCE=1` y un `git commit -c user.name=sdd-agent -c user.email=sdd-agent@users.noreply.github.com`, el hook permite el commit.
 - **AC16** — Sin `SDD_AGENT_ENFORCE` en el entorno, un `git commit` sin identidad de agente pasa: el hook no lo deniega.
 - **AC17** — Con `SDD_AGENT_ENFORCE=1`, `SDD_AGENT_NAME=otro-agente` y un commit que declara `user.name=otro-agente`, el hook permite el commit.
 - **AC18** — Tras un commit hecho con la identidad de agente, `git log -1 --format='%an'` devuelve `sdd-agent`. Este AC es la prueba de que la guarda de autoría dejó de ser tautológica.
 - **AC36** — Con `SDD_AGENT_ENFORCE=1` **y** `SDD_ALLOW_BASE_COMMIT=1` a la vez, un commit sin identidad de agente **sigue siendo denegado**. El hatch desactiva el chequeo de rama protegida, nunca el de identidad.
+  - **Mutación** (`quality-gates.md` §10.2): reintroducir el bypass del hatch `SDD_ALLOW_BASE_COMMIT` sobre el chequeo de identidad · revertir después.
 - **AC37** — Con `SDD_AGENT_ENFORCE=1` y el repo en `HEAD` detached, un commit sin identidad de agente **sigue siendo denegado**.
+  - **Mutación** (`quality-gates.md` §10.2): reintroducir el bypass de `HEAD` detached sobre el chequeo de identidad · revertir después.
 - **AC38** — Los tres textos que describen el alcance del hatch dicen la verdad: `plugins/sdd-flow/standards/quality-gates.md`, el encabezado de `plugins/sdd-flow/hooks/guard-git.sh` y `SDD/docs/doc_architecture.md`. Ninguno afirma que `SDD_ALLOW_BASE_COMMIT` desactive únicamente el chequeo de rama sin decir que el de identidad sigue activo. `doc_architecture.md` además lista las tres variables nuevas con su default. Verificable con grep.
 
 **Ratificación v5** (tras el `ESCALATE` de la ronda 1 de R2). El Delta de v4 ordenaba poner el bloque de identidad *después* del chequeo de rama protegida, y el implementador cumplió al pie de la letra. Medido por el reviewer contra el payload real del hook, esa ubicación deja el bloque aguas abajo de cuatro salidas tempranas que pertenecen al chequeo de rama —el `allow` del hatch, el `command -v git`, el `rev-parse --git-dir` y el `HEAD` detached—, ninguna de las cuales tiene que ver con identidad: el bloque nuevo sólo parsea el comando.
@@ -263,6 +270,7 @@ La regla ya existe en el plugin con alcance angosto: `quality-gates.md:19` (DoD 
 - **AC21** — `plugins/sdd-flow/agents/reviewer-agent.md` clasifica como `BLOCKER` un AC de detección sin las tres corridas, y como `MAJOR` una cifra reportada sin la salida que la produce.
 - **AC22** — `plugins/sdd-flow/agents/implementing-agent.md` y `plugins/sdd-flow/skills/write-pr-report/SKILL.md` exigen adjuntar la salida del comando de cada cifra reportada.
 - **AC23** — Los cinco archivos del Delta referencian la sección de `quality-gates.md` por su título, y ninguno recopia el texto normativo del triple. Verificable con grep del título en los cinco archivos.
+  - **Mutación** (`quality-gates.md` §10.2): recopiar el texto normativo del triple en uno de los cinco archivos del Delta · revertir después.
 - **AC24** — `quality-gates.md` declara que un diff que corrige un artefacto ya aprobado vuelve al loop de review.
 - **AC39** — `plugins/sdd-flow/templates/verification-report.md` tiene una sección donde registrar el triple, con una fila por corrida (comando, exit code, resultado) y un campo para la mutación que declaró el contract.
 - **AC40** — `plugins/sdd-flow/commands/sdd-fixes.md` declara quién escribe la mutación en la vía corta: cuando un ítem de fix es un control de detección, la mutación la declara **el propio ítem de `fixes.md` en el triage**, y el triple va en la evidencia de ese ítem.
@@ -310,6 +318,7 @@ El caso del barrido documental queda cubierto por la regla de correcciones post-
 | Skill | `plugins/sdd-flow/skills/enrich-user-story/SKILL.md:92` — `analysis` entra a la lista de arquetipos |
 | Skill | `plugins/sdd-flow/skills/sdd-plan/SKILL.md` — el binding AC↔test admite la forma de evidencia del arquetipo `analysis` |
 | Tests | `SDD/tests/test_analysis_archetype.sh` (NEW) |
+| Script | `plugins/sdd-flow/scripts/sdd-check.sh` — guard de `.md` en la regla de supresores (**agregado en v7**) |
 
 ## Contenido normativo del arquetipo `analysis`
 
@@ -330,6 +339,9 @@ El caso del barrido documental queda cubierto por la regla de correcciones post-
 - **AC26** — La sección `analysis` incluye los siete ítems de checklist del contenido normativo de arriba.
 - **AC27** — `plugins/sdd-flow/skills/enrich-user-story/SKILL.md` incluye `analysis` en la lista de arquetipos de su dimensión 7.
 - **AC28** — El total de arquetipos declarado en `archetypes.md` y en `enrich-user-story` coincide: diez en ambos. Verificable con grep.
+- **AC42** — `plugins/sdd-flow/scripts/sdd-check.sh` no levanta `BLOCKER` de supresor sobre un archivo `.md`. **Ratificación v7**: la regla de supresores no tiene el guard `file !~ /\.md$/` que sí tiene la regla de `--no-verify` en el mismo script, así que el chequeo mecánico del plugin levanta un `BLOCKER` sobre los documentos normativos **del propio plugin** — el `@ts-ignore` que enumera las mitigaciones prohibidas en `commands/sdd-fixes.md` lo dispara. Medido por el reviewer: `sdd-check.sh e5ef90c` sale 2 sobre un texto que existía desde antes del diff. Un checker que se pone rojo sobre la prosa que describe lo que prohíbe va a entrenar al equipo a ignorarlo.
+  - **Mutación** (`quality-gates.md` §10.2): quitar el guard de `.md` recién agregado y verificar que el `BLOCKER` falso reaparece · revertir después.
+  - **Mutación** (`quality-gates.md` §10.2): agregar un arquetipo falso a **uno solo** de los dos archivos · revertir después.
 
 ## Checklist del arquetipo `infra`
 
@@ -385,6 +397,7 @@ Este ciclo aporta una razón más, medida por su cuenta y registrada en `SDD/ret
 
 - **AC29** — El encabezado del reporte estampa el doc con su ruta **y** su hash, y ese hash coincide con los primeros 16 caracteres hexadecimales de `shasum -a 256 <doc>` sobre el mismo archivo.
 - **AC30** — Cambiar un byte del doc de gates entre dos corridas produce dos hashes distintos en los dos reportes. **Es un AC de detección**: se prueba por mutación, con el triple registrado.
+  - **Mutación** (`quality-gates.md` §10.2): hacer que el helper de hash devuelva un valor constante, y por separado uno que difiera siempre · revertir cada una.
 - **AC31** — Sin `shasum` ni `sha256sum` en el `PATH`, el runner estampa `sha256:-` y sale con el código que corresponde al resultado de los gates, sin abortar.
 - **AC32** — `plugins/sdd-flow/templates/verification-report.md` registra el doc de gates con hash, no sólo con ruta. Verificable con grep.
 - **AC33** — `plugins/sdd-flow/skills/sdd-init/SKILL.md` exige escribir `SDD/docs/doc-manifest.md` con el hash de cada doc generado, y exige comparar antes de sobrescribir, mostrando el diff cuando el hash difiere. Verificable con grep.
