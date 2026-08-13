@@ -4,9 +4,9 @@ Evidencia de la escalera de gates (`plugins/sdd-flow/standards/quality-gates.md`
 
 - **Branch**: `feat-GEN-94-sicop-hardening` (heredada, ya creada; no creé otra)
 - **Contract**: `SDD/contracts/2026-08-13-sicop-hardening.md` v5, sección R5
-- **Commit evaluado (código + tests + docs + este reporte)**: el commit `[ADD] [GEN-94] [sdd-flow] ...` que se crea inmediatamente después de este archivo (el hash no puede conocerse antes de crearlo; queda en el `sdd.result` con su valor real, mismo patrón que R2 ronda 2).
-- **Commit evaluado (evidencia de gates regenerada)**: un segundo commit posterior, que agrega `feat-GEN-94-sicop-hardening-R5-gates.md` — exigido por el exit 4 de R1 (`-o` fuera de `.sdd/` exige árbol limpio, y ese archivo no existe todavía al escribir este párrafo).
-- **Doc de gates del repo**: `SDD/docs/doc_quality_gates.md` (sin cambios de contenido — R5 no toca comandos de la escalera, sólo el runner que la corre y la reporta).
+- **Commit evaluado (código + tests + docs + este reporte, sin la evidencia de gates)**: `cd22425` — `[ADD] [GEN-94] [sdd-flow] R5 — hash de contenido de los docs que gobiernan`.
+- **Commit evaluado (evidencia de gates regenerada)**: un segundo commit posterior que agrega `feat-GEN-94-sicop-hardening-R5-gates.md` — exigido por el exit 4 de R1 (`-o` fuera de `.sdd/` exige árbol limpio; se generó DESPUÉS de commitear `cd22425`, con el árbol ya limpio).
+- **Doc de gates del repo**: `SDD/docs/doc_quality_gates.md` (sin cambios de contenido — R5 no toca comandos de la escalera, sólo el runner que la corre y la reporta). Hash real en esta corrida: `sha256:e96c7d0f61963400` — verificado independiente con `shasum -a 256 SDD/docs/doc_quality_gates.md | awk '{print $1}' | cut -c1-16` → coincide byte a byte con el que estampó el runner (AC29 en producción, no sólo en el test).
 
 ---
 
@@ -223,7 +223,8 @@ bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -o SDD/verification/feat-G
 ```
 
 - **Reporte generado**: `SDD/verification/feat-GEN-94-sicop-hardening-R5-gates.md` (mismo directorio que este archivo, path commiteado).
-- **Resumen** (línea `sdd.gates` del runner): ver el archivo generado — se referencia, no se transcribe (editar esa tabla a mano invalida la evidencia).
+- **Resumen** (línea `sdd.gates` del runner, real): `{"green":4,"red":0,"skipped":7,"report":"SDD/verification/feat-GEN-94-sicop-hardening-R5-gates.md"}` — exit `0`. Los 7 `[SKIPPED]` son todos `N/A` con razón declarada en `doc_quality_gates.md` (gates 1, 3, 5, 6, 7, 8, 10 — ninguno aplica a este repo, ver ese doc), no gates omitidos sin explicación.
+- El encabezado del reporte generado estampa `**Doc**: \`SDD/docs/doc_quality_gates.md\` (\`sha256:e96c7d0f61963400\`)` — la ruta y el hash juntos, exactamente lo que exige AC29, ahora en una corrida de producción real (no sólo en el harness de test).
 
 ---
 
