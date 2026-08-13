@@ -213,7 +213,8 @@ Un AC es **de detección** cuando su condición de aprobación es *"algo falla c
 
 1. **Rechazo** — el AC exige una reacción negativa ante un estado incorrecto: error, denegación, exit ≠ 0, 4xx, constraint violada, build roto.
 2. **Hallazgo** — el AC exige que un control reporte lo que encuentra: scanner, linter, validador, guarda.
-3. **Ausencia** — el AC afirma que algo *no* está: "ninguno contiene X", "cero coincidencias", "ningún caller quedó sin cobertura". Un chequeo de ausencia que busca algo inexistente pasa siempre, y sigue pasando el día que el defecto aparece.
+3. **Ausencia sobre un conjunto** — el AC afirma que, **recorriendo un conjunto de elementos** (archivos, filas, callers, coincidencias), ninguno cumple la condición mala: "ninguno de los cinco archivos contiene X", "cero coincidencias en el árbol", "ningún caller quedó sin cobertura". Lo que lo vuelve de detección es que el chequeo tiene que **recorrer el conjunto para no encontrar nada**: si recorre mal, o busca algo que ya no se llama así, pasa igual — y sigue pasando el día que el defecto aparece.
+   **No entra acá el desenlace negativo de un comportamiento que el propio test ejercita** — "el hook **no lo deniega** cuando la variable no está en el entorno", "la operación no falla con input válido": ahí **no hay conjunto que recorrer**, hay una operación que el test ejecuta y un resultado que observa. Ese AC es de la forma 1 de la lista de abajo y ya es falsable por construcción: el día que el sistema empieza a rechazar, el test se pone rojo solo.
 4. **Sensibilidad** — el AC afirma que dos salidas difieren cuando la entrada difiere. Un valor constante satisface todo el resto del AC.
 
 Un AC **no** es de detección —y entonces esta sección no le aplica— cuando su condición de aprobación es un resultado producido ante una entrada válida:

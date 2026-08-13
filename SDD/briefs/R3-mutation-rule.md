@@ -44,6 +44,8 @@ Este mismo ciclo tiene la evidencia de que sirve: el gate de secretos de R0 no d
 | `plugins/sdd-flow/agents/reviewer-agent.md` | (mod) AC de detección sin triple = `BLOCKER`; cifra sin salida = `MAJOR`. **Más el MINOR de R5**, abajo |
 | `plugins/sdd-flow/skills/write-pr-report/SKILL.md` | (mod) las cifras del PR report llevan su salida |
 | `SDD/tests/test_mutation_rule.sh` | (NEW) |
+| `plugins/sdd-flow/templates/verification-report.md` | (mod) **ronda 2 · contract v6** — sección donde registrar el triple (AC39) |
+| `plugins/sdd-flow/commands/sdd-fixes.md` | (mod) **ronda 2 · contract v6** — quién declara la mutación en la vía corta (AC40) |
 
 ## Pasos
 
@@ -57,6 +59,15 @@ Este mismo ciclo tiene la evidencia de que sirve: el gate de secretos de R0 no d
 - [x] T4.1 Test verde. `bash SDD/tests/run.sh` completo (7 archivos). `shellcheck --severity=warning` en 0.
 - [x] T4.2 Verification report + binding. Evidencia a `SDD/verification/feat-GEN-94-sicop-hardening-R3-gates.md` — **commiteá primero, regenerá después**.
 - [x] T4.3 Commit `[ADD] [GEN-94] [sdd-flow] <descripción>`, con la identidad `sdd-agent`.
+
+### Ronda 2 — tres `MINOR` del review (`APPROVED` en ronda 1, contract ratificado a **v6**)
+
+- [x] T5.1 Asserts de AC39-AC41 + el ADVISORY, **corridos antes del cambio**: exit `1`, 18 de 20 en rojo (los 2 verdes son otra vez los de ausencia).
+- [x] T5.2 **AC41** — `quality-gates.md` §10.1: la forma "ausencia" queda acotada a la ausencia **sobre un conjunto que hay que recorrer**, con el contraejemplo explícito del desenlace negativo que el propio test ejercita (la forma de AC16 de R2).
+- [x] T5.3 **AC39** — `templates/verification-report.md`: sección «Prueba por mutación (AC de detección)» con campo de mutación declarada y una fila por corrida.
+- [x] T5.4 **AC40** — `commands/sdd-fixes.md`: campo `Mutación:` en el bloque de intake, regla de triage y cláusula (1b) del Mini-DoD. La vía corta **no** queda exceptuada de §10.
+- [x] T5.5 **ADVISORY** — `reviewer-agent.md` 4b: contract sin la mutación declarada → `ESCALATE` al planner, no `BLOCKER` contra el agente.
+- [x] T5.6 Triple de AC23 **re-medido** contra el test nuevo (el de la ronda 1 se midió contra la versión anterior del archivo de test). Suite 7/7, lint 0, evidencia regenerada.
 
 ## Acceptance criteria (IDs del contract v5 — no los renumeres)
 
@@ -79,6 +90,10 @@ Este mismo ciclo tiene la evidencia de que sirve: el gate de secretos de R0 no d
 | AC22 | `implementing-agent.md` y `write-pr-report/SKILL.md` exigen adjuntar la salida del comando de cada cifra reportada | `SDD/tests/test_mutation_rule.sh::"AC22 implementing-agent - toda cifra reportada va con la salida del comando que la produce"`, `"AC22 write-pr-report - toda cifra del PR report va con la salida del comando que la produce"`, `"AC22 implementing-agent - una cifra copiada de otro documento no cuenta como medicion"`, `"AC22 write-pr-report - una cifra copiada de otro documento no cuenta como medicion"` | grep (automatizado) | [x] |
 | AC23 | **AC de detección**: los cinco archivos referencian la sección por su título y ninguno recopia el texto normativo del triple | `SDD/tests/test_mutation_rule.sh::"AC23 quality-gates.md - contiene la seccion referenciada por su titulo"`, `"AC23 sdd-plan - referencia la seccion por su titulo"`, `"AC23 implementing-agent - referencia la seccion por su titulo"`, `"AC23 reviewer-agent - referencia la seccion por su titulo"`, `"AC23 write-pr-report - referencia la seccion por su titulo"`, `"AC23 quality-gates.md - el texto normativo del triple vive aca"`, `"AC23 implementing-agent - no recopia el texto normativo del triple"`, `"AC23 implementing-agent - no recopia la forma corta del triple"` (+6: los otros tres archivos × 2 formas) | grep (automatizado) · **probado por mutación** (triple en el verification report) | [x] |
 | AC24 | `quality-gates.md` declara que un diff que corrige un artefacto ya aprobado vuelve al loop de review | `SDD/tests/test_mutation_rule.sh::"AC24 quality-gates.md - existe la regla de correcciones posteriores a APPROVED"`, `"AC24 quality-gates.md - la regla apunta al artefacto ya aprobado"`, `"AC24 quality-gates.md - la correccion se revisa como el cambio original"` | grep (automatizado) | [x] |
+| AC39 (v6) | `templates/verification-report.md` tiene sección para el triple: fila por corrida (comando · exit code · resultado) + campo de la mutación declarada | `SDD/tests/test_mutation_rule.sh::"AC39 verification-report.md - tiene la seccion para registrar el triple"`, `"AC39 verification-report.md - tiene el campo de la mutacion que declaro el contract"`, `"AC39 verification-report.md - la tabla del triple tiene columna de comando"`, `"AC39 verification-report.md - la tabla del triple tiene columna de exit code"`, `"AC39 verification-report.md - la tabla del triple tiene columna de resultado"`, `"AC39 verification-report.md - la tabla del triple tiene una fila por corrida"` (+2: remite a §10 y no recopia el texto normativo) | grep (automatizado) | [x] |
+| AC40 (v6) | `commands/sdd-fixes.md` declara que la mutación la escribe el propio ítem de `fixes.md` en el triage, y el triple va en la evidencia de ese ítem | `SDD/tests/test_mutation_rule.sh::"AC40 sdd-fixes - la mutacion la declara el propio item de fixes.md en el triage"`, `"AC40 sdd-fixes - el triple va en la evidencia del item"`, `"AC40 sdd-fixes - la regla aplica cuando el item es un control de deteccion"`, `"AC40 sdd-fixes - el bloque de intake tiene el campo donde se declara la mutacion"` (+2: título y no recopia) | grep (automatizado) | [x] |
+| AC41 (v6) | La forma "ausencia" de §10.1 queda acotada al conjunto que hay que recorrer y no cubre el desenlace negativo que el propio test ejercita (clasifica cerrado el AC16 de R2) | `SDD/tests/test_mutation_rule.sh::"AC41 quality-gates 10.1 - la forma ausencia exige un conjunto que hay que recorrer"`, `"AC41 quality-gates 10.1 - el desenlace negativo de un comportamiento que el test ejercita queda fuera de la forma ausencia"`, `"AC41 quality-gates 10.1 - el contraejemplo es la forma exacta del AC16 de R2"`, `"AC41 quality-gates 10.1 - el contraejemplo dice por que no hay conjunto que recorrer"` | grep (automatizado) | [x] |
+| ADV (review) | `reviewer-agent.md` 4b: contract sin la mutación declarada = `ESCALATE` al planner, no `BLOCKER` contra el agente | `SDD/tests/test_mutation_rule.sh::"ADV reviewer-agent - contract sin la mutacion declarada es ESCALATE al planner"`, `"ADV reviewer-agent - contract sin la mutacion declarada no es BLOCKER contra el agente"` | grep (automatizado) | [x] |
 
 ## Reglas innegociables
 
@@ -102,7 +117,8 @@ La regla sube el costo de cada AC de detección de una corrida a tres. El punto 
 ## Execution Report
 
 - **Summary**: `quality-gates.md` gana §10 «Prueba por mutación (AC de detección)» — criterio de clasificación cerrado (cuatro formas que entran: rechazo, hallazgo, ausencia, sensibilidad; dos que no: valor devuelto y fallback declarado; desempate = el AC que cae en las dos listas se parte en dos), la mutación declarada por el planner en el contract, y el triple como evidencia. El ítem 5 de la DoD referencia esa sección en vez de limitar la regla a `bugfix` (AC19); §5 suma las tres corridas al contrato de evidencia más la regla de que toda cifra va con la salida que la produce; §7.2 suma las severidades nuevas; §7.5 declara que un diff que corrige un artefacto ya aprobado vuelve al loop (AC24). Los otros cuatro archivos la referencian **por su título** sin recopiar el texto normativo (AC20-AC23). Incluye el MINOR heredado del review de R5 (T3.2).
-- **Task status**: 10/10 pasos `[x]` (T1.1-T4.3). 0 `BLOCKED`.
+- **Ronda 2** (contract **v6**, tras el `APPROVED` con tres `MINOR`): AC41 acota la forma "ausencia" al conjunto que hay que recorrer y agrega el contraejemplo del desenlace negativo, con lo que **AC16 de R2 cae limpio en no-detección y AC23 se queda en detección** (clasificación paso a paso en el verification report). AC39 le da al template la sección donde van las tres corridas —la asimetría que fabricaba rechazos evitables— y AC40 le da a la vía corta su declarante (el propio ítem de `fixes.md`, en el triage) en vez de dejarla exceptuada de §10. Más el ADVISORY del reviewer sobre su propio prompt.
+- **Task status**: 16/16 pasos `[x]` (T1.1-T4.3 ronda 1, T5.1-T5.6 ronda 2). 0 `BLOCKED`.
 - **Validation executed** (comando · exit code) — detalle completo y salidas pegadas en `SDD/verification/feat-GEN-94-sicop-hardening-R3.md`:
   - `bash SDD/tests/test_mutation_rule.sh` **antes** del cambio → exit `1`, 33 de 41 asserts en rojo (los 8 verdes son los de ausencia de AC23, que es lo que obliga a probarlo por mutación).
   - `bash SDD/tests/test_mutation_rule.sh` después del cambio → exit `0`, 41/41 `ok`.
@@ -111,6 +127,7 @@ La regla sube el costo de cada AC de detección de una corrida a tres. El punto 
   - `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh SDD/tests/*.sh` → exit `0` (glob del gate, no `git ls-files`).
   - `bash SDD/tests/secret-scan.sh` con el archivo nuevo ya stageado → exit `0`, 92 archivos versionados. Sin `git add` el escaneo cubría 91 y **no** incluía el test nuevo: medido, no supuesto (`D8`).
   - Escalera completa por el runner → `SDD/verification/feat-GEN-94-sicop-hardening-R3-gates.md`.
+  - **Ronda 2**: los 20 asserts nuevos (AC39-AC41 + ADVISORY) corridos **antes** del cambio → exit `1`, 18 en rojo; después → exit `0`, **61/61** `ok`. Triple de AC23 re-medido contra el test nuevo → verde (0) / rojo (1, **un solo assert**, el de la frase copiada) / verde (0), con el archivo mutado de vuelta en `sha256:377ad222b0e3d283…`.
 - **Blockers**: ninguno.
-- **Files changed**: los 6 de la tabla Files (5 modificados + `SDD/tests/test_mutation_rule.sh` nuevo), más este brief y los dos archivos de evidencia. Ningún archivo fuera de la tabla.
-- **Final statement**: los 6 ACs (AC19-AC24) tienen test real y pasan; AC23, el único AC de detección del requerimiento, va probado por mutación con el triple registrado; el criterio de §10.1 se escribió con desempate explícito para que un AC de valor devuelto no pueda entrar; cero mitigaciones prohibidas y ninguna exclusión por path; ningún gate `[SKIPPED]` sin razón declarada en el doc.
+- **Files changed**: los 8 de la tabla Files (7 modificados + `SDD/tests/test_mutation_rule.sh` nuevo), más este brief y los dos archivos de evidencia. Ningún archivo fuera de la tabla; `evals/golden-requirements.md` quedó como deuda `D9` y **no** se tocó.
+- **Final statement**: los 9 ACs (AC19-AC24 + AC39-AC41) tienen test real y pasan; AC23, el único AC de detección del requerimiento bajo el criterio corregido, va probado por mutación con el triple registrado en las dos rondas; el criterio de §10.1 quedó cerrado contra el caso que lo rompía (AC16 de R2); cero mitigaciones prohibidas y ninguna exclusión por path; ningún gate `[SKIPPED]` sin razón declarada en el doc.

@@ -184,5 +184,84 @@ rev_hash="$(grep -m1 'Hashes distintos' "$REVIEWER")"
 assert_contains "$rev_hash" "MAJOR" "T3.2 reviewer-agent - la rama de hashes distintos nombra MAJOR"
 assert_contains "$rev_hash" "MINOR" "T3.2 reviewer-agent - la rama de hashes distintos nombra MINOR"
 
+# =========================================================================
+# AC39 (contract v6) — templates/verification-report.md tiene la sección
+# donde registrar el triple: una fila por corrida (comando, exit code,
+# resultado) y un campo para la mutación que declaró el contract.
+#
+# Por qué entró en v6: R3 convierte "AC de detección sin las tres corridas"
+# en BLOCKER que rechaza, y el template que el implementing agent tiene
+# instrucción de usar no tenía dónde ponerlas — la asimetría fabrica
+# rechazos evitables.
+# =========================================================================
+VERIF_TEMPLATE="$REPO_ROOT/plugins/sdd-flow/templates/verification-report.md"
+if [ ! -f "$VERIF_TEMPLATE" ]; then
+  echo "  FAIL  setup — no existe $VERIF_TEMPLATE"
+  exit 1
+fi
+verif_tpl_text="$(cat "$VERIF_TEMPLATE")"
+
+assert_contains "$verif_tpl_text" "## $SECTION_TITLE" "AC39 verification-report.md - tiene la seccion para registrar el triple"
+assert_contains "$verif_tpl_text" "Mutación declarada en el contract" "AC39 verification-report.md - tiene el campo de la mutacion que declaro el contract"
+tpl_head="$(grep -m1 '| # | Estado del sistema |' "$VERIF_TEMPLATE")"
+assert_contains "$tpl_head" "Comando" "AC39 verification-report.md - la tabla del triple tiene columna de comando"
+assert_contains "$tpl_head" "Exit code" "AC39 verification-report.md - la tabla del triple tiene columna de exit code"
+assert_contains "$tpl_head" "Resultado" "AC39 verification-report.md - la tabla del triple tiene columna de resultado"
+tpl_rows="$(grep -c '^| [1-3] | ' "$VERIF_TEMPLATE")"
+assert_eq "$tpl_rows" "3" "AC39 verification-report.md - la tabla del triple tiene una fila por corrida"
+assert_contains "$verif_tpl_text" "§10" "AC39 verification-report.md - remite a la seccion 10 en vez de redefinir la regla"
+assert_eq "$(has_text "$verif_tpl_text" "$TRIPLE_TEXT")" "no" "AC39 verification-report.md - no recopia el texto normativo del triple"
+
+# =========================================================================
+# AC40 (contract v6) — commands/sdd-fixes.md declara quién escribe la
+# mutación en la vía corta: el propio ítem de fixes.md, en el triage.
+#
+# /sdd-fixes es por diseño un carril sin contract, así que §10.2 se quedaba
+# sin declarante y lo que quedaba escrito era que la vía corta está
+# exceptuada de §10 — el molde de escape hatch que este contract viene
+# encontrando en D7, D8 y en el hatch de R2.
+# =========================================================================
+FIXES="$REPO_ROOT/plugins/sdd-flow/commands/sdd-fixes.md"
+if [ ! -f "$FIXES" ]; then
+  echo "  FAIL  setup — no existe $FIXES"
+  exit 1
+fi
+fixes_text="$(cat "$FIXES")"
+
+fixes_mut="$(grep -m1 'la declara el propio ítem' "$FIXES")"
+assert_contains "$fixes_mut" "control de detección" "AC40 sdd-fixes - la regla aplica cuando el item es un control de deteccion"
+assert_contains "$fixes_mut" "en el triage" "AC40 sdd-fixes - la mutacion la declara el propio item de fixes.md en el triage"
+assert_contains "$fixes_mut" "las tres corridas van en la evidencia de ese ítem" "AC40 sdd-fixes - el triple va en la evidencia del item"
+assert_contains "$fixes_text" "- Mutación:" "AC40 sdd-fixes - el bloque de intake tiene el campo donde se declara la mutacion"
+assert_contains "$fixes_text" "$SECTION_TITLE" "AC40 sdd-fixes - referencia la seccion por su titulo"
+assert_eq "$(has_text "$fixes_text" "$TRIPLE_TEXT")" "no" "AC40 sdd-fixes - no recopia el texto normativo del triple"
+
+# =========================================================================
+# AC41 (contract v6) — la forma "ausencia" de §10.1 queda acotada a la
+# ausencia SOBRE UN CONJUNTO QUE HAY QUE RECORRER, y no cubre el desenlace
+# negativo de un comportamiento que el propio test ejercita.
+#
+# El hueco medido: AC16 de R2 ("un commit sin identidad de agente pasa: el
+# hook NO lo deniega") entraba por la letra de la viñeta y salía por su
+# justificación —el día que el hook empieza a denegar, AC16 falla— y además
+# la no-detección lo reclamaba por falsable por construcción. Tres lecturas
+# para un mismo AC es exactamente lo que las closure rules prohíben.
+# =========================================================================
+qg_ausencia="$(grep -m1 'Ausencia sobre un conjunto' "$QG")"
+assert_contains "$qg_ausencia" "recorrer el conjunto para no encontrar nada" "AC41 quality-gates 10.1 - la forma ausencia exige un conjunto que hay que recorrer"
+qg_excl="$(grep -m1 'No entra acá el desenlace negativo' "$QG")"
+assert_contains "$qg_excl" "el propio test ejercita" "AC41 quality-gates 10.1 - el desenlace negativo de un comportamiento que el test ejercita queda fuera de la forma ausencia"
+assert_contains "$qg_excl" "no lo deniega" "AC41 quality-gates 10.1 - el contraejemplo es la forma exacta del AC16 de R2"
+assert_contains "$qg_excl" "no hay conjunto que recorrer" "AC41 quality-gates 10.1 - el contraejemplo dice por que no hay conjunto que recorrer"
+
+# =========================================================================
+# ADVISORY del review de R3 — reviewer-agent.md 4b no decía qué hacer
+# cuando el contract NO declara la mutación de un AC que el reviewer
+# clasifica como de detección: el defecto es del plan, no del agente.
+# =========================================================================
+rev_escalate="$(grep -m1 'si el contract no declara la mutación' "$REVIEWER")"
+assert_contains "$rev_escalate" "ESCALATE" "ADV reviewer-agent - contract sin la mutacion declarada es ESCALATE al planner"
+assert_contains "$rev_escalate" "no \`BLOCKER\` contra el agente" "ADV reviewer-agent - contract sin la mutacion declarada no es BLOCKER contra el agente"
+
 test_summary
 exit $?

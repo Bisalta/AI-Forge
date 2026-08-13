@@ -38,6 +38,30 @@ bash SDD/scripts/sdd-run-gates.sh --full -o <este-dir>/AGENT_<slug>-gates.md
 
 ---
 
+## Prueba por mutación (AC de detección)
+
+Una sección como esta **por cada AC** que entra en el criterio de `standards/quality-gates.md` §10 — ahí está qué AC lo requiere y qué prueba cada corrida; acá sólo se registra. El runner no conoce estas corridas: la mutación nace y muere dentro del trabajo del agente, así que si no queda escrita acá no queda escrita en ningún lado. **AC de detección sin las tres corridas = `BLOCKER` en review.**
+
+### AC<N> — <comportamiento que el AC afirma detectar>
+
+- **Mutación declarada en el contract**: `<qué se rompe · dónde · qué queda revertido>` — copiada del contract, no inventada acá. Si el contract no la declara, `BLOCKED` al planner: no la elijas vos.
+
+| # | Estado del sistema | Comando | Exit code | Resultado |
+|---|---|---|---|---|
+| 1 | intacto | `<cmd>` | 0 | verde |
+| 2 | con la mutación aplicada | `<cmd>` | 1 | rojo — `<qué asserts cayeron, y que sean sólo los que corresponden>` |
+| 3 | mutación revertida | `<cmd>` | 0 | verde |
+
+```
+<pegar la salida de la corrida 2 — es la única que prueba que el control tiene poder>
+```
+
+Si el artefacto mutado es un archivo versionado, la reversión se verifica byte a byte (`shasum -a 256` antes y después), no a ojo.
+
+**Bugfix**: no lleva esta sección — su evidencia son las dos corridas de la sección de arriba (`quality-gates.md` §10.3, último párrafo).
+
+---
+
 ## Smoke manual (sólo ACs `manual-only`)
 
 ### AC<N> — <comportamiento>
