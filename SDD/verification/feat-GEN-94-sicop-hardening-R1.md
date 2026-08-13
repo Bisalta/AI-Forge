@@ -4,8 +4,19 @@ Evidencia de la escalera de gates (`plugins/sdd-flow/standards/quality-gates.md`
 
 - **Branch**: `feat-GEN-94-sicop-hardening` (creada desde `prod`, heredada de R0)
 - **Contract**: `SDD/contracts/2026-08-13-sicop-hardening.md` v3, sección R1
-- **Commit evaluado**: el commit `[FIX] [GEN-94] [sdd-flow] ...` que se crea después de este reporte (mismo razonamiento que R0: el hash no puede conocerse antes de crearlo; queda en el `sdd.result` con su valor real)
+- **Commit evaluado (ronda 1)**: `44a0f0c` (fix) + `aa36684` (evidencia de gates regenerada)
+- **Commit evaluado (ronda 2)**: el commit `[FIX] [GEN-94] [sdd-flow] ...` que se crea después de este reporte con los 3 MINOR corregidos (mismo razonamiento que ronda 1: el hash no puede conocerse antes de crearlo; queda en el `sdd.result` con su valor real)
 - **Doc de gates del repo**: `SDD/docs/doc_quality_gates.md` (sin cambios de contenido — R1 no toca comandos de la escalera)
+
+---
+
+## Ronda 2 — 3 MINOR de la ronda 1 (`APPROVED`, cero BLOCKER/MAJOR)
+
+R1 quedó `APPROVED` en ronda 1. Lo que sigue son los 3 `MINOR` (≤3 líneas cada uno) que el reviewer pidió corregir antes del PR, más la tarea adicional de regenerar la evidencia de gates de R0 (arrastrada como `ADVISORY` desde su ronda 1, ahora cerrable de verdad porque el sellado ya funciona).
+
+1. **`sdd-run-gates.sh` — el hash no dice qué excluye.** Con `--allow-dirty`, el encabezado listaba los archivos `??` (sin trackear) pero nunca decía que el hash de `Tree:` no los incluye — esa semántica vivía sólo en el comentario del script, invisible en el artefacto que alguien lee en el PR. Fix: cuando `DIRTY_FILES` tiene al menos una entrada `??`, `TREE_STATE` suma el sufijo `(el hash no incluye N archivo(s) sin trackear)`, así que aparece en el encabezado sin tocar el resto del bloque de sellado. Verificado a mano contra un repo con 1 archivo trackeado modificado + 2 sin trackear: `ARBOL SUCIO (el hash no incluye 2 archivo(s) sin trackear)` — ver sección "MINOR 1" abajo.
+2. **`test_run_gates_tree.sh` — 6 `assert_eq` con los argumentos invertidos.** `SDD/tests/lib.sh:25` declara `assert_eq <actual> <esperado>`, pero mis 6 llamadas directas pasaban `<esperado>` primero (el mismo orden que `assert_exit`, que SÍ es `esperado, actual` — mezclé las dos convenciones). El veredicto no cambiaba (comparación simétrica), pero el mensaje de `FAIL` mentía sobre cuál valor era cuál. Las 6 líneas (103, 122, 126, 142, 156, 185) quedaron con el orden correcto.
+3. **Números de línea stale en este mismo reporte.** La causa: pegué salidas de `grep`/`shellcheck` durante el trabajo, y el archivo siguió creciendo después de cada captura — retro `RT7` del coordinador, tercera vez que pasa en este contract. Recapturé AC13 y la nota de `SC2016` contra el árbol ya con los 3 fixes aplicados (ver esas secciones abajo, marcadas "Ronda 2"). Al recapturar encontré además una **cuarta** aparición de `SC2016` que mi propia verificación de ronda 1 nunca vio (`SDD/tests/test_run_gates_tree.sh:183`) — el detalle está en la nota de `SC2016` más abajo, no lo escondo acá.
 
 ---
 
@@ -55,6 +66,8 @@ FAIL — 11 assert(s) fallaron
 ```
 
 Nota sobre AC10 en la corrida roja: salió `obtenido [3]` en vez de `[0]` porque `--allow-dirty` todavía no existía en el parseo de argumentos — caía en la rama `*) echo "arg desconocido: $1" >&2; exit 3`. Confirma que el test detecta también la ausencia del flag, no sólo la ausencia de `Tree:`.
+
+**Nota (ronda 2, MINOR 2)**: las líneas 56 y 58 de arriba (`AC9 ... no crea el archivo` y `AC10 ... crea el archivo`) vienen de `assert_eq`, y en el momento de esta corrida esa llamada todavía tenía los argumentos invertidos (ver "Ronda 2" al inicio de este archivo). El veredicto `FAIL` es correcto — la comparación es simétrica, así que el test detectó el fallo igual — pero el texto `esperado [X], obtenido [Y]` de esas dos líneas puntuales está al revés de la semántica real (línea 56: la verdad era "esperado [no], obtenido [si]"; línea 58: "esperado [si], obtenido [no]"). No reescribo la transcripción pegada — es el registro fiel de lo que esa corrida imprimió — sólo dejo esta nota para que no se lea con el rótulo viejo. El fix de `assert_eq` ya está aplicado en el archivo actual (ver binding y "Ronda 2 — validación final").
 
 **Corrida 2 completa (verde), después del fix**, pegada tal cual:
 
@@ -131,6 +144,8 @@ FAIL — 2 assert(s) fallaron
 
 Revertido, confirmado sin rastro (`grep -n "MUTACION" plugins/sdd-flow/scripts/sdd-run-gates.sh` → exit `1`, sin resultados) y corrida 3 verde (idéntica a la corrida 1, ver bloque "Test de reproducción" arriba, corrida 2 de esa tabla).
 
+**Nota (ronda 2, MINOR 2)**: igual que en la corrida roja de reproducción, la línea `no crea el archivo — esperado [si], obtenido [no]` de la corrida 2 de arriba viene de `assert_eq` con los argumentos todavía invertidos en el momento de esa corrida — el veredicto (`FAIL`) es correcto, la verdad era "esperado [no], obtenido [si]". Transcripción sin alterar; el fix ya está aplicado en el archivo actual.
+
 Conclusión: el test que respalda AC9 tiene poder de detección real — no es tautológico. `plugins/sdd-flow/scripts/sdd-run-gates.sh` en el repo, al momento de este commit, es la versión sin la mutación (con `exit 4` presente).
 
 ---
@@ -139,19 +154,48 @@ Conclusión: el test que respalda AC9 tiene poder de detección real — no es t
 
 Comando exacto del brief, corrida real:
 
+**Ronda 2 — recapturado tras los 3 fixes MINOR** (los números de línea de la ronda 1 quedaron stale apenas el diff creció; ver sección "Ronda 2" al final de este archivo). Comando y salida reales, contra el árbol con los 3 MINOR ya aplicados:
+
 ```
 $ grep -rn "rev-parse HEAD\|rev-parse --short HEAD" plugins/sdd-flow/scripts/ plugins/sdd-flow/hooks/
 plugins/sdd-flow/scripts/sdd-run-gates.sh:36:#   - árbol limpio  → Tree: hash de `git rev-parse HEAD^{tree}`.
-plugins/sdd-flow/scripts/sdd-run-gates.sh:83:COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo '-')"
+plugins/sdd-flow/scripts/sdd-run-gates.sh:86:COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo '-')"
 ```
 Exit `0` (grep encontró coincidencias). Dos apariciones, ambas en el archivo que este mismo diff modifica — no aparecieron hermanos en otro script ni en `plugins/sdd-flow/hooks/` (`guard-git.sh` usa `rev-parse --abbrev-ref HEAD` y `rev-parse --git-dir`, ninguno de los dos matchea el patrón literal del brief; confirmado con el mismo comando, cero líneas de `guard-git.sh` en la salida de arriba).
 
 Clasificación de cada aparición:
 
 1. **`sdd-run-gates.sh:36`** — comentario del bloque de documentación del sellado, agregado por este mismo diff (`# árbol limpio → Tree: hash de \`git rev-parse HEAD^{tree}\`.`). No es la evidencia sellada del bug: es prosa que documenta la fórmula correcta (`HEAD^{tree}`, no `HEAD` desnudo) que el propio fix introduce. **Uso legítimo** — es exactamente lo que R1 quiere que se use para el caso limpio.
-2. **`sdd-run-gates.sh:83`** — `COMMIT="$(git rev-parse --short HEAD ...)"`. Es la línea original de la causa raíz. **Ya corregida por este mismo diff**, no por reescritura de la línea sino por contexto: el contract (punto 1 de la Decisión de diseño) exige que el reporte muestre el commit **además del** árbol, no en su lugar — `Commit:` sigue siendo información de contexto (qué branch/HEAD había al momento de la corrida), pero ya **no es la única** afirmación sobre qué código corrió: `TREE`/`TREE_STATE` (líneas 84-113, calculadas antes de este `COMMIT`) son las que ahora cargan esa responsabilidad y aparecen siempre junto a `Commit:` en el encabezado (AC7, AC8, AC12). No queda ninguna otra ocurrencia de este patrón en `plugins/sdd-flow/scripts/` ni `plugins/sdd-flow/hooks/` fuera de este archivo — no hay deuda ni scope adicional que registrar.
+2. **`sdd-run-gates.sh:86`** — `COMMIT="$(git rev-parse --short HEAD ...)"`. Es la línea original de la causa raíz. **Ya corregida por este mismo diff**, no por reescritura de la línea sino por contexto: el contract (punto 1 de la Decisión de diseño) exige que el reporte muestre el commit **además del** árbol, no en su lugar — `Commit:` sigue siendo información de contexto (qué branch/HEAD había al momento de la corrida), pero ya **no es la única** afirmación sobre qué código corrió: `TREE`/`TREE_STATE` (líneas 85-127, calculadas antes de este `COMMIT`) son las que ahora cargan esa responsabilidad y aparecen siempre junto a `Commit:` en el encabezado (AC7, AC8, AC12). No queda ninguna otra ocurrencia de este patrón en `plugins/sdd-flow/scripts/` ni `plugins/sdd-flow/hooks/` fuera de este archivo — no hay deuda ni scope adicional que registrar.
 
 No se encontraron hermanos que requieran corrección fuera del archivo que R1 ya modifica.
+
+---
+
+## MINOR 1 (ronda 2) — el encabezado ahora dice qué archivos excluye el hash
+
+Antes de este fix, `--allow-dirty` listaba los archivos sin trackear (`??`) en "Archivos sin commitear" pero no decía en ningún lado del artefacto que el hash de `Tree:` no los incluye — esa semántica sólo vivía en el comentario del script (líneas 105-114), invisible para quien lee el reporte en el PR sin abrir el código. Fix: `TREE_STATE` suma el sufijo `(el hash no incluye N archivo(s) sin trackear)` cuando `DIRTY_FILES` tiene al menos una línea `^??` — ninguna otra parte del bloque de sellado cambia.
+
+Verificación manual, repo temporal con 1 archivo trackeado modificado + 2 archivos nuevos sin trackear (fuera de `SDD/tests/.tmp/`, descartado al terminar):
+
+```
+$ git status --porcelain
+ M tracked.txt
+?? sin-trackear-1.txt
+?? sin-trackear-2.txt
+
+$ bash sdd-run-gates.sh -d SDD/docs/doc_quality_gates.md -o SDD/verification/x.md --allow-dirty | head -6
+# Gates run — generado por sdd-run-gates.sh v0.11.0
+
+- **Branch**: `main` · **Commit**: `ca3e6d8` · **Doc**: `SDD/docs/doc_quality_gates.md` · **Fecha**: 2026-08-13T17:20:36Z
+- Tree: `d83dd0c73e61476ea4e2d0143535df8800c677d2` — ARBOL SUCIO (el hash no incluye 2 archivo(s) sin trackear). Archivos sin commitear:
+  - ` M tracked.txt`
+  - `?? sin-trackear-1.txt`
+```
+
+`2 archivo(s) sin trackear` coincide exactamente con los 2 `??` reales del `git status --porcelain` de arriba. No es un caso cubierto por `test_run_gates_tree.sh` (ningún AC del contract lo exige — el brief cierra la lista en AC7-AC12) y no agrego un AC nuevo sin ratificación del planner; queda como verificación manual de este MINOR, no como test automatizado nuevo.
+
+Suite completa y `shellcheck --severity=warning` re-verificados después de este fix — sin regresión (ver "Ronda 2 — validación final" al pie de este archivo).
 
 ---
 
@@ -212,7 +256,11 @@ Ningún caller de `plugins/sdd-flow/scripts/sdd-run-gates.sh` quedó sin cubrir:
 
 ## Nota — `SC2016` nuevos, justificados inline (no es un rojo, pero es un hallazgo que declaro)
 
-Mis líneas nuevas del encabezado del reporte (`Tree: ...`) repiten el mismo patrón que la línea preexistente de `Branch`/`Commit`/`Doc` (backtick literal dentro de un string de una comilla, para que el markdown del reporte muestre el backtick sin que bash lo interprete como sustitución de comando) — a severidad default (`style`) eso dispara `SC2016` (info), igual que la línea preexistente. Como `sdd-run-gates.sh` SÍ está en mi scope (a diferencia de los `SC2016` de R0 que son de archivos que R1 tiene prohibido tocar), apliqué la misma disciplina que AC3bis de R0: `# shellcheck disable=SC2016` inline con comentario, en las 3 líneas nuevas. Verificado, comando y salida reales:
+Mis líneas nuevas del encabezado del reporte (`Tree: ...`) repiten el mismo patrón que la línea preexistente de `Branch`/`Commit`/`Doc` (backtick literal dentro de un string de una comilla, para que el markdown del reporte muestre el backtick sin que bash lo interprete como sustitución de comando) — a severidad default (`style`) eso dispara `SC2016` (info), igual que la línea preexistente. Como `sdd-run-gates.sh` SÍ está en mi scope (a diferencia de los `SC2016` de R0 que son de archivos que R1 tiene prohibido tocar), apliqué la misma disciplina que AC3bis de R0: `# shellcheck disable=SC2016` inline con comentario, en las 3 líneas nuevas.
+
+**Ronda 2 — corrección propia, no pedida por el review**: al recapturar la salida para esta misma nota (MINOR 3, ver "Ronda 2" al inicio de este archivo) encontré una CUARTA aparición que mi verificación de ronda 1 nunca vio: `SDD/tests/test_run_gates_tree.sh:183` (el `assert_contains "$out12" 'Tree: `-`' ...` de AC12) tiene el mismo backtick literal dentro de comillas simples. No es un hallazgo nuevo de esta ronda — estaba desde que escribí el archivo en Fase 1 — sino un hallazgo que mi propio comando de verificación de ronda 1 no podía ver: corrí `git ls-files -z -- '*.sh' | xargs -0 shellcheck` **antes** de hacer `git add` de ese archivo, y `git ls-files` sólo lista lo trackeado — el mismo tipo de desfasaje de timing que motivó el MINOR 3 de esta ronda, aplicado a mi propio proceso de verificación en vez de a un número de línea. Corregido con la misma disciplina (`# shellcheck disable=SC2016` inline, línea 183, justo arriba de la línea 184 que dispara el hallazgo).
+
+Verificado, comando y salida reales, **después** de los 3 fixes MINOR (incluida esta cuarta justificación):
 
 ```
 $ git ls-files -z -- '*.sh' | xargs -0 shellcheck 2>&1 | grep "SC2016\|SC2329"
@@ -221,7 +269,37 @@ $ git ls-files -z -- '*.sh' | xargs -0 shellcheck 2>&1 | grep "SC2016\|SC2329"
             ^-- SC2016 (info): Expressions don't expand in single quotes, use double quotes for that.
   https://www.shellcheck.net/wiki/SC2016 -- Expressions don't expand in singl...
 ```
-Exactamente 3 hallazgos reales (la 4ta línea es el link de ayuda, no un hallazgo nuevo) — el mismo total que dejó R0 (`D4`, `plugins/sdd-lint-contract.sh:54` + `sdd-run-gates.sh:158`, preexistentes) más la línea preexistente `sdd-run-gates.sh:124` (ahora en la línea 206 tras mis inserciones arriba), sin agregar ninguno nuevo sin justificar. `--severity=warning` (el piso real del gate 2) sigue en `0` de todos modos, porque `SC2016` es `info`.
+Exactamente 3 hallazgos reales (la 4ta línea es el link de ayuda, no un hallazgo nuevo), y los 3 son preexistentes de `plugins/` — cero en `SDD/tests/`, cero sin justificar. Line refs exactos (`shellcheck -f gcc`, recapturados contra el árbol con los 3 MINOR aplicados):
+
+```
+plugins/sdd-flow/scripts/sdd-lint-contract.sh:54:47: note: ... [SC2016]
+plugins/sdd-flow/scripts/sdd-run-gates.sh:172:62: note: ... [SC2016]
+plugins/sdd-flow/scripts/sdd-run-gates.sh:220:13: note: ... [SC2016]
+```
+`sdd-lint-contract.sh:54` es `D4` de R0 (preexistente, fuera de scope de R1). `sdd-run-gates.sh:172` es el `grep -oE` preexistente de antes de R1 (era la línea 158 en ronda 1, se corrió por mis inserciones). `sdd-run-gates.sh:220` es la línea preexistente de `Branch`/`Commit`/`Doc` (era la línea 206 en ronda 1, se corrió por el fix del MINOR 1 de esta ronda, que agregó líneas arriba). `--severity=warning` (el piso real del gate 2) sigue en `0` de todos modos, porque `SC2016` es `info` — esto nunca fue un rojo, es la contabilidad exacta que declaro para que no quede una cifra vieja dando vueltas.
+
+---
+
+## Ronda 2 — validación final (los 3 MINOR + la corrección propia, todos juntos)
+
+Corridas reales, en esta máquina, contra el árbol con los 3 fixes de ronda 2 aplicados (antes de commitear):
+
+| Comando | Exit code | Resultado |
+|---|---|---|
+| `bash SDD/tests/test_run_gates_tree.sh` | `0` | `PASS` — 19/19 `ok` (mismo conteo que ronda 1; el fix del MINOR 2 no cambia qué pasa, sólo la verdad del mensaje si algo falla) |
+| `bash SDD/tests/run.sh` | `0` | `PASS` los 4 archivos — `4 passed, 0 failed (4 total)` |
+| `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh SDD/tests/*.sh` | `0` | limpio |
+
+Sin regresión: los mismos 19 asserts siguen en `ok`, la suite completa sigue en verde, el gate de lint real (`--severity=warning`) sigue en `0`. Los 3 MINOR (más la corrección propia del `SC2016` #4) son cambios de **calidad de la evidencia y del mensaje de fallo**, no de comportamiento — ningún AC cambia de estado.
+
+Commiteados estos 3 fixes (ver `sdd.result` de esta ronda para el hash), regeneré — con el árbol ya limpio — **las dos** evidencias de gates que el coordinador pidió:
+
+```bash
+bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -d SDD/docs/doc_quality_gates.md -o SDD/verification/feat-GEN-94-sicop-hardening-R1-gates.md
+bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -d SDD/docs/doc_quality_gates.md -o SDD/verification/feat-GEN-94-sicop-hardening-R0-gates.md
+```
+
+Exit codes, la línea `{"type":"sdd.gates",...}` de cada corrida, y el `Tree:`/`Commit:` resultantes quedan en esos dos archivos (generados por el runner) y en el `sdd.result` de esta ronda — no los transcribo acá para no duplicar evidencia que el runner ya dejó por escrito.
 
 ---
 

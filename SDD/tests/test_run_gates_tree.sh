@@ -100,7 +100,7 @@ assert_exit 0 "$ec7" "AC7 arbol limpio - sale 0"
 assert_contains "$out7" "Tree:" "AC7 arbol limpio - encabezado tiene Tree:"
 assert_contains "$out7" "$EXPECTED_TREE_AC7" "AC7 arbol limpio - Tree coincide con el hash de HEAD^{tree}"
 [ -f "$AC7_DIR/.sdd/gates-run.md" ] && ac7_file="si" || ac7_file="no"
-assert_eq "si" "$ac7_file" "AC7 arbol limpio - el reporte se escribe"
+assert_eq "$ac7_file" "si" "AC7 arbol limpio - el reporte se escribe"
 
 # =========================================================================
 # AC8 — árbol sucio, -o DENTRO de .sdd/: se escribe, marca sucio, Tree
@@ -119,11 +119,11 @@ out8="$(cd "$AC8_DIR" && bash "$RUN_GATES" -d SDD/docs/doc_quality_gates.md -o .
 ec8=$?
 assert_exit 0 "$ec8" "AC8 arbol sucio con -o dentro de .sdd - sale 0"
 [ -f "$AC8_DIR/.sdd/gates-run.md" ] && ac8_file="si" || ac8_file="no"
-assert_eq "si" "$ac8_file" "AC8 arbol sucio con -o dentro de .sdd - el reporte se escribe"
+assert_eq "$ac8_file" "si" "AC8 arbol sucio con -o dentro de .sdd - el reporte se escribe"
 assert_contains "$out8" "ARBOL SUCIO" "AC8 arbol sucio con -o dentro de .sdd - encabezado marca el arbol sucio"
 assert_contains "$out8" "$EXPECTED_DIRTY_TREE_AC8" "AC8 arbol sucio - Tree usa el hash de git stash create"
 if [ "$EXPECTED_DIRTY_TREE_AC8" = "$CLEAN_TREE_AC8" ]; then ac8_trees_differ="no"; else ac8_trees_differ="si"; fi
-assert_eq "si" "$ac8_trees_differ" "AC8 arbol sucio - Tree difiere del hash de HEAD^{tree} limpio"
+assert_eq "$ac8_trees_differ" "si" "AC8 arbol sucio - Tree difiere del hash de HEAD^{tree} limpio"
 
 # =========================================================================
 # AC9 — árbol sucio, -o FUERA de .sdd/ (evidencia que se commitea), SIN
@@ -139,7 +139,7 @@ make_dirty "$AC9_DIR"
 ec9=$?
 assert_exit 4 "$ec9" "AC9 arbol sucio con -o fuera de .sdd sin allow-dirty - sale 4"
 [ -f "$AC9_DIR/SDD/verification/x-gates.md" ] && ac9_file="si" || ac9_file="no"
-assert_eq "no" "$ac9_file" "AC9 arbol sucio con -o fuera de .sdd sin allow-dirty - no crea el archivo"
+assert_eq "$ac9_file" "no" "AC9 arbol sucio con -o fuera de .sdd sin allow-dirty - no crea el archivo"
 
 # =========================================================================
 # AC10 — árbol sucio, -o FUERA de .sdd/, CON --allow-dirty: crea el
@@ -153,7 +153,7 @@ out10="$(cd "$AC10_DIR" && bash "$RUN_GATES" -d SDD/docs/doc_quality_gates.md -o
 ec10=$?
 assert_exit 0 "$ec10" "AC10 arbol sucio con --allow-dirty - sale 0"
 [ -f "$AC10_DIR/SDD/verification/x-gates.md" ] && ac10_file="si" || ac10_file="no"
-assert_eq "si" "$ac10_file" "AC10 arbol sucio con --allow-dirty - crea el archivo"
+assert_eq "$ac10_file" "si" "AC10 arbol sucio con --allow-dirty - crea el archivo"
 assert_contains "$out10" "ARBOL SUCIO" "AC10 arbol sucio con --allow-dirty - encabezado marca ARBOL SUCIO"
 
 # =========================================================================
@@ -180,9 +180,10 @@ fixture_gates_doc "$NONGIT_DIR" "false"
 out12="$(cd "$NONGIT_DIR" && bash "$RUN_GATES" -d SDD/docs/doc_quality_gates.md -o out/gates.md 2>&1)"
 ec12=$?
 assert_exit 1 "$ec12" "AC12 sin repo git - sale con el exit code de los gates (hay un rojo)"
+# shellcheck disable=SC2016  # backtick literal para matchear el Tree: del reporte, no es expansion querida
 assert_contains "$out12" 'Tree: `-`' "AC12 sin repo git - Tree en guion"
 [ -f "$NONGIT_DIR/out/gates.md" ] && ac12_file="si" || ac12_file="no"
-assert_eq "si" "$ac12_file" "AC12 sin repo git - el reporte se escribe igual, sin abortar por el sellado"
+assert_eq "$ac12_file" "si" "AC12 sin repo git - el reporte se escribe igual, sin abortar por el sellado"
 
 test_summary
 exit $?

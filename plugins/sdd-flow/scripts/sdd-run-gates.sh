@@ -112,6 +112,14 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     # (no hay nada trackeado que stashear) y Tree cae a "-" en vez de reusar
     # el hash de HEAD, que mentiría igual que el bug que este sellado
     # arregla.
+    #
+    # Ese límite hay que decirlo en el propio encabezado, no sólo acá:
+    # alguien leyendo el reporte generado (no este script) no tiene forma de
+    # saber que un `??` de la lista de abajo no está en el hash de arriba.
+    UNTRACKED_COUNT="$(printf '%s\n' "$DIRTY_FILES" | grep -c '^??')"
+    if [ "$UNTRACKED_COUNT" -gt 0 ]; then
+      TREE_STATE="ARBOL SUCIO (el hash no incluye ${UNTRACKED_COUNT} archivo(s) sin trackear)"
+    fi
   else
     TREE_STATE="LIMPIO"
     TREE="$(git rev-parse 'HEAD^{tree}' 2>/dev/null || echo '-')"
