@@ -1,7 +1,8 @@
 # HLTC — sdd-flow v0.11.0 · hardening desde el análisis de SICOP
 
 - **Contract version**: v3 — ratificado el 13-ago-2026 tras el `REJECTED` de la ronda 2 de R0. Cambio respecto de v2: los cuatro literales de credencial de AC6bis se escriben con clave y valor en spans separados, para que el contract deje de disparar su propio detector. Verificado con el patrón de `SDD/tests/secret-scan.sh`: cero coincidencias en este archivo. Con eso, la exclusión de `SDD/contracts/` queda **prohibida** y se elimina.
-- **Contract version**: v4 — ampliado el 13-ago-2026 con **R5**, tras el consolidado externo `MD-consolidado.md` (13-ago) que reemplaza a los cinco documentos previos de SICOP. R5 es su propuesta 3 (identidad de contenido de los docs que gobiernan), que no estaba en v1-v3. Su propuesta 6 (gate mínimo portable) queda **fuera de este contract**: está planteada como oferta y necesita como insumo el script de `Bisalta/Odoo-Addons`, que este ciclo no tiene. Los ACs de R0-R4 no cambian.
+- **Contract version**: v5 — ratificado el 13-ago-2026 tras el `ESCALATE` de la ronda 1 de R2. La ubicación del bloque de identidad en `guard-git.sh` pasa de "tras el chequeo de rama protegida" a "por encima del escape hatch `SDD_ALLOW_BASE_COMMIT`", y entran **AC36, AC37 y AC38**. Detalle y medición en la ratificación de la sección R2.
+- **Historial de versiones**: v4 — ampliado el 13-ago-2026 con **R5**, tras el consolidado externo `MD-consolidado.md` (13-ago) que reemplaza a los cinco documentos previos de SICOP. R5 es su propuesta 3 (identidad de contenido de los docs que gobiernan), que no estaba en v1-v3. Su propuesta 6 (gate mínimo portable) queda **fuera de este contract**: está planteada como oferta y necesita como insumo el script de `Bisalta/Odoo-Addons`, que este ciclo no tiene. Los ACs de R0-R4 no cambian.
 - **Historial de versiones**: v2 — ratificado por el planner el 13-ago-2026 tras el `ESCALATE` de la ronda 1 de R0. Cambios respecto de v1: threat model y bloque `concerns:` agregados (eran un BLOCKER de contract); AC3 reescrito con la severidad de `shellcheck` adentro; AC5 reescrito para apuntar a `SDD/verification/` en vez de `.sdd/`; AC6bis nuevo para cubrir `secret-scan.sh`. Los IDs de AC existentes no se reciclaron.
 - **Tarea madre Proxima**: `GEN-94`
 - **Repo**: `Bisalta/AI-Forge` · **Rama base**: `prod` · **Branch**: `feat-GEN-94-sicop-hardening`
@@ -184,7 +185,7 @@ El punto 3 es enforcement opt-in por repo. La alternativa de detectar al subagen
 
 | Capa | Cambio |
 |---|---|
-| Hook | `plugins/sdd-flow/hooks/guard-git.sh` — bloque nuevo de identidad, tras el chequeo de rama protegida |
+| Hook | `plugins/sdd-flow/hooks/guard-git.sh` — bloque nuevo de identidad, **por encima del escape hatch `SDD_ALLOW_BASE_COMMIT`** (ratificación v5, ver abajo) |
 | Agente | `plugins/sdd-flow/agents/implementing-agent.md` — la regla de commit con identidad |
 | Docs | `plugins/sdd-flow/standards/base-standards.md` — sección Git, la identidad de agente |
 | Docs | `plugins/sdd-flow/standards/quality-gates.md` — la regla de AC de autoría |
@@ -197,6 +198,17 @@ El punto 3 es enforcement opt-in por repo. La alternativa de detectar al subagen
 - **AC16** — Sin `SDD_AGENT_ENFORCE` en el entorno, un `git commit` sin identidad de agente pasa: el hook no lo deniega.
 - **AC17** — Con `SDD_AGENT_ENFORCE=1`, `SDD_AGENT_NAME=otro-agente` y un commit que declara `user.name=otro-agente`, el hook permite el commit.
 - **AC18** — Tras un commit hecho con la identidad de agente, `git log -1 --format='%an'` devuelve `sdd-agent`. Este AC es la prueba de que la guarda de autoría dejó de ser tautológica.
+- **AC36** — Con `SDD_AGENT_ENFORCE=1` **y** `SDD_ALLOW_BASE_COMMIT=1` a la vez, un commit sin identidad de agente **sigue siendo denegado**. El hatch desactiva el chequeo de rama protegida, nunca el de identidad.
+- **AC37** — Con `SDD_AGENT_ENFORCE=1` y el repo en `HEAD` detached, un commit sin identidad de agente **sigue siendo denegado**.
+- **AC38** — Los tres textos que describen el alcance del hatch dicen la verdad: `plugins/sdd-flow/standards/quality-gates.md`, el encabezado de `plugins/sdd-flow/hooks/guard-git.sh` y `SDD/docs/doc_architecture.md`. Ninguno afirma que `SDD_ALLOW_BASE_COMMIT` desactive únicamente el chequeo de rama sin decir que el de identidad sigue activo. `doc_architecture.md` además lista las tres variables nuevas con su default. Verificable con grep.
+
+**Ratificación v5** (tras el `ESCALATE` de la ronda 1 de R2). El Delta de v4 ordenaba poner el bloque de identidad *después* del chequeo de rama protegida, y el implementador cumplió al pie de la letra. Medido por el reviewer contra el payload real del hook, esa ubicación deja el bloque aguas abajo de cuatro salidas tempranas que pertenecen al chequeo de rama —el `allow` del hatch, el `command -v git`, el `rev-parse --git-dir` y el `HEAD` detached—, ninguna de las cuales tiene que ver con identidad: el bloque nuevo sólo parsea el comando.
+
+El resultado contradice la decisión 3, que dice que el chequeo está activo *únicamente* cuando `SDD_AGENT_ENFORCE=1` está en el entorno, y agrega tres condiciones implícitas de apagado. Y es **circular**: R2 existe para matar una guarda tautológica, y esta ubicación introduce una forma nueva de la misma tautología — un repo con las dos variables puestas cree tener enforcement y no lo tiene, que es exactamente lo que `quality-gates.md` le pide al reviewer dar por válido. `SDD_ALLOW_BASE_COMMIT=1` es justo lo que exporta un repo donde commitear a la default es legítimo, y `HEAD` detached pasa en cualquier rebase o bisect: los dos casos son alcanzables, no teóricos.
+
+**AC36 y AC37 son ACs de detección** y se prueban por mutación, con el triple registrado por cada uno.
+
+**AC38 es la parte que no es código**: tres documentos normativos afirman hoy que el hatch desactiva *sólo* el chequeo de rama. Una afirmación falsa en un documento de gobierno es del mismo tipo que el defecto que este contract entero ataca, y por eso entra como AC y no como nota.
 
 ## Checklist del arquetipo `infra`
 
