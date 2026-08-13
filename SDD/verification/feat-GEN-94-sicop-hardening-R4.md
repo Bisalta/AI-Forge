@@ -3,10 +3,10 @@
 Evidencia de la escalera de gates (`standards/quality-gates.md` §4-§5) y de lo que el runner no puede saber. Lo escribe el implementing agent; lo audita el reviewer-agent.
 
 - **Branch**: `feat-GEN-94-sicop-hardening`
-- **Ronda**: **2/3** — la ronda 1 entregó `BLOCKED` sobre los ítems 5 y 6 del checklist estadístico. El planner ratificó **v8** con las dos redacciones corregidas y amplió AC42 a la regla `test-skipeado`. Esta ronda ejecuta las tres tareas de v8. El detalle de la ronda 1 queda abajo, sin editar.
+- **Ronda**: **3/3** — la ronda 1 entregó `BLOCKED` sobre los ítems 5 y 6 del checklist estadístico; el planner ratificó **v8** con las dos redacciones corregidas y amplió AC42 a la regla `test-skipeado`; la ronda 2 ejecutó las tres tareas de v8. **La ronda 3 no cambia código ni tests**: regenera la evidencia con árbol limpio, ahora que el planner commiteó `SDD/retro.md` (`e643508`), que era lo único que forzaba `--allow-dirty`. El detalle de las rondas 1 y 2 queda abajo, sin editar.
 - **Contract**: `SDD/contracts/2026-08-13-sicop-hardening.md` **v8**, sección R4 (AC25-AC28 + AC42)
 - **Brief**: `SDD/briefs/R4-analysis-archetype.md`
-- **Commit evaluado**: `2d63f8e` (ronda 2) — sellado por el runner (R1). Ronda 1: `4f17172`. La evidencia se genera **después** del commit de trabajo, como en cada requerimiento de este ciclo.
+- **Commit evaluado**: `e643508` — sellado por el runner (R1) sobre **árbol limpio**. Commits de trabajo: `2d63f8e` (ronda 2, ítems 5-6 + AC42 ampliado) y `4f17172` (ronda 1). `e643508` es del planner (`RT10` + la fila del Delta), y es el tip sobre el que corrió la escalera. La evidencia se genera **después** del commit de trabajo, como en cada requerimiento de este ciclo.
 - **Doc de gates del repo**: `SDD/docs/doc_quality_gates.md` — el reporte generado lo registra con hash: `sha256:e96c7d0f61963400`. Copiado del encabezado del reporte, **no recalculado acá**. Mismo hash que en R3 y R5: el doc de gates **no cambió** durante el ciclo, así que ninguna fila de la escalera se movió.
 - **Momento de captura** (`RT7`): todas las salidas pegadas abajo se capturaron **después** del último cambio a los archivos que describen. Las tres pruebas por mutación se corrieron después de la implementación, y sus reversiones están verificadas byte a byte contra el estado **commiteado** (los tres `shasum` de abajo se re-corrieron post-commit y coinciden).
 - **Estado**: **completo** — el `BLOCKED` de la ronda 1 fue ratificado por el planner en v8 y está resuelto. Los cinco ACs verdes, cinco triples de mutación registrados, escalera en verde.
@@ -15,34 +15,26 @@ Evidencia de la escalera de gates (`standards/quality-gates.md` §4-§5) y de lo
 
 ## Gates — evidencia GENERADA (no escrita a mano)
 
-- **Reporte generado (ronda 2, el vigente)**: `SDD/verification/feat-GEN-94-sicop-hardening-R4-gates.md` — `sdd-run-gates.sh v0.12.0`, 2026-08-13T21:19:49Z, commit `2d63f8e`, tree `55e2446cecd00471dce420e07011a93c2afedd31`. 4 gates con comando en verde, 7 `[SKIPPED]` declarados `N/A` en el doc, 0 rojos.
-- **Comando y exit code**, pegados tal cual:
+- **Reporte generado (ronda 3, el vigente)**: `SDD/verification/feat-GEN-94-sicop-hardening-R4-gates.md` — `sdd-run-gates.sh v0.12.0`, 2026-08-13T21:26:26Z, commit `e643508`, tree `4bc4d3b2fe3913acd664d4b1be8723d4bc625d54` **LIMPIO**. 4 gates con comando en verde, 7 `[SKIPPED]` declarados `N/A` en el doc, 0 rojos.
+- **Comando y exit code**, pegados tal cual — **sin `--allow-dirty`**:
 
 ```
-$ bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full --allow-dirty -d SDD/docs/doc_quality_gates.md -o SDD/verification/feat-GEN-94-sicop-hardening-R4-gates.md
+$ bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -d SDD/docs/doc_quality_gates.md -o SDD/verification/feat-GEN-94-sicop-hardening-R4-gates.md
 RUNNER_EXIT=0
 {"type":"sdd.gates","green":4,"red":0,"skipped":7,"report":"SDD/verification/feat-GEN-94-sicop-hardening-R4-gates.md"}
 ```
 
-### `--allow-dirty` en la ronda 2: por qué, y qué archivo lo ensucia
+- **Doc de gates**: `sha256:e96c7d0f61963400`, el mismo de las rondas 1 y 2 y el mismo de R3 y R5. La escalera no se movió en ningún momento del ciclo, así que las tres corridas de este requerimiento son comparables entre sí.
 
-La primera invocación, sin la bandera, **salió 4 y no escribió nada** — la estrictez derivada del destino (R1): `-o` fuera de `.sdd/` exige árbol limpio.
+### Historia de las tres corridas (no se borra: es señal)
 
-```
-$ bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -d … -o SDD/verification/…-R4-gates.md; echo "RUNNER_EXIT=$?"
-RUNNER_EXIT=4
-```
+| Ronda | Commit | Árbol | Bandera | Exit | Resultado |
+|---|---|---|---|---|---|
+| 1 | `4f17172` | LIMPIO (`71c6678d…`) | — | `0` | 4 verdes · 0 rojos · 7 `[SKIPPED]` |
+| 2 | `2d63f8e` | SUCIO (`55e2446c…`) | `--allow-dirty` | `0` | ídem, con `SDD/retro.md` estampado como no commiteado |
+| 3 | `e643508` | LIMPIO (`4bc4d3b2…`) | — | `0` | ídem, **la vigente** |
 
-El árbol no estaba sucio por trabajo mío: **`SDD/retro.md` está modificado sin commitear por el planner** (la entrada `RT10`, sobre el hallazgo de mi ronda 1). El brief me prohíbe tocar ese archivo, y commitear el trabajo de otro no es una opción. Las tres salidas posibles eran: (a) escribir la evidencia en `.sdd/`, que está gitignoreado y no viaja en el PR — prohibido por mi propio prompt; (b) stashear un archivo que no es mío; (c) `--allow-dirty`, que es el modo que el runner declara para exactamente esto y **estampa él mismo qué quedó sin commitear**. Elegí (c), y la prueba de que ningún archivo de mi diff quedó fuera del commit la escribe el runner, no yo:
-
-```
-- Tree: `55e2446cecd00471dce420e07011a93c2afedd31` — ARBOL SUCIO. Archivos sin commitear:
-  - ` M SDD/retro.md`
-```
-
-Efecto sobre los gates: ninguno. El único gate que lee ese archivo es el 9 (`secret-scan.sh` escanea todo `git ls-files`, incluido su contenido de working tree) y salió verde. Los gates 2 y 4 no lo tocan (globs de `.sh` y de `SDD/tests/`). **Si el planner prefiere evidencia con árbol limpio, commitea `SDD/retro.md` y la regenero: es una corrida de dos segundos.**
-
-- **Ronda 1** (sustituida, misma escalera): commit `4f17172`, tree `71c6678d032817c254cdc58efe153cd01f040f9e` **LIMPIO**, exit `0`, `{"green":4,"red":0,"skipped":7}`.
+**Por qué la ronda 2 necesitó la bandera, y por qué ya no**: el runner sin bandera había salido **4 sin escribir nada** (la estrictez derivada del destino de R1: `-o` fuera de `.sdd/` exige árbol limpio). Lo que ensuciaba el árbol era `SDD/retro.md` —la entrada `RT10`, del planner, sobre el hallazgo de mi ronda 1—, un archivo que el brief me prohíbe tocar. Descarté escribir a `.sdd/` (gitignoreado, no viaja en el PR) y stashear trabajo ajeno; usé el modo que el runner declara para esto, que **estampa él mismo qué quedó sin commitear**, de modo que la prueba de que ningún archivo mío faltaba la escribía el runner y no yo. El planner commiteó ese archivo en `e643508` y esta ronda regenera con árbol limpio. **La evidencia vigente no depende de ninguna bandera de degradación.**
 
 - Los 7 `[SKIPPED]` son los gates que `SDD/docs/doc_quality_gates.md` declara `N/A` con razón (format, type-check, integration, build, e2e, cobertura, smoke). Ninguno es un gate existente que no se corrió.
 - Corridas rojas intermedias del runner: ninguna. Los rojos de este trabajo son los del test — corrida previa al cambio y las tres pruebas por mutación —, cada uno con su comando y su exit code abajo.
@@ -305,9 +297,16 @@ Mismo resultado que en la ronda 1, ahora contra las 48 asserts: `0` → `1` (3 a
 1. **Mi propio arnés de medición dio 127 en las 15 corridas de los triples** — puse el comando en una variable (`T="bash SDD/tests/…"`) y lo invoqué sin comillas dentro de una función; **la shell de esta máquina es `zsh`, que no hace word splitting**, así que buscó un ejecutable llamado literalmente `bash SDD/tests/test_analysis_archetype.sh`. Las tres corridas de cada triple salieron `127` — ni verde ni rojo, el test **nunca corrió**. Si pego esos exit codes, publico un triple entero inventado con cara de medición. Lo rehice con los comandos literales dentro de un script `bash` explícito, y esos son los números de arriba. Es `RT8` otra vez, en el instrumento en vez de en el objeto medido: **el arnés que mide el control también puede estar roto, y da un número igual**.
 2. **Mi propio archivo de test disparaba una regla del checker que estoy arreglando**: el caso 4 necesita un `catch` silencioso literal, y contiguo en el fuente hacía que `sdd-check.sh` reportara `WARN  SDD/tests/test_analysis_archetype.sh  catch-silencioso`. Lo armé en runtime (`printf '%s%s' 'catch (e) {' '}'`), la misma convención que el archivo ya usaba para los supresores. Medido después: `bash plugins/sdd-flow/scripts/sdd-check.sh | awk -F'\t' '$2 ~ /test_analysis_archetype/' | wc -l` → `0`.
 
-### Observación de plan (`MINOR`, no bloquea)
+### Observación de plan (`MINOR`) — **CERRADA en `e643508`**
 
-El **Architectural Delta de v8 no se actualizó**: su fila de `scripts/sdd-check.sh` sigue diciendo *"guard de `.md` en la regla de supresores (**agregado en v7**)"*, mientras el texto de AC42 ya exige las dos reglas. El AC manda y es inequívoco, así que implementé las dos; lo dejo anotado porque el reviewer chequea el Delta contra el diff y esa fila describe de menos. Es la misma clase de desfase que el ciclo viene encontrando entre el Delta y los ACs (R3 lo tuvo con cinco consumidores declarados y siete reales).
+Reportado en la ronda 2: el **Architectural Delta de v8 no se había actualizado** — su fila de `scripts/sdd-check.sh` decía *"guard de `.md` en la regla de supresores (**agregado en v7**)"* mientras el texto de AC42 ya exigía las dos reglas. El AC manda y es inequívoco, así que implementé las dos y lo dejé anotado porque el reviewer contrasta el Delta contra el diff. El planner corrigió la fila; verificado sobre el árbol, no supuesto:
+
+```
+$ grep -n "sdd-check.sh" SDD/contracts/2026-08-13-sicop-hardening.md
+322:| Script | `plugins/sdd-flow/scripts/sdd-check.sh` — guard de `.md` en la regla de supresores (**agregado en v7**) **y en la de `test-skipeado`** (**ampliado en v8**). …
+```
+
+Era la misma clase de desfase entre el Delta y los ACs que el ciclo ya había encontrado en R3 (cinco consumidores declarados, siete reales).
 
 ---
 
