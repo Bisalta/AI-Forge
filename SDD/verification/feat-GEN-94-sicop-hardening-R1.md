@@ -175,6 +175,13 @@ bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -d SDD/docs/doc_quality_ga
 
 Su exit code y su línea `{"type":"sdd.gates",...}` quedan en ese archivo (generado por el runner, no transcripto acá) y en el `sdd.result` de este agente.
 
+**Resultado real de esa corrida** (post-commit `44a0f0c`, árbol limpio): exit `0` — `{"type":"sdd.gates","green":4,"red":0,"skipped":7,"report":"SDD/verification/feat-GEN-94-sicop-hardening-R1-gates.md"}`. Encabezado: `**Commit**: \`44a0f0c\`` (el commit real que contiene este trabajo, no un commit anterior) y `Tree: \`81f51f839efa0eb89589688efd58180baeaa642f\` — LIMPIO`. Verificado que coincide exactamente con el árbol real de ese commit:
+```
+$ git rev-parse HEAD^{tree}
+81f51f839efa0eb89589688efd58180baeaa642f
+```
+Es la primera vez en este repo que un reporte de gates sella el commit que efectivamente contiene el trabajo certificado — el bug que motivó R1, cerrado con evidencia real, no sólo con el test.
+
 **Límite conocido, encontrado en la vista previa de arriba (no algo hipotético)**: `git stash create` sólo ve contenido que alguna vez pasó por `git add` — el archivo nuevo `SDD/tests/test_run_gates_tree.sh` (sin trackear en el momento de la vista previa) aparece listado en "Archivos sin commitear" pero **no** queda representado en el hash de `Tree:` de esa corrida (verificado: `git ls-tree -r 5671eded86e15270315001379c9bbd4edf368bb3 -- SDD/tests/ | grep test_run_gates_tree` → sin resultados, exit `1`), aunque el archivo modificado `sdd-run-gates.sh` sí quedó representado (mismo comando contra ese path → el blob correcto, confirmado con `git diff`). Es una limitación heredada de la decisión cerrada del contract (`git stash create`, no `git write-tree`), documentada en el script (comentario del bloque de sellado) y en `quality-gates.md` §5. No aplica a la evidencia oficial de arriba porque ahí el árbol está limpio (todo commiteado, sin archivos sin trackear) — pero es una recomendación para que el planner evalúe si amerita una entrada en `SDD/debt.md` (no lo agrego yo: está fuera de mi scope tocar ese archivo).
 
 ---
