@@ -54,14 +54,14 @@ Cada ítem tiene que poder rastrearse al incidente que lo motiva. Los siete sale
 
 ## Pasos
 
-- [ ] T1.1 Leer `archetypes.md` entero antes de tocarlo, y **respetar su forma**: los nueve existentes tienen exactamente NFR obligatorias · Tests exigidos · Checklist→ACs. El tuyo tiene que leerse como uno más, no como un anexo.
-- [ ] T1.2 Escribir `SDD/tests/test_analysis_archetype.sh` (AC25-AC28) con `SDD/tests/lib.sh`. **Corré el test antes del cambio**: tiene que salir ≠0.
-- [ ] T2.1 La sección `analysis` en `archetypes.md`, entre `infra` y "Cómo lo usa el pipeline".
-- [ ] T2.2 `enrich-user-story/SKILL.md`: `analysis` en la lista de arquetipos de la dimensión 7, y la rama de preguntas NFR que el arquetipo dispara.
-- [ ] T2.3 `sdd-plan/SKILL.md`: el binding AC↔test admite la forma de evidencia de `analysis` — un AC cuya evidencia es la salida de una consulta o un test estadístico, no un test unitario.
-- [ ] T3.1 Test verde. `bash SDD/tests/run.sh` completo (8 archivos). `shellcheck --severity=warning` en 0.
-- [ ] T3.2 Verification report + binding. Evidencia a `SDD/verification/feat-GEN-94-sicop-hardening-R4-gates.md` — **commiteá primero, regenerá después**.
-- [ ] T3.3 Commit `[ADD] [GEN-94] [sdd-flow] <descripción>`, con la identidad `sdd-agent`.
+- [x] T1.1 Leer `archetypes.md` entero antes de tocarlo, y **respetar su forma**: los nueve existentes tienen exactamente NFR obligatorias · Tests exigidos · Checklist→ACs. El tuyo tiene que leerse como uno más, no como un anexo.
+- [x] T1.2 Escribir `SDD/tests/test_analysis_archetype.sh` (AC25-AC28) con `SDD/tests/lib.sh`. **Corré el test antes del cambio**: tiene que salir ≠0. → corrida roja registrada: exit `1`, 31 de 37 asserts en rojo.
+- [x] T2.1 La sección `analysis` en `archetypes.md`, entre `infra` y "Cómo lo usa el pipeline". → posición asserteada por número de línea, no a ojo.
+- [x] T2.2 `enrich-user-story/SKILL.md`: `analysis` en la lista de arquetipos de la dimensión 7, y la rama de preguntas NFR que el arquetipo dispara.
+- [x] T2.3 `sdd-plan/SKILL.md`: el binding AC↔test admite la forma de evidencia de `analysis` — un AC cuya evidencia es la salida de una consulta o un test estadístico, no un test unitario.
+- [x] T3.1 Test verde. `bash SDD/tests/run.sh` completo (8 archivos). `shellcheck --severity=warning` en 0.
+- [x] T3.2 Verification report + binding. Evidencia a `SDD/verification/feat-GEN-94-sicop-hardening-R4-gates.md` — **commiteá primero, regenerá después**.
+- [x] T3.3 Commit `[ADD] [GEN-94] [sdd-flow] <descripción>`, con la identidad `sdd-agent`. → `4f17172`.
 
 ## Acceptance criteria (IDs del contract v6 — no los renumeres)
 
@@ -74,12 +74,17 @@ Cada ítem tiene que poder rastrearse al incidente que lo motiva. Los siete sale
 
 ## AC ↔ test binding (llenalo vos)
 
+Todos los tests viven en `SDD/tests/test_analysis_archetype.sh`; el "nombre del caso" es el mensaje literal del assert (convención de `doc_quality_gates.md`).
+
 | AC | Comportamiento | Test | Tipo | Estado |
 |----|----------------|------|------|--------|
-| AC25 | | | | [ ] |
-| AC26 | | | | [ ] |
-| AC27 | | | | [ ] |
-| AC28 | | | | [ ] |
+| AC25 | La sección `analysis` existe, con NFR obligatorias + tests exigidos + checklist→ACs, y en la posición que fija el Delta | `test_analysis_archetype.sh::"AC25 archetypes.md - existe la seccion del arquetipo analysis"` · `::"AC25 archetypes.md - la seccion analysis declara sus NFR obligatorias"` · `::"AC25 archetypes.md - la seccion analysis declara los tests exigidos"` · `::"AC25 archetypes.md - la seccion analysis tiene el checklist que entra como ACs"` · `::"AC25 archetypes.md - observability es NFR obligatoria del arquetipo analysis"` · `::"AC25 archetypes.md - data-privacy es NFR obligatoria cuando el dataset tiene PII"` · `::"AC25 archetypes.md - los tests exigidos incluyen el test que falsaria la conclusion"` · `::"AC25 archetypes.md - los tests exigidos incluyen la re-derivacion de cada cifra citada"` · `::"AC25 archetypes.md - la seccion analysis va entre infra y Como lo usa el pipeline"` | grep sobre el recorte de la sección (no sobre el archivo) | [x] |
+| AC26 | El checklist tiene los siete ítems del contenido normativo, y exactamente siete | `test_analysis_archetype.sh::"AC26 archetypes.md - el checklist del arquetipo analysis tiene exactamente siete items"` · `::"AC26 item 1 - hipotesis nula declarada antes de mirar el resultado"` · `::"AC26 item 2 - el test que falsaria la conclusion nombrado y corrido"` · `::"AC26 item 2 - el resultado se reporta gane o pierda"` · `::"AC26 item 3 - toda cifra re-derivada desde la fuente con la salida adjunta"` · `::"AC26 item 4 - sensibilidad al excluir las filas defectuosas"` · `::"AC26 item 4 - si las exclusiones se concentran en pocas unidades"` · `::"AC26 item 5 - unidad de analisis declarada y el test a esa unidad"` · `::"AC26 item 6 - tamano de muestra y potencia declarados con el numero"` · `::"AC26 item 7 - la conclusion se escribe con su incertidumbre"` | grep sobre el bloque de checklist + conteo exacto | [x] — con **BLOCKED** sobre el CONTENIDO de los ítems 5 y 6 (ver Blockers) |
+| AC27 | `enrich-user-story` lista `analysis` en la dimensión 7, con la rama de NFR que dispara | `test_analysis_archetype.sh::"AC27 enrich-user-story - la dimension 7 lista el arquetipo analysis"` · `::"AC27 enrich-user-story - observability del arquetipo analysis es que la corrida sea reproducible por otro"` | grep sobre la línea de la dimensión, no sobre el archivo | [x] |
+| AC28 | Los dos totales coinciden en diez, y las dos listas nombran los mismos arquetipos | `test_analysis_archetype.sh::"AC28 archetypes.md - declara diez arquetipos"` · `::"AC28 enrich-user-story - la dimension 7 lista diez arquetipos"` · `::"AC28 - el total de arquetipos coincide entre archetypes.md y enrich-user-story"` · `::"AC28 - las dos listas nombran exactamente los mismos diez arquetipos"` | **AC de detección** (sensibilidad §10.1) — triple registrado, dos mutaciones (una por lado) | [x] |
+| AC42 | `sdd-check.sh` no levanta `BLOCKER` de supresor sobre un `.md`, y sigue levantándolo sobre código | `test_analysis_archetype.sh::"AC42 sdd-check.sh - no reporta supresor sobre un archivo .md"` · `::"AC42 sdd-check.sh - sale 0 cuando el unico supresor del diff esta en un .md"` · `::"AC42 sdd-check.sh - un supresor en un archivo de codigo sigue siendo BLOCKER"` · `::"AC42 sdd-check.sh - sale 2 cuando hay un supresor en un archivo de codigo"` · `::"AC42 sdd-check.sh - el .md sigue sin reportarse cuando el codigo si dispara"` · `::"AC42 sdd-check.sh - el guard no apaga las otras reglas sobre .md"` · `::"AC42 sdd-check.sh - sale 2 con un test skipeado agregado en un .md"` | **AC de detección** (rechazo §10.1) — triple registrado; incluye T4.3 | [x] |
+| (impact set) | El README del plugin —tercera declaración de la lista— no queda desactualizado | `test_analysis_archetype.sh::"IMPACT plugin README - el total de arquetipos declarado es diez"` · `::"IMPACT plugin README - la lista de arquetipos incluye analysis"` | grep; fuera de AC28, que nombra dos archivos | [x] |
+| (T2.3) | El binding AC↔test admite la evidencia del arquetipo `analysis` | `test_analysis_archetype.sh::"T2.3 sdd-plan - la regla habla del binding AC-test del arquetipo analysis"` · `::"T2.3 sdd-plan - la evidencia admite la salida de la consulta que re-deriva la cifra"` · `::"T2.3 sdd-plan - la evidencia admite la corrida del test estadistico"` | grep | [x] |
 
 ## Reglas innegociables
 
@@ -104,12 +109,18 @@ Este arquetipo es el único del plugin cuyo checklist es **estadístico**, y el 
 
 ## Execution Report
 
-- **Summary**:
-- **Task status**:
-- **Validation executed** (comando · exit code):
-- **Blockers**:
-- **Files changed**:
-- **Final statement**:
+- **Summary**: décimo arquetipo `analysis` agregado a `archetypes.md` con la misma forma que los otros nueve (NFR obligatorias · Tests exigidos · Checklist→ACs, los siete ítems textuales del contract), propagado a `enrich-user-story` (dimensión 7 + rama NFR), a `sdd-plan` (evidencia admitida en el binding AC↔test) y al README del plugin (tercera declaración de la lista, fuera de la tabla de Files, declarada en el reporte). Tarea extra AC42: la regla de supresores de `sdd-check.sh` gana el guard de `.md` que la regla de al lado ya tenía — 16 `BLOCKER` falsos sobre `.md` en el diff de esta branch pasan a 0, con la detección real sobre código intacta. Test nuevo con 37 asserts, corrida roja previa registrada, y los tres triples de mutación (AC28 por los dos lados, AC42).
+- **Task status**: 11 de 11 tareas `[x]` (T1.1-T1.2, T2.1-T2.3, T3.1-T3.3, T4.1-T4.3). 0 `[BLOCKED]` a nivel tarea; el `BLOCKED` es de **contenido normativo**, ver Blockers.
+- **Validation executed** (comando · exit code): ver `SDD/verification/feat-GEN-94-sicop-hardening-R4.md`, que referencia el reporte generado `SDD/verification/feat-GEN-94-sicop-hardening-R4-gates.md` (`sdd-run-gates.sh --full`, exit `0`, `{"green":4,"red":0,"skipped":7}`, commit `4f17172`, árbol LIMPIO). No lo duplico acá.
+- **Blockers**: **los ítems 5 y 6 del checklist del arquetipo no se sostienen estadísticamente** — el ítem 5 no obliga a que la unidad declarada sea aquella en la que las observaciones son independientes (se cumple corriendo el test al nivel equivocado, que es el error del incidente), y el ítem 6 pide "potencia con el número" sin decir contra qué tamaño de efecto (invita a la potencia observada, que es una transformación monótona del p-valor). Los escribí **textuales del contract** —desviarme sería infidelidad, `BLOCKER` de review— con la corrección mínima propuesta para v8 en el verification report. También quedan para el planner: el defecto hermano de AC42 en la regla `test-skipeado` (medido: 2 hits sobre documentos del propio plugin) y `evals/golden-requirements.md`, que queda con diez arquetipos y nueve goldens.
+- **Files changed**: `plugins/sdd-flow/standards/archetypes.md` · `plugins/sdd-flow/skills/enrich-user-story/SKILL.md` · `plugins/sdd-flow/skills/sdd-plan/SKILL.md` · `plugins/sdd-flow/README.md` · `plugins/sdd-flow/scripts/sdd-check.sh` · `SDD/tests/test_analysis_archetype.sh` (NEW) · `SDD/verification/feat-GEN-94-sicop-hardening-R4.md` (NEW) · `SDD/verification/feat-GEN-94-sicop-hardening-R4-gates.md` (NEW, generado) · este brief.
+- **Final statement**: los cinco ACs (AC25-AC28 + AC42) tienen test y están verdes; los dos de detección tienen sus tres corridas registradas con exit codes y reversión verificada byte a byte. La escalera corrió completa en verde sobre el árbol limpio del commit `4f17172`. Entrego **`blocked`** y no `done` porque el brief pide explícitamente marcar BLOCKED si un ítem del checklist no se sostiene, y dos no se sostienen: prefiero devolver el arquetipo con dos cláusulas por ratificar antes que publicar un checklist que suene riguroso y no lo sea, que es el modo de falla que este ciclo entero ataca.
+
+## Tarea extra — estado
+
+- [x] T4.1 Guard de `.md` en la regla de supresores (única línea tocada de `scripts/`).
+- [x] T4.2 AC42 probado por mutación: triple registrado (verde `0` → rojo `1` con el guard quitado → verde `0` revertido), con `shasum` idéntico antes y después.
+- [x] T4.3 La detección real sigue viva: caso propio con `assert_exit 2` sobre un supresor en un archivo de código, más el caso de que el guard no ensancha a otras reglas.
 
 ---
 
