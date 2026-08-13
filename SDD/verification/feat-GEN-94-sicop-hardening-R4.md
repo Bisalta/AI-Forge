@@ -3,26 +3,46 @@
 Evidencia de la escalera de gates (`standards/quality-gates.md` §4-§5) y de lo que el runner no puede saber. Lo escribe el implementing agent; lo audita el reviewer-agent.
 
 - **Branch**: `feat-GEN-94-sicop-hardening`
-- **Ronda**: 1/3
-- **Contract**: `SDD/contracts/2026-08-13-sicop-hardening.md` **v7**, sección R4 (AC25-AC28 + AC42)
-- **Brief**: `SDD/briefs/R4-analysis-archetype.md` (v6 en su encabezado; los ACs no cambian en v7, que **agrega** AC42 y las dos `Mutación:` declaradas)
-- **Commit evaluado**: `4f17172` — sellado por el runner (R1). La evidencia se genera **después** del commit de trabajo, como en cada requerimiento de este ciclo.
+- **Ronda**: **2/3** — la ronda 1 entregó `BLOCKED` sobre los ítems 5 y 6 del checklist estadístico. El planner ratificó **v8** con las dos redacciones corregidas y amplió AC42 a la regla `test-skipeado`. Esta ronda ejecuta las tres tareas de v8. El detalle de la ronda 1 queda abajo, sin editar.
+- **Contract**: `SDD/contracts/2026-08-13-sicop-hardening.md` **v8**, sección R4 (AC25-AC28 + AC42)
+- **Brief**: `SDD/briefs/R4-analysis-archetype.md`
+- **Commit evaluado**: `2d63f8e` (ronda 2) — sellado por el runner (R1). Ronda 1: `4f17172`. La evidencia se genera **después** del commit de trabajo, como en cada requerimiento de este ciclo.
 - **Doc de gates del repo**: `SDD/docs/doc_quality_gates.md` — el reporte generado lo registra con hash: `sha256:e96c7d0f61963400`. Copiado del encabezado del reporte, **no recalculado acá**. Mismo hash que en R3 y R5: el doc de gates **no cambió** durante el ciclo, así que ninguna fila de la escalera se movió.
 - **Momento de captura** (`RT7`): todas las salidas pegadas abajo se capturaron **después** del último cambio a los archivos que describen. Las tres pruebas por mutación se corrieron después de la implementación, y sus reversiones están verificadas byte a byte contra el estado **commiteado** (los tres `shasum` de abajo se re-corrieron post-commit y coinciden).
-- **Estado**: **BLOCKED** — el trabajo está completo, verde y commiteado; el bloqueo es sobre **dos ítems del checklist normativo que el contract cierra** (ítems 5 y 6 de AC26). Ver la sección «BLOCKED» al final, que es la parte de este reporte que el planner tiene que leer primero.
+- **Estado**: **completo** — el `BLOCKED` de la ronda 1 fue ratificado por el planner en v8 y está resuelto. Los cinco ACs verdes, cinco triples de mutación registrados, escalera en verde.
 
 ---
 
 ## Gates — evidencia GENERADA (no escrita a mano)
 
-- **Reporte generado**: `SDD/verification/feat-GEN-94-sicop-hardening-R4-gates.md` — `sdd-run-gates.sh v0.12.0`, 2026-08-13T21:01:30Z, commit `4f17172`, tree `71c6678d032817c254cdc58efe153cd01f040f9e` **LIMPIO**. 4 gates con comando en verde, 7 `[SKIPPED]` declarados `N/A` en el doc, 0 rojos.
+- **Reporte generado (ronda 2, el vigente)**: `SDD/verification/feat-GEN-94-sicop-hardening-R4-gates.md` — `sdd-run-gates.sh v0.12.0`, 2026-08-13T21:19:49Z, commit `2d63f8e`, tree `55e2446cecd00471dce420e07011a93c2afedd31`. 4 gates con comando en verde, 7 `[SKIPPED]` declarados `N/A` en el doc, 0 rojos.
 - **Comando y exit code**, pegados tal cual:
 
 ```
-$ bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -d SDD/docs/doc_quality_gates.md -o SDD/verification/feat-GEN-94-sicop-hardening-R4-gates.md
+$ bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full --allow-dirty -d SDD/docs/doc_quality_gates.md -o SDD/verification/feat-GEN-94-sicop-hardening-R4-gates.md
 RUNNER_EXIT=0
 {"type":"sdd.gates","green":4,"red":0,"skipped":7,"report":"SDD/verification/feat-GEN-94-sicop-hardening-R4-gates.md"}
 ```
+
+### `--allow-dirty` en la ronda 2: por qué, y qué archivo lo ensucia
+
+La primera invocación, sin la bandera, **salió 4 y no escribió nada** — la estrictez derivada del destino (R1): `-o` fuera de `.sdd/` exige árbol limpio.
+
+```
+$ bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -d … -o SDD/verification/…-R4-gates.md; echo "RUNNER_EXIT=$?"
+RUNNER_EXIT=4
+```
+
+El árbol no estaba sucio por trabajo mío: **`SDD/retro.md` está modificado sin commitear por el planner** (la entrada `RT10`, sobre el hallazgo de mi ronda 1). El brief me prohíbe tocar ese archivo, y commitear el trabajo de otro no es una opción. Las tres salidas posibles eran: (a) escribir la evidencia en `.sdd/`, que está gitignoreado y no viaja en el PR — prohibido por mi propio prompt; (b) stashear un archivo que no es mío; (c) `--allow-dirty`, que es el modo que el runner declara para exactamente esto y **estampa él mismo qué quedó sin commitear**. Elegí (c), y la prueba de que ningún archivo de mi diff quedó fuera del commit la escribe el runner, no yo:
+
+```
+- Tree: `55e2446cecd00471dce420e07011a93c2afedd31` — ARBOL SUCIO. Archivos sin commitear:
+  - ` M SDD/retro.md`
+```
+
+Efecto sobre los gates: ninguno. El único gate que lee ese archivo es el 9 (`secret-scan.sh` escanea todo `git ls-files`, incluido su contenido de working tree) y salió verde. Los gates 2 y 4 no lo tocan (globs de `.sh` y de `SDD/tests/`). **Si el planner prefiere evidencia con árbol limpio, commitea `SDD/retro.md` y la regenero: es una corrida de dos segundos.**
+
+- **Ronda 1** (sustituida, misma escalera): commit `4f17172`, tree `71c6678d032817c254cdc58efe153cd01f040f9e` **LIMPIO**, exit `0`, `{"green":4,"red":0,"skipped":7}`.
 
 - Los 7 `[SKIPPED]` son los gates que `SDD/docs/doc_quality_gates.md` declara `N/A` con razón (format, type-check, integration, build, e2e, cobertura, smoke). Ninguno es un gate existente que no se corrió.
 - Corridas rojas intermedias del runner: ninguna. Los rojos de este trabajo son los del test — corrida previa al cambio y las tres pruebas por mutación —, cada uno con su comando y su exit code abajo.
@@ -170,6 +190,127 @@ $ bash plugins/sdd-flow/scripts/sdd-check.sh | awk -F'\t' '$3=="supresor" && $2 
 
 ---
 
+## Ronda 2 — contract v8
+
+Tres tareas: la redacción nueva de los ítems 5 y 6, la ampliación de AC42 a la regla `test-skipeado`, y evidencia regenerada. **Los asserts se escribieron antes del cambio, igual que en la ronda 1.**
+
+| Corrida | Comando | Exit code | Resultado |
+|---|---|---|---|
+| antes del cambio de la ronda 2 | `bash SDD/tests/test_analysis_archetype.sh` | `1` | 12 asserts en rojo (36 verdes: los de la ronda 1 que no cambiaron) |
+| después del cambio | `bash SDD/tests/test_analysis_archetype.sh` | `0` | 48 de 48 `ok` |
+
+Extracto de la corrida roja, pegado sin editar — las 4 líneas que prueban que **los dos asserts de ausencia no son tautológicos** (las frases viejas existían en el árbol) más las dos direcciones nuevas de AC42:
+
+```
+  FAIL  AC26 item 5 - la redaccion vieja autosatisfacible ya no esta — esperado [no], obtenido [si]
+  FAIL  AC26 item 6 - la redaccion vieja sin tamano de efecto ya no esta — esperado [no], obtenido [si]
+  FAIL  AC42 sdd-check.sh - no reporta test-skipeado sobre un archivo .md — esperado [no], obtenido [si]
+  FAIL  AC42 sdd-check.sh - sale 0 cuando el unico test skipeado del diff esta en un .md (exit 0) — esperado [0], obtenido [2]
+FAIL — 12 assert(s) fallaron
+```
+
+Un chequeo de ausencia que busca una frase inexistente pasa siempre (es lo que R3 documenta en `AC23`). Estos dos **no** son de esa clase, y la corrida de arriba lo prueba: salieron rojos contra el árbol que todavía tenía la redacción vieja.
+
+```
+$ bash SDD/tests/test_analysis_archetype.sh | grep -c "^  ok"
+48
+$ bash SDD/tests/test_analysis_archetype.sh >/dev/null 2>&1; echo "EXIT=$?"
+EXIT=0
+```
+
+### AC42 ampliado — efecto medido sobre este repo
+
+```
+$ bash <copia-con-el-guard-solo-en-supresores>/sdd-check.sh | awk -F'\t' '$1=="BLOCKER" && $2 ~ /\.md$/' | wc -l
+2
+$ bash plugins/sdd-flow/scripts/sdd-check.sh | awk -F'\t' '$1=="BLOCKER" && $2 ~ /\.md$/' | wc -l
+0
+```
+
+Los 2 que quedaban eran `standards/quality-gates.md` §6.1 (la lista de mitigaciones prohibidas) y `templates/doc_quality_gates.md` (el placeholder de markers prohibidos) — los mismos que reporté en la ronda 1. **El diff de esta branch ya no levanta ningún `BLOCKER` sobre un archivo `.md`.** Lo que queda son 5 hallazgos sobre `.sh`, todos de los dos ejecutables que describen los patrones que detectan (`hooks/guard-git.sh`, `scripts/sdd-check.sh`): autodetección, fuera del alcance de AC42.
+
+### Los cinco triples, re-medidos contra el test final (`RT7`)
+
+**Importante**: las primeras corridas de los triples se hicieron **antes** de mi último cambio al archivo de test (el literal de `catch` armado en runtime, abajo). Como el test cambió, **volví a correr los cinco enteros** contra el archivo final, y son estos los que valen. Es la misma decisión que tomó R3 cuando su test cambió entre rondas.
+
+Las dos mutaciones declaradas en el contract v8 se ejecutan tal cual. La tercera de AC42 está marcada **adicional**: no sustituye a ninguna declarada, agrega la dirección que las declaradas no cubren.
+
+#### AC42-A — guard de `test-skipeado` quitado (mutación declarada; es el guard que v8 agrega)
+
+- **Mutación declarada en el contract**: *«quitar el guard de `.md` recién agregado y verificar que el `BLOCKER` falso reaparece · revertir después»*.
+
+| # | Estado del sistema | Comando | Exit code | Resultado |
+|---|---|---|---|---|
+| 1 | intacto | `bash SDD/tests/test_analysis_archetype.sh` | `0` | verde — 48/48 |
+| 2 | con la mutación aplicada | `bash SDD/tests/test_analysis_archetype.sh` | `1` | rojo — 4 asserts, todos de `.md` |
+| 3 | mutación revertida | `bash SDD/tests/test_analysis_archetype.sh` | `0` | verde — 48/48 |
+
+```
+  FAIL  AC42 sdd-check.sh - no reporta test-skipeado sobre un archivo .md — esperado [no], obtenido [si]
+  FAIL  AC42 sdd-check.sh - sale 0 cuando el unico test skipeado del diff esta en un .md (exit 0) — esperado [0], obtenido [2]
+  FAIL  AC42 sdd-check.sh - la prosa que enumera las mitigaciones prohibidas no levanta ningun BLOCKER — esperado [no], obtenido [si]
+  FAIL  AC42 sdd-check.sh - sale 0 sobre un .md que enumera supresores y tests skipeados (exit 0) — esperado [0], obtenido [2]
+FAIL — 4 assert(s) fallaron
+```
+
+Los dos asserts de la **dirección 2** (un test realmente skipeado en un archivo de código sigue siendo `BLOCKER`) quedaron **verdes durante la mutación**: el rojo vino del guard, no de haber roto la regla.
+
+#### AC42-B — guard de supresores quitado (mutación declarada, re-medida)
+
+| # | Estado del sistema | Comando | Exit code | Resultado |
+|---|---|---|---|---|
+| 1 | intacto | `bash SDD/tests/test_analysis_archetype.sh` | `0` | verde — 48/48 |
+| 2 | con la mutación aplicada | `bash SDD/tests/test_analysis_archetype.sh` | `1` | rojo — 4 asserts |
+| 3 | mutación revertida | `bash SDD/tests/test_analysis_archetype.sh` | `0` | verde — 48/48 |
+
+```
+  FAIL  AC42 sdd-check.sh - no reporta supresor sobre un archivo .md — esperado [no], obtenido [si]
+  FAIL  AC42 sdd-check.sh - sale 0 cuando el unico supresor del diff esta en un .md (exit 0) — esperado [0], obtenido [2]
+  FAIL  AC42 sdd-check.sh - la prosa que enumera las mitigaciones prohibidas no levanta ningun BLOCKER — esperado [no], obtenido [si]
+  FAIL  AC42 sdd-check.sh - sale 0 sobre un .md que enumera supresores y tests skipeados (exit 0) — esperado [0], obtenido [2]
+```
+
+#### AC42-EXTRA — el guard implementado como «saltear el `.md` entero» (adicional, no sustituye ninguna declarada)
+
+La forma barata de hacer pasar AC42 es descartar los archivos `.md` **antes** de evaluar ninguna regla. Con eso, **todos los demás asserts de AC42 pasan igual** y el checker queda ciego a la prosa: es el ablandamiento disfrazado en su forma más difícil de ver. El caso 4 del test existe para distinguir las dos implementaciones, y esta corrida prueba que tiene poder — cae **exactamente él, y ninguno más**:
+
+| # | Estado del sistema | Comando | Exit code | Resultado |
+|---|---|---|---|---|
+| 1 | intacto | `bash SDD/tests/test_analysis_archetype.sh` | `0` | verde — 48/48 |
+| 2 | con la mutación aplicada (`if (file ~ /\.md$/) next` al tope del bloque) | `bash SDD/tests/test_analysis_archetype.sh` | `1` | rojo — **un solo assert** |
+| 3 | mutación revertida | `bash SDD/tests/test_analysis_archetype.sh` | `0` | verde — 48/48 |
+
+```
+  FAIL  AC42 sdd-check.sh - el guard no saltea el archivo .md entero, solo las dos reglas — no encontré [WARN	doc.md	catch-silencioso	] en la salida
+FAIL — 1 assert(s) fallaron
+```
+
+#### AC28-A y AC28-B — re-medidas contra el test final
+
+Mismo resultado que en la ronda 1, ahora contra las 48 asserts: `0` → `1` (3 asserts, con el `fake-archetype` cambiando de lado según el archivo mutado) → `0`. Salidas completas en la corrida de los cinco triples.
+
+#### Reversiones verificadas byte a byte (los tres archivos mutados, post-commit)
+
+```
+  sha_antes   6fe144599f8fd806149d84bdfdb03112af567c51ef5a5121bc840377bb34ff6d  (sdd-check.sh)
+  sha_despues 6fe144599f8fd806149d84bdfdb03112af567c51ef5a5121bc840377bb34ff6d
+  sha_antes   9b4d616fce9746db9d3f538b212c51968063751894faa8a5a125a4e9708b0762  (archetypes.md)
+  sha_despues 9b4d616fce9746db9d3f538b212c51968063751894faa8a5a125a4e9708b0762
+  sha_antes   da7843ddb4358c6ab9124c712b5d4b303410f4df7269e38fcd4fcb2fc745419a  (enrich-user-story/SKILL.md)
+  sha_despues da7843ddb4358c6ab9124c712b5d4b303410f4df7269e38fcd4fcb2fc745419a
+```
+
+### Dos cosas que salieron mal en esta ronda, y cómo las agarré
+
+1. **Mi propio arnés de medición dio 127 en las 15 corridas de los triples** — puse el comando en una variable (`T="bash SDD/tests/…"`) y lo invoqué sin comillas dentro de una función; **la shell de esta máquina es `zsh`, que no hace word splitting**, así que buscó un ejecutable llamado literalmente `bash SDD/tests/test_analysis_archetype.sh`. Las tres corridas de cada triple salieron `127` — ni verde ni rojo, el test **nunca corrió**. Si pego esos exit codes, publico un triple entero inventado con cara de medición. Lo rehice con los comandos literales dentro de un script `bash` explícito, y esos son los números de arriba. Es `RT8` otra vez, en el instrumento en vez de en el objeto medido: **el arnés que mide el control también puede estar roto, y da un número igual**.
+2. **Mi propio archivo de test disparaba una regla del checker que estoy arreglando**: el caso 4 necesita un `catch` silencioso literal, y contiguo en el fuente hacía que `sdd-check.sh` reportara `WARN  SDD/tests/test_analysis_archetype.sh  catch-silencioso`. Lo armé en runtime (`printf '%s%s' 'catch (e) {' '}'`), la misma convención que el archivo ya usaba para los supresores. Medido después: `bash plugins/sdd-flow/scripts/sdd-check.sh | awk -F'\t' '$2 ~ /test_analysis_archetype/' | wc -l` → `0`.
+
+### Observación de plan (`MINOR`, no bloquea)
+
+El **Architectural Delta de v8 no se actualizó**: su fila de `scripts/sdd-check.sh` sigue diciendo *"guard de `.md` en la regla de supresores (**agregado en v7**)"*, mientras el texto de AC42 ya exige las dos reglas. El AC manda y es inequívoco, así que implementé las dos; lo dejo anotado porque el reviewer chequea el Delta contra el diff y esa fila describe de menos. Es la misma clase de desfase que el ciclo viene encontrando entre el Delta y los ACs (R3 lo tuvo con cinco consumidores declarados y siete reales).
+
+---
+
 ## Smoke manual
 
 `N/A — ningún AC de R4 está declarado `manual-only` en el contract.`
@@ -187,7 +328,8 @@ El cambio es normativo (markdown) más una línea de `awk` en un script y un tes
 | lista de arquetipos | `commands/sdd.md:33,38`, `agents/reviewer-agent.md:33`, `standards/concerns.md:3` | referencian `archetypes.md` **sin enumerar** la lista → no quedan desactualizados. Verificado con `grep -rn "arquetipo\|archetype"` sobre los tres |
 | lista de arquetipos | **`evals/golden-requirements.md` — "un requerimiento golden **por arquetipo**", G1-G9** | **queda incompleto: no hay golden para `analysis`.** Escribirlo es contenido normativo nuevo (y `G10` ya está tomado por el golden adversarial) → **no lo inventé**: va como hallazgo al planner, abajo |
 | checklist del arquetipo → ACs | `skills/sdd-plan/SKILL.md:18` (inyecta el checklist como ACs) y `agents/reviewer-agent.md:33` (ítem sin AC ni `N/A` = `MAJOR` de contract) | el mecanismo es genérico sobre "el checklist del arquetipo": el arquetipo nuevo entra sin tocarlos. `sdd-plan` **sí** recibió la regla de evidencia del binding (T2.3), cubierta por 3 asserts |
-| regla de supresores (`scripts/sdd-check.sh:63-69`) | `standards/quality-gates.md` §7.1 y `agents/reviewer-agent.md` Fase 1 — corren el script y leen su salida | el guard **reduce** falsos positivos y no cambia la interfaz (mismo formato de línea, mismos exit codes). 7 asserts de AC42, incluidos los 4 que prueban que la detección real sigue viva |
+| reglas `supresor` y `test-skipeado` (`scripts/sdd-check.sh`) | `standards/quality-gates.md` §7.1 y `agents/reviewer-agent.md` Fase 1 — corren el script y leen su salida | el guard **reduce** falsos positivos y no cambia la interfaz (mismo formato de línea, mismos exit codes). 11 asserts de AC42 tras la ronda 2, incluidos los 4 de detección real viva y el que distingue el guard de "saltear el `.md` entero" |
+| regla `test-skipeado` (ronda 2) | `commands/sdd-fixes.md` y `standards/quality-gates.md` §6.1 enumeran los markers que la regla busca | son **prosa**, y son justamente los falsos positivos que el guard elimina: no hay caller que dependa de que el `.md` dispare. Verificado midiendo 2 → 0 |
 | `SDD/tests/run.sh` (descubre `test_*.sh`) | el archivo nuevo entra a la suite | 8 archivos, los 8 `PASS` (gate 4 del reporte generado) |
 
 **Rojos preexistentes**: ninguno. Los 7 archivos de test que existían antes de este trabajo corren en mi propia corrida y salen los 7 `PASS` — medición de esta corrida (bloque del gate 4 del reporte generado), no una cita del reporte de R3.
@@ -205,6 +347,9 @@ El cambio es normativo (markdown) más una línea de `awk` en un script y un tes
 | 16 → 0 `BLOCKER` falsos | dos corridas del **mismo** diff (base `merge-base` → árbol), una con una copia del script sin el guard y otra con el del árbol, filtrando `$3=="supresor" && $2 ~ /\.md$/` | comparar exit codes no servía: el script sale 2 por otras reglas en los dos casos. Se cuenta la **línea de hallazgo**, no el exit |
 | 14 `SC2016` a severidad `info` | `shellcheck -f gcc ... \| grep -c SC2016`, y por archivo con `cut -d: -f1 \| sort \| uniq -c` | **el formato tty da 15**: agrega una línea de pie con el link del wiki por cada código único. La cifra buena es la de `-f gcc`, una línea por hallazgo. Es la trampa de `RT8` en su forma más chica, y me mordió en la primera medición |
 | 8 archivos de test, 8 `PASS` | salida de `bash SDD/tests/run.sh`, que es también el gate 4 del reporte generado | ninguno |
+| **48 asserts** (ronda 2) | `grep -c '^  ok'` de la propia corrida | ninguno |
+| **2 → 0 `BLOCKER` sobre `.md`** (ronda 2) | mismo método que la fila de 16 → 0, filtrando ahora por `$1=="BLOCKER" && $2 ~ /\.md$/` (las dos reglas, no sólo `supresor`) | ídem: el exit code sigue siendo 2 por los `.sh` autodetectados, así que la cifra sale del conteo de líneas |
+| **exit codes de los 5 triples** (ronda 2) | script `bash` explícito con los comandos literales | **la primera versión del arnés devolvió `127` en las 15 corridas** porque puso el comando en una variable y esta shell es `zsh`, que no hace word splitting: el test nunca corrió. Ver "Dos cosas que salieron mal" |
 
 Gate 2, pegado tal cual (salida vacía = sin hallazgos):
 
@@ -248,7 +393,11 @@ Uno solo, y lo declaro explícito porque la tabla de Files del brief no lo lista
 
 ## Hallazgos para el planner (no los resolví por mi cuenta)
 
-### 1. `BLOCKED` — dos ítems del checklist de AC26 no se sostienen estadísticamente
+### 1. `BLOCKED` de la ronda 1 — **CERRADO en v8**
+
+El planner ratificó las dos redacciones **tal cual las propuse** y las escribió en el contract con su razón medida al lado. Aplicadas en `archetypes.md` en la ronda 2 (asserts nuevos + ausencia de la redacción vieja, con la corrida roja que prueba que la ausencia no es tautológica). Dejo el diagnóstico original abajo sin editar, porque es la parte que el ciclo va a querer releer: es el único defecto de plan del ciclo que no se detectaba midiendo.
+
+**Diagnóstico original (ronda 1):**
 
 Es el riesgo que el brief declara ("el planner que lo escribió no es estadístico"), y **está materializado en dos de los siete ítems**. Los escribí **textuales del contract** en `archetypes.md` —desviarme sería infidelidad al contract, que es `BLOCKER` de review— y los reporto acá para que el planner ratifique v8. Los cinco restantes (1, 2, 3, 4 y 7) se sostienen: son pre-especificación, anti-reporte-selectivo, trazabilidad de cifras y robustez a exclusiones, y ninguno se puede cumplir mientras se comete el error que ataca.
 
@@ -262,7 +411,9 @@ La potencia no es una propiedad del dataset: es función del tamaño de efecto, 
 
 **Por qué esto es `BLOCKED` y no un `MINOR` que arreglo yo**: son ítems normativos que el contract cierra y que van a generar ACs en cada ciclo de análisis futuro. Reescribirlos por mi cuenta sería cerrar una decisión que el contract ya cerró —la misma prohibición que §10.2 pone sobre inventar una mutación—. El costo de dejarlos como están no lo paga este ciclo: lo paga el primer análisis real que los cumpla al pie de la letra y llegue igual a una conclusión falsa. Es, además, el único punto ciego del review adversarial de este ciclo, porque **un ítem estadístico mal formulado no se detecta midiendo el plugin**: los cuatro defectos de plan anteriores se atraparon con un grep, un payload y un `git ls-tree`; éste sólo aparece el día que alguien lo aplica a un dataset.
 
-### 2. Defecto hermano de AC42, medido: la regla `test-skipeado` tiene el mismo hueco
+### 2. Defecto hermano de AC42 — **CERRADO en v8** (AC42 ampliado, implementado en la ronda 2)
+
+El planner amplió AC42 a la regla `test-skipeado`. Implementado con las **dos direcciones** probadas y con el caso que distingue el guard de dos reglas de "saltear el `.md` entero". Medición post-fix: 2 → 0 `BLOCKER` sobre `.md`. Diagnóstico original de la ronda 1:
 
 Búsqueda de hermanos (checklist del arquetipo `bugfix`) aplicada al fix de AC42: **la regla de al lado tiene el defecto idéntico** y pega sobre los documentos normativos del propio plugin.
 
