@@ -179,7 +179,7 @@ El reviewer midió, sobre un repo de prueba, que la exclusión de `SDD/contracts
 
 **Mutación aplicada** (`SDD/tests/secret-scan.sh`, loop principal): se reintrodujo un `case "$f" in SDD/contracts/*) ... continue ;; esac` antes del chequeo de auto-exclusión — exactamente el patrón que v3 prohíbe. Revertido antes de la corrida 3.
 
-Salida completa y real de la corrida 2 (roja, con la exclusión reintroducida), pegada tal cual — sólo la forma 6 falla, las formas 1-5 (que no pasan por `SDD/contracts/`) siguen verdes:
+**Extracto** de las líneas de la forma 6 en la corrida 2 (roja, con la exclusión reintroducida). La corrida completa emite 26 asserts: 24 `ok` y 2 `FAIL`, ambos de la forma 6 — las formas 1-5, que no pasan por `SDD/contracts/`, siguen verdes. *(Etiqueta corregida por el planner al cerrar el review de la ronda 3: decía "pegada tal cual" sobre lo que es un extracto. El reparto 24/2 declarado en la tabla de arriba fue verificado exacto por el reviewer; no había nada falso, sólo la etiqueta.)*
 ```
   ok    forma6 secreto bajo SDD-contracts - verde antes de plantar (exit 0)
   FAIL  forma6 secreto bajo SDD-contracts - rojo al plantar (exit 1) — esperado [1], obtenido [0]
