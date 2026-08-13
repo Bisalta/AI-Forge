@@ -40,6 +40,8 @@ Un AC verificable sólo a mano (ej. visual, hardware ausente) se permite si el H
 
 Los criterios **advisory** (SEO, `standards/seo-frontend.md`) NO son ACs: van en su propia sección con IDs `SEO1..SEOn`, no exigen test y no entran en la Definition of Done. Un ítem advisory se vuelve bloqueante sólo si el planner lo promueve explícitamente a `ACn` — decisión consciente, no default.
 
+**AC de autoría tautológico**: un AC que afirma distinguir trabajo humano de trabajo de agente (ej. "esto lo hizo una persona, no el agente", verificado con `git log -1 --format='%an'` sobre un archivo) sólo es válido si el repo tiene el enforcement de identidad activo (`SDD_AGENT_ENFORCE=1` — ver `hooks/guard-git.sh` y `base-standards.md` sección Git). Sin enforcement, el agente commitea con la identidad git del usuario y el AC es verdadero siempre, lo llene quien lo llene: un AC de autoría sin enforcement no es verificable, es tautológico, y un AC tautológico es `BLOCKER` de contract — no un detalle de implementación que el reviewer pueda dejar pasar.
+
 ---
 
 ## 3. Trazabilidad AC ↔ test (regla dura)

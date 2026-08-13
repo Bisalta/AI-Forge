@@ -44,6 +44,7 @@ Proxima es ortogonal a la capa de integración: puede haber tracking Proxima en 
   - **Sin Proxima** (MCP ausente o el usuario declinó): `<MODULO>-<TICKET>` (ej. `COMPRAS-FAC-81`); sin ticket: `<MODULO>-<desc-corta>`.
   - Se borra al integrar.
 - Commits: `[TIPO] [TICKET] [Módulo] [Descripción]`. Tipos: ADD/FIX/REF/IMP/REM/REV/MOV/REL.
+- **Identidad de agente en el commit**: el implementing-agent commitea con `git -c user.name="$SDD_AGENT_NAME" -c user.email="$SDD_AGENT_EMAIL" commit -m "..."` — default `sdd-agent` / `sdd-agent@users.noreply.github.com`, overrideable por repo con esas dos variables de entorno. El commit nunca toma la identidad git del usuario. Repos que exportan `SDD_AGENT_ENFORCE=1` lo hacen cumplir: `hooks/guard-git.sh` deniega un `git commit` que no declare esa identidad (`quality-gates.md`, regla del AC de autoría tautológico). Sin esa variable en el entorno, el hook no opina — un humano commiteando en el mismo repo no queda bloqueado.
 - **Integración** según capa: con remote → **PR** (a CODEOWNERS) hacia la base; sin remote → **merge local `--no-ff`** tras review. Tests verdes obligatorio en ambas. Nunca commit directo a la base.
 - **Cierre Proxima**: la tarea/subtask pasa a `done` **cuando se integra** (PR mergeado, o merge local hecho) — no antes. Solo el planner llama al MCP `proxima`; los implementing-agents reportan estado/integración por el canal file-based.
 

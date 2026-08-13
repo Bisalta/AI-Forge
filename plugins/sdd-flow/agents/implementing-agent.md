@@ -43,6 +43,7 @@ Si tu cambio tocó capas/rutas/contratos del Architectural Delta → actualizá 
 
 ## Branch / PR (regla dura)
 - Trabajás en la **branch que indica tu brief** (formato `{action}-{KEY_MADRE}-{vos}-{desc}` con Proxima — KEY de la tarea madre + tu slug; sino `<MODULO>-<TICKET>`), creada desde la **rama base** del contract. Si la base no está declarada → BLOCKED, preguntá al planner. No la inventes: usá la exacta del brief.
+- **Identidad del commit**: commiteá con `git -c user.name="${SDD_AGENT_NAME:-sdd-agent}" -c user.email="${SDD_AGENT_EMAIL:-sdd-agent@users.noreply.github.com}" commit -m "..."` — nunca dejes que el commit tome la identidad git del usuario (`standards/base-standards.md`, sección Git). Si el repo exporta `SDD_AGENT_ENFORCE=1`, `hooks/guard-git.sh` deniega el commit si falta esa identidad.
 - NUNCA commits directos a la base. Integración según la capa del repo (la declara el contract): con remote → PR (reportás link y "mergeado"); sin remote → review + merge local `--no-ff` (reportás hash). Si el repo no es git, trabajás sin branch y lo decís.
 - **No toques Proxima.** El planner es el único que crea/cierra tareas Proxima; vos solo reportás estado (PR abierto / CI verde / mergeado) por mensaje y `status.md`.
 

@@ -111,4 +111,22 @@ for pat in $PROTECTED; do
 done
 IFS="$OLD_IFS"
 
+# --- 4. Identidad de agente en el autor del commit (contract R2) -------------
+# Opt-in por repo: sin SDD_AGENT_ENFORCE=1 en el entorno este bloque no corre
+# y un humano commiteando en el mismo repo no queda bloqueado (AC16, par de
+# detección con AC14). Con la variable en 1, el mecanismo de identidad es
+# `git -c user.name=... -c user.email=...` (decisión cerrada del contract:
+# nunca GIT_AUTHOR_*/--author) — un commit que no declara las dos flags con
+# el valor esperado se deniega con el mismo deny() que usa el chequeo de rama
+# protegida de arriba (mismo código de denegación, AC14).
+if [ "${SDD_AGENT_ENFORCE:-0}" = "1" ]; then
+  EXPECTED_NAME="${SDD_AGENT_NAME:-sdd-agent}"
+  EXPECTED_EMAIL="${SDD_AGENT_EMAIL:-sdd-agent@users.noreply.github.com}"
+  GOT_NAME="$(printf '%s' "$CMD" | grep -oE '\-c[[:space:]]+user\.name=[^[:space:]]+' | tail -1 | sed -E 's/^-c[[:space:]]+user\.name=//')"
+  GOT_EMAIL="$(printf '%s' "$CMD" | grep -oE '\-c[[:space:]]+user\.email=[^[:space:]]+' | tail -1 | sed -E 's/^-c[[:space:]]+user\.email=//')"
+  if [ "$GOT_NAME" != "$EXPECTED_NAME" ] || [ "$GOT_EMAIL" != "$EXPECTED_EMAIL" ]; then
+    deny "sdd-flow: este repo exige identidad de agente en los commits (SDD_AGENT_ENFORCE=1). Esperada: user.name=${EXPECTED_NAME} user.email=${EXPECTED_EMAIL}. Recibida: user.name=${GOT_NAME:-<ninguna>} user.email=${GOT_EMAIL:-<ninguna>}. Commiteá con: git -c user.name=${EXPECTED_NAME} -c user.email=${EXPECTED_EMAIL} commit ... (standards/base-standards.md, sección Git)."
+  fi
+fi
+
 allow
