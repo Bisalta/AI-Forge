@@ -16,7 +16,7 @@ Una tarea está `done` sólo si TODO esto es cierto. Sin excepciones por tamaño
 2. La escalera de gates (§4) corrió completa y en verde, con evidencia registrada (§5).
 3. Ninguna mitigación prohibida (§6) aparece en el diff.
 4. El impact set está cubierto: cada caller/import de un símbolo cambiado tiene test de regresión o justificación explícita de por qué no lo necesita.
-5. Si el requerimiento es un **bugfix**: existe un test que reproducía el bug — con evidencia del fallo **antes** del fix (exit code ≠ 0) y del verde **después**. Un bugfix sin test rojo previo no está probado, está supuesto.
+5. Todo **AC de detección** tiene registrada su prueba por mutación, **en cualquier arquetipo** — §10 «Prueba por mutación (AC de detección)» define el criterio de qué AC lo requiere y la evidencia que exige. El **bugfix** es el caso particular de esa regla: existe un test que reproducía el bug, con evidencia del fallo **antes** del fix (exit code ≠ 0) y del verde **después**. Un control sin su corrida roja registrada no está probado, está supuesto.
 6. Docs delta aplicado: si el Architectural Delta tocó capas/rutas/contratos → `SDD/docs/doc_architecture.md` actualizado; si aparecieron comandos de verificación nuevos → `doc_verification_guide.md` y `doc_quality_gates.md` actualizados.
 7. Review con veredicto `APPROVED` (§7).
 8. Execution Report completo, sin ninguna validación declarada que no se corrió.
@@ -107,10 +107,13 @@ Contenido:
 
 - **referencia al reporte generado** por el runner (path + fecha) — la historia de rojos intermedios es señal, no vergüenza: no se borra un reporte rojo, se genera uno nuevo;
 - para bugfixes, las **dos** corridas del test de reproducción (roja antes, verde después) — el runner no las conoce, van a mano con comando + exit code;
+- para cada **AC de detección**, las **tres** corridas de su prueba por mutación (§10) con el comando y el exit code de cada una, más la mutación que se aplicó y se revirtió, copiada del contract — el runner tampoco las conoce: la mutación nace y muere dentro del trabajo del agente, así que si no queda escrita acá no queda escrita en ningún lado;
 - para ACs `manual-only`, pasos ejecutados y resultado observado;
 - impact set y rojos preexistentes de la base.
 
 El Execution Report del brief referencia este archivo; no lo duplica. **Evidencia ausente o sin exit codes = BLOCKER**: el reviewer no la infiere ni la asume.
+
+**Toda cifra citada en un reporte va con la salida del comando que la produce**, no con su resumen: el número que se escribe es el que imprimió esa corrida, pegado tal cual. Aplica a cualquier número que sostenga una afirmación — casos que pasaron, archivos escaneados, hallazgos, líneas cubiertas, tiempos. Una cifra copiada de otro documento (de un reporte anterior, del contract, de un mensaje) es una cita, no una medición: se re-corre el comando y se pega su salida, o no se escribe la cifra. Cifra sin su salida = `MAJOR` (§7.2), porque el reviewer no tiene cómo distinguir una medición de un recuerdo, y una cifra equivocada con cara de dato es más cara que no tener el dato.
 
 ---
 
@@ -148,9 +151,9 @@ El reviewer corre, en este orden, y todo hallazgo es objetivo:
 
 | Severidad | Qué cae acá | Efecto |
 |---|---|---|
-| `BLOCKER` | infidelidad al contract · AC sin test · gate rojo o sin evidencia · mitigación prohibida · secreto en código · SQL concatenado · código en la capa incorrecta | rechaza |
-| `MAJOR` | test que no asserta el comportamiento del AC (asserts vacíos, snapshot-only para lógica, mock que se testea a sí mismo) · caller impactado sin regresión ni justificación · error handling ausente frente al "expected behavior" del contract · lógica duplicada existiendo ya una implementación (viola el Reuse statement del Architectural Delta) | rechaza |
-| `MINOR` | naming inconsistente · dead code · comentario obsoleto · falta un edge case no exigido por ningún AC | no rechaza |
+| `BLOCKER` | infidelidad al contract · AC sin test · gate rojo o sin evidencia · **AC de detección sin las tres corridas de su prueba por mutación (§10)** · mitigación prohibida · secreto en código · SQL concatenado · código en la capa incorrecta | rechaza |
+| `MAJOR` | test que no asserta el comportamiento del AC (asserts vacíos, snapshot-only para lógica, mock que se testea a sí mismo) · **cifra reportada sin la salida del comando que la produce (§5)** · **hash del doc de gates distinto entre el reporte y el árbol cuando el cambio toca alguna fila de la escalera que corrió** · caller impactado sin regresión ni justificación · error handling ausente frente al "expected behavior" del contract · lógica duplicada existiendo ya una implementación (viola el Reuse statement del Architectural Delta) | rechaza |
+| `MINOR` | naming inconsistente · dead code · comentario obsoleto · **hash del doc de gates distinto entre el reporte y el árbol cuando el cambio no toca ninguna fila que corrió** · falta un edge case no exigido por ningún AC | no rechaza |
 | `ADVISORY` | SEO · sugerencias fuera del scope del brief · deuda técnica preexistente | no rechaza, informa |
 
 ### 7.3 Veredicto
@@ -164,6 +167,12 @@ El reviewer corre, en este orden, y todo hallazgo es objetivo:
 Implementar → review es un loop acotado: **3 rondas por brief**. Si la ronda 3 no cierra en `APPROVED`, el reviewer emite `ESCALATE` al planner con: qué hallazgo no se cierra, qué intentó el agente en cada ronda, y qué decisión falta. El planner ratifica contract, corta el scope, o lo eleva al gate humano de Feature Ready.
 
 Sin cota, el failure mode conocido aparece solo: en la ronda 5 el agente empieza a ablandar tests para salir del loop.
+
+### 7.5 Correcciones posteriores a `APPROVED`
+
+Un `APPROVED` cubre el diff que el reviewer leyó, no los que vengan después. Un diff que corrige un artefacto ya aprobado —código, documento, contract o la propia evidencia— **vuelve al loop**: se revisa como el cambio original, con la misma Fase 1 mecánica (§7.1), las mismas severidades (§7.2) y su propio veredicto. No existe la categoría "arreglo chico post-review" que saltee la review.
+
+Razón medida, no principio: en este método el defecto caro rara vez entra al escribir — entra al corregir. Un fix apurado de un `MINOR` que agrega una exclusión por path y deja el gate ciego a un directorio entero, una evidencia regenerada contra un árbol que ya no es el que se verificó, un documento "aclarado" que de paso cambia la regla que gobierna los gates: los tres se ven inofensivos y ninguno pasa por review, porque el veredicto ya estaba puesto.
 
 ---
 
@@ -193,3 +202,45 @@ El método de este archivo es agnóstico. Las reglas con forma de lenguaje viven
 - **SQL**: siempre parametrizado, nunca concatenación de strings.
 
 Si el stack del repo no tiene perfil escrito, el gate mínimo sigue siendo el de §4 y las prohibiciones de §6 aplican con el equivalente del lenguaje.
+
+## 10. Prueba por mutación (AC de detección)
+
+Un control que no puede ponerse rojo no es un control: es una afirmación. Medición que funda esta sección — cuatro controles de un mismo proyecto tenían forma de control y ningún poder: un test de partición que no ejecutaba nada y salía 0 con y sin violación; una comparación donde 4 de 25 casos comparaban un build contra una copia de sí mismo; un criterio que exigía `LEFT JOIN` y pasaba igual con `INNER`, porque el lookup contiene las claves sin familia; y una guarda de autoría verdadera siempre. Ninguno era un error de lógica: los cuatro se veían bien y no podían fallar. Los cuatro aparecieron recién cuando alguien rompió el sistema a propósito para ver si el control se daba cuenta.
+
+### 10.1 Qué AC lo requiere (criterio de clasificación)
+
+Un AC es **de detección** cuando su condición de aprobación es *"algo falla cuando X está mal"*. Las cuatro formas, cerradas:
+
+1. **Rechazo** — el AC exige una reacción negativa ante un estado incorrecto: error, denegación, exit ≠ 0, 4xx, constraint violada, build roto.
+2. **Hallazgo** — el AC exige que un control reporte lo que encuentra: scanner, linter, validador, guarda.
+3. **Ausencia** — el AC afirma que algo *no* está: "ninguno contiene X", "cero coincidencias", "ningún caller quedó sin cobertura". Un chequeo de ausencia que busca algo inexistente pasa siempre, y sigue pasando el día que el defecto aparece.
+4. **Sensibilidad** — el AC afirma que dos salidas difieren cuando la entrada difiere. Un valor constante satisface todo el resto del AC.
+
+Un AC **no** es de detección —y entonces esta sección no le aplica— cuando su condición de aprobación es un resultado producido ante una entrada válida:
+
+1. **Valor devuelto o artefacto producido**: "devuelve 201 con el `id`", "el encabezado estampa el hash del árbol", "el archivo contiene la fila del gate". Ya es falsable por construcción: si la implementación no lo produce, el test se pone rojo solo.
+2. **Fallback declarado**: "sin el binario X, degrada al valor Y y sigue con el exit code de los gates". El resultado esperado sigue siendo un valor producido; el entorno degradado es la entrada del caso, no un defecto que haya que atrapar.
+
+**Desempate (regla dura, misma dureza que las closure rules del contract)**: un AC que cae en las dos listas está mal escrito — se parte en dos ACs, uno por condición de aprobación (§2: si necesita dos tests, son dos ACs). La duda no la resuelve el implementador ni el reviewer: si dos ingenieros clasificarían distinto el mismo AC, el defecto es del AC y vuelve al planner.
+
+Por qué el criterio es angosto y no "todo AC": la regla lleva de una corrida a tres cada AC que entra. Un AC de valor devuelto que entra por las dudas triplica el costo sin comprar nada, porque ese AC no puede pasar vacío.
+
+### 10.2 La mutación la declara el contract
+
+Cada AC de detección lleva escrita **en el contract, debajo del AC**, la mutación exacta que lo prueba: qué se rompe, dónde, y qué queda revertido después. La escribe el planner en el mismo acto en que escribe el AC; el implementador la ejecuta tal cual y registra las corridas. Un AC de detección sin mutación declarada es un contract incompleto: el implementador queda `BLOCKED` y pregunta, nunca la inventa por su cuenta — inventarla es cerrar una decisión que el contract dejó abierta.
+
+La mutación se aplica sobre el sistema que el AC vigila (el código, el dato, el archivo), **nunca sobre el test**: aflojar el test para verlo fallar es la mitigación prohibida §6.2 con otro nombre, y no prueba nada sobre el control.
+
+### 10.3 La evidencia: el triple
+
+Tres corridas del mismo comando, con su exit code cada una — el triple **verde → rojo → verde**: **verde con el sistema intacto, rojo con la mutación aplicada, verde otra vez tras revertirla**.
+
+| # | Estado del sistema | Resultado exigido | Qué descarta |
+|---|---|---|---|
+| 1 | intacto | verde | un control que rechaza siempre: el rojo permanente detecta lo mismo que un reloj parado |
+| 2 | con la mutación aplicada | rojo | un control sin poder: el que produce la misma salida con el defecto y sin él |
+| 3 | mutación revertida | verde | que el rojo del paso 2 haya venido de otra cosa que se rompió en el camino |
+
+El rojo solo no alcanza, porque un control permanentemente roto produce la misma salida que uno correcto; el verde solo tampoco, porque es exactamente lo que produce un control tautológico. Las tres corridas van al verification report a mano, con el comando literal y el exit code de cada una (§5).
+
+**Bugfix**: es el mismo triple con la primera corrida ya gastada. La mutación no hay que aplicarla —el bug es la mutación y ya está en el árbol—, así que la evidencia son las dos corridas del ítem 5 de la DoD: rojo con el bug, verde con el fix. Un bugfix no necesita una tercera corrida.
