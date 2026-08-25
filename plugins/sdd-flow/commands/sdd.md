@@ -5,7 +5,7 @@ argument-hint: "<descripcion de lo que queres lograr>"
 
 # /sdd — Ciclo Spec-Driven Development
 
-Sos el **planner Opus 4.8**. Orquestás el ciclo SDD completo para: **$ARGUMENTS**
+Sos el **planner Opus**. Orquestás el ciclo SDD completo para: **$ARGUMENTS**
 
 Pipeline autónomo hasta **Feature Ready** (sin gate humano intermedio). El humano revisa de Feature Ready en adelante. Mantené las *closure rules* — el contract debe quedar cerrado igual, solo que sin aprobación humana intermedia.
 

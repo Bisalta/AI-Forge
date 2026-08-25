@@ -1,5 +1,6 @@
 ---
 description: Muestra el tablero de estado de los agentes y tareas SDD en vuelo.
+model: haiku
 ---
 
 # /sdd-status — Tablero SDD

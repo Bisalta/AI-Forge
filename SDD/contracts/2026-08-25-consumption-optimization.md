@@ -1,10 +1,32 @@
 # HLTC — sdd-flow · optimización de consumo (GEN-101)
 
-**Versión**: v3 · **Fecha**: 2026-08-25 · **Planner**: Opus 5
+**Versión**: v5 · **Fecha**: 2026-08-25 · **Planner**: Opus 5
 **Estado**: auto-aprobado (modo multi-agente, `sdd-plan` Fase A)
 **Branch**: `refactor-GEN-101-optimizacion-consumo` · base `origin/prod`
 
 ## Ratificaciones
+
+- **v5** (durante la ejecución de R2, disparada por el propio AC10): el grep de AC10 devolvía
+  dos hits, y los dos eran **la regla citando lo que prohíbe** — la sección Modelos de
+  `base-standards.md` y la convención de `CLAUDE.md` nombran `claude-opus-4-8` para
+  prohibirlo. Es la **tercera aparición** de la clase de `SDD/debt.md` D10/D11, y la primera
+  en un AC en vez de en un script. Se resuelve con la técnica que `sdd-lint-contract.sh` ya
+  usa (`grep -qiE 'prohibido|closure|banned'`): saltear la línea que lleva lenguaje de
+  prohibición. **Por línea, nunca por archivo** — excluir archivos enteros ciega el chequeo,
+  que es la lección de D6. El triple de mutación de AC10 prueba que no lo ciega: 0 hits
+  limpio, 1 hit con una violación inyectada.
+  **Límite declarado**: una violación escrita en la MISMA línea que lenguaje de prohibición
+  se pierde. Es angosto y conocido; no se corrige.
+
+- **v4** (self-review del planner, antes de ejecutar R3): la decisión de R3 nombraba tres
+  artefactos para `haiku` pero el Architectural Delta listaba dos — `sdd-fixes` aparecía en la
+  prosa y no en el Delta. Resuelto **sacándolo**, no agregándolo: su triage declara las
+  mutaciones de los ACs de detección, que es una decisión de planner. Tercer defecto de plan
+  del ciclo detectado antes de despachar.
+- **v4b** — R2 gana una excepción explícita a la regla de tier: el trailer `Co-Authored-By:`
+  de un commit y el `CHANGELOG.md` **sí** llevan el modelo exacto. Registran un hecho pasado
+  en vez de seleccionar un modelo futuro, y son las dos formas donde borrar la versión
+  destruiría información en vez de evitar que envejezca.
 
 - **v3** (durante la ejecución de R4, disparada por AC6): el chequeo de `concerns:` sólo
   aceptaba la forma YAML, y el contract de GEN-94 declara sus concerns en prosa
@@ -240,7 +262,7 @@ y la línea `Co-Authored-By: Claude Opus 4.8`, que es la misma clase de defecto.
 
 | # | Criterio |
 |---|---|
-| AC10 | `grep -rniE 'opus 4\.8\|sonnet 4\.6\|claude-opus-4-8\|claude-sonnet-4-6' plugins/ CLAUDE.md` no devuelve ninguna línea fuera de `CHANGELOG.md` y `docs/specs/`. |
+| AC10 | El grep de versiones pinneadas sobre `plugins/` y `CLAUDE.md`, **excluyendo las líneas que citan la regla** (las que llevan `defecto`, `prohibi`, `nunca versión` o `envejece`), no devuelve ninguna línea. La exclusión es por línea, no por archivo. |
 | AC11 | `base-standards.md` contiene la regla tier-nunca-versión en una sección propia. |
 | AC12 | El frontmatter de `implementing-agent.md` sigue siendo `model: sonnet` y el de `reviewer-agent.md` `model: opus`, sin cambios. |
 
@@ -277,9 +299,15 @@ frontmatter, aunque tres de ellos son mecánicos y de contexto acotado.
 
 ## Decisión de diseño (cerrada)
 
-**Tres skills pasan a `model: haiku` en frontmatter**: `write-pr-report`, `sdd-status` y el
-triage de `sdd-fixes`. Los tres leen poco, no deciden arquitectura y su salida es verificable
-de un vistazo.
+**Dos artefactos pasan a `model: haiku` en frontmatter**: `write-pr-report` y `sdd-status`.
+Leen poco, no deciden arquitectura y su salida es verificable de un vistazo.
+
+**`sdd-fixes` queda en el default, y la razón importa**: su triage es el único momento en que
+alguien mira un ítem antes de arreglarlo, y ahí es donde se llena el campo `Mutación:` de los
+ACs de detección (`commands/sdd-fixes.md`). Declarar una mutación es una decisión de planner —
+el contract lo dice explícito para la vía larga y la vía corta no cambia quién tiene la
+autoridad, sólo dónde se ejerce. Bajarlo a `haiku` delegaría a un tier barato exactamente lo
+que el resto del plugin prohíbe delegar.
 
 **El criterio de «brief trivial» se escribe cerrado y enumerativo** en `standards/archetypes.md`.
 Un brief es trivial cuando cumple **las cuatro** condiciones: toca ≤2 archivos · no agrega
@@ -293,7 +321,6 @@ detección. Si falla una, no es trivial. La duda resuelve a no-trivial.
 | Archivo | Cambio |
 |---|---|
 | `plugins/sdd-flow/skills/write-pr-report/SKILL.md` | `model: haiku` en frontmatter |
-| `plugins/sdd-flow/skills/sdd-seo/SKILL.md` | sin cambio — audita, no reporta |
 | `plugins/sdd-flow/commands/sdd-status.md` | `model: haiku` en frontmatter |
 | `plugins/sdd-flow/standards/archetypes.md` | Fila nueva: criterio de brief trivial (4 condiciones) |
 | `plugins/sdd-flow/skills/sdd-plan/SKILL.md` | Línea 83: apuntar al criterio en vez de decir «si trivial» |

@@ -5,7 +5,7 @@ description: Planner Opus para SDD. Convierte un requerimiento decision-closed e
 
 # SDD Planner (Opus)
 
-Sos el planner. **No implementás código.** Producís dos artefactos: el HLTC y los task briefs. Corré preferentemente en **Opus 4.8** (`claude-opus-4-8`).
+Sos el planner. **No implementás código.** Producís dos artefactos: el HLTC y los task briefs. Corré preferentemente en **Opus** — el tier, no una versión (ver `standards/base-standards.md`, sección Modelos).
 
 ## Antes de planear
 1. Leé `SDD/docs/doc_architecture.md`, `SDD/docs/doc_verification_guide.md` y `SDD/docs/doc_quality_gates.md` de cada repo involucrado. Si no existen, corré el comando `/sdd-init` del plugin para bootstrapearlos (deriva o entrevista) en vez de dejar el HLTC bloqueado. Sin `doc_quality_gates.md` no podés escribir validation steps con comandos reales — los inventarías.
@@ -80,7 +80,7 @@ Por cada `AGENT_{uuid}` (repo + branch + working-dir):
 - Objective + out-of-scope · prerequisites · files to create/update
 - **Los ACs que le tocan, con su ID original del HLTC** (`AC2`, `AC5`… no renumerados). Un AC pertenece a exactamente un agente: si dos lo tocan, se parte en dos ACs.
 - Pasos en fases con task IDs estables: `- [ ] T<fase>.<i> Descripción` (una acción verificable por checkbox; no fusionar acciones).
-- **Modelo asignado**: `sonnet` default · `opus` si pesada/arquitectónica · `haiku` si trivial.
+- **Modelo asignado**: `sonnet` default · `opus` si pesada/arquitectónica · `haiku` si el brief es **trivial** según el criterio cerrado de `standards/archetypes.md` (las cuatro condiciones, todas). No lo estimes a ojo: «trivial» sin criterio es lo que hizo que el slot nunca se usara.
 - Validation steps: los comandos reales de `SDD/docs/doc_quality_gates.md` (nunca inventados) + expected outcome + required/optional.
 - Self-check loop antes de entregar · Risks · Rollback · Done criteria.
 - `Execution Report` vacío al final (Summary / Task Status / Validation Executed / Blockers / Files Changed / Final Statement).

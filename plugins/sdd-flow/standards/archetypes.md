@@ -130,6 +130,26 @@ Cubre el trabajo cuyo entregable es una conclusión o una cifra que alimenta una
 
 ---
 
+## Criterio de brief trivial (asignación de `haiku`)
+
+Un brief es **trivial** cuando cumple **las cuatro** condiciones. Si falla una, no es trivial.
+La duda resuelve a no-trivial.
+
+| # | Condición |
+|---|---|
+| 1 | Toca **≤2 archivos** |
+| 2 | **No agrega dependencias** |
+| 3 | Su arquetipo es `refactor`, `infra` o `bugfix` |
+| 4 | **Ninguno de sus ACs es de detección** (`quality-gates.md` §10.1) |
+
+La cuarta es la que más filtra, y a propósito: un AC de detección exige el triple de mutación,
+que es donde un modelo barato falla caro — no por no saber aplicar la mutación, sino por no
+notar que las tres corridas salieron iguales (`SDD/retro.md` RT11).
+
+Este criterio existe porque «`haiku` si trivial» sin definición no se usó nunca: en el ciclo
+GEN-94 los seis agentes fueron `sonnet`×4 y `opus`×2, `haiku`×0. Un default sin criterio es un
+default que nadie ejerce.
+
 ## Cómo lo usa el pipeline
 
 1. **`enrich-user-story`** pregunta/confirma el arquetipo (dimensión obligatoria) y cierra las NFR que el arquetipo exige — bloque `nfr:` en el requerimiento.

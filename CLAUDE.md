@@ -17,7 +17,7 @@ Install para cualquier dev:
 
 ## El plugin sdd-flow — concepto
 
-Pipeline SDD: **planner Opus 4.8** cierra decisiones y corta tareas → **subagentes** las ejecutan (Sonnet default, Opus si pesada, Haiku si trivial) → coordinación file-based multi-repo con topología flexible `AGENT_{uuid}` (cada agente = repo + branch + working-dir).
+Pipeline SDD: **planner Opus** cierra decisiones y corta tareas → **subagentes** las ejecutan (Sonnet default, Opus si pesada, Haiku si trivial) → coordinación file-based multi-repo con topología flexible `AGENT_{uuid}` (cada agente = repo + branch + working-dir).
 
 ### Ciclo (basado en el "Ciclo de desarrollo SDD" de LIDR)
 ```
@@ -127,8 +127,8 @@ Los scripts versionan **independiente** del plugin a propósito: `sdd-init` usa 
 
 - **Versionado**: SemVer por plugin en su `plugin.json`. Bumpear + anotar en `CHANGELOG.md` (orden descendente) + commit/push. Marketplace no tiene versión propia.
 - **Plugin nuevo**: `plugins/<nombre>/.claude-plugin/plugin.json` + registrar en `marketplace.json` (`source: "./plugins/<nombre>"`).
-- **Modelos**: Opus 4.8 = `claude-opus-4-8`, Sonnet 4.6 = `claude-sonnet-4-6`, Haiku 4.5 = `claude-haiku-4-5-20251001`. En agents frontmatter alcanza con `opus`/`sonnet`/`haiku`.
-- **Commits**: convención Construplaza `[TIPO] [TICKET] [Módulo] [Descripción]` (ADD/FIX/REF/IMP/REM/REV/MOV/REL). Cerrar con `Co-Authored-By: Claude Opus 4.8`.
+- **Modelos**: el plugin declara **tier**, nunca versión — `opus` · `sonnet` · `haiku` en el frontmatter de agents, skills y commands. Los alias resuelven al último modelo de cada tier, así que escribir un ID con número (`claude-opus-4-8`) envejece solo y es un defecto. Detalle en `plugins/sdd-flow/standards/base-standards.md`, sección Modelos.
+- **Commits**: convención Construplaza `[TIPO] [TICKET] [Módulo] [Descripción]` (ADD/FIX/REF/IMP/REM/REV/MOV/REL). Cerrar con `Co-Authored-By: Claude <modelo> <noreply@anthropic.com>` — acá **sí** va el modelo exacto que hizo el trabajo. Es atribución de un hecho pasado, no configuración que envejece: la regla de tier gobierna lo que *selecciona* un modelo, no lo que *registra* cuál corrió.
 - **Branching (regla dura, aplica también a ESTE repo)**: todo trabajo (feature/fix/lo que sea) nace en branch nueva — NUNCA commits directos a `main` ni ramas normales. Elegir y confirmar la rama base antes de crear la branch (`<MODULO>-<TICKET>`, sin ticket `<MODULO>-<desc>`). Integración SOLO vía PR.
 - Idioma: bilingüe ES/EN, match al thread.
 
