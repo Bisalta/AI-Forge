@@ -107,9 +107,18 @@ Y **Opus 5 cuesta exactamente lo mismo que Opus 4.8**. Corregir la prosa **no ah
 
 **Haiku**: el techo es 200 K y el **67% de las sesiones corre sobre 150 K**. Entra donde el contexto es chico y el trabajo determinístico — `write-pr-report`, `sdd-status`, triage de `/sdd-fixes` — y en el implementing-agent cuando el brief es trivial. Ese slot (`haiku si trivial`) existe desde v0.1 y **nunca se usó**: en GEN-94 fueron sonnet×4, opus×2, **haiku×0**.
 
-### Palanca D — las sesiones en paralelo  ·  *fuera del plugin*
+### Palanca D — las sesiones en paralelo  ·  *sin verificar, todavía no es una palanca*
 
-44% del consumo ocurrió con 4+ sesiones simultáneas. Cada una carga su contexto completo. Es disciplina de trabajo, no código — se documenta y no se implementa.
+El panel de uso reporta **44% del consumo bajo "4+ sesiones en paralelo"** — pero a diferencia de A, B y C, esta cifra no tiene mecanismo de medición propio: se tomó del panel tal cual, sin desglose ni verificación independiente.
+
+**Revisión externa (Esteban Fait, Slack, 25-ago-2026) encontró el hueco antes de que se implementara nada sobre esta base**:
+
+- **La métrica es *this machine only*** (así lo declara el propio panel) — no puede estar midiendo colisión entre distintas personas de Bisalta corriendo `/sdd` a la vez, porque no ve otras máquinas. Esa lectura queda descartada por construcción, lo cual de paso evita el choque con la ambición de SDD multipersona (que alguien tenga ciclos corriendo mientras está fuera).
+- El panel separa "sesiones en paralelo" de "sesiones subagent-heavy" (27%, otra línea) — así que tampoco es necesariamente `max_parallel_agents` del propio orquestador. Es más consistente con una sola persona corriendo varios `claude` de proyectos distintos a la vez que con el orquestador fanning out.
+- **El punto más fuerte, y el que sigue sin respuesta**: si una sola persona concentra una fracción grande del gasto total de la organización con un perfil agéntico intensivo, y esa misma persona es también quien más corre en paralelo, "44% ocurre en paralelo" puede estar describiendo **dónde** está esa persona, no una causa independiente. Es el mismo confound que este diseño debería estar cazando, no reproduciendo.
+- Tampoco está resuelto si el costo ahí es de **input re-leído** (que el caché ya abarata, posiblemente incluso entre sesiones si el prefijo coincide dentro de la ventana) o de **output no compartible** (que nunca cachea) — sin esa distinción no se sabe si "paralelo" es desperdicio o sólo trabajo real corriendo más rápido.
+
+**No se implementa nada sobre D.** Queda como hipótesis sin verificar hasta que se mida con el mismo rigor que A/B/C: mecanismo propio, desglose, y control por el confound de *quién* antes de atribuirle causalidad a *cuántas sesiones*.
 
 ---
 
