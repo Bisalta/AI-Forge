@@ -1,10 +1,19 @@
 # HLTC — sdd-flow · optimización de consumo (GEN-101)
 
-**Versión**: v5 · **Fecha**: 2026-08-25 · **Planner**: Opus 5
+**Versión**: v6 · **Fecha**: 2026-08-25 · **Planner**: Opus 5
 **Estado**: auto-aprobado (modo multi-agente, `sdd-plan` Fase A)
 **Branch**: `refactor-GEN-101-optimizacion-consumo` · base `origin/prod`
 
 ## Ratificaciones
+
+- **v6** (ampliación tras segunda ronda de revisión externa de Esteban Fait, Slack, 26-ago-2026):
+  agrega **R6** — el ciclo original prometía "volver con el número" de ESCALATEs de plan en
+  ciclos futuros sin ningún mecanismo que no dependiera de que alguien se acordara de
+  re-derivarlo a mano. Esteban lo señaló con dos preguntas: (1) ¿la clasificación plan-vs-decisión
+  la hace el linter o hay que rehacer la arqueología cada vez? (2) ¿"un par de ciclos" tiene
+  fecha, dado que sólo hay 3 repos con ciclos SDD completos (AI-Forge, Odoo-Addons,
+  Documentos_Customer_Experience) y 3 personas usándolo? R6 responde con mecanismo, no con
+  promesa: ledger + tally script + regla del orquestador ya existente ampliada.
 
 - **v5** (durante la ejecución de R2, disparada por el propio AC10): el grep de AC10 devolvía
   dos hits, y los dos eran **la regla citando lo que prohíbe** — la sección Modelos de
@@ -56,6 +65,11 @@ rondas evitadas (escalón), contexto no cargado (lineal × turnos) y tier de mod
 - **Seccionar `quality-gates.md`, `archetypes.md` y `concerns.md`** (R5 del diseño). Bloqueado
   a la espera de revisión externa. Ningún AC de este contract se satisface tocando esos tres
   archivos, salvo `archetypes.md` para agregar una fila de tabla en R3.
+- **Propagar `escalations.md` y el tally a Odoo-Addons y Documentos_Customer_Experience** (R6).
+  Esos repos tienen su propia copia de los scripts del plugin (`/sdd-init` los copia versionados,
+  `--version` decide si actualiza) — no se editan desde acá. El checkpoint de R6 depende de que
+  esos repos re-sincronicen el plugin antes de esa fecha; si no lo hicieron, el tally de esos
+  dos repos sale vacío, no falso-cero — hay que decir "no propagado", no "0 eventos".
 - **Disciplina de sesiones en paralelo** (palanca D). Es workflow, no código.
 - **Bajar el tier del reviewer-agent o del planner.** Decisión cerrada en contra: en GEN-94
   seis de ocho defectos fueron del plan, y ambos roles son el detector.
@@ -415,3 +429,107 @@ archivo) · en el bucle de suma · queda revertido.
 | Las limitaciones están declaradas | Cumplido — mide contexto **estático**; no mide turnos ni contexto acumulado. Escrito en la cabecera del script |
 | La conclusión no excede lo que el dato sostiene | Cumplido — el script no concluye, reporta |
 | Potencia / significancia | `N/A` — no hay inferencia estadística; es un conteo exhaustivo, no una muestra |
+
+---
+
+# R6 — Ledger y tally de clasificación de ESCALATE
+
+## Problema
+
+El plan original para decidir R5 era "corré A, medí cuánto queda". Pero "cuánto queda" depende
+de saber cuántos `ESCALATE`/`REJECTED` de ciclos futuros son defecto de plan — y esa
+clasificación, hoy, no la produce nada mecánico. El "3 de GEN-94" salió de releer el contract y
+la retro a mano, después del hecho. Sin un mecanismo que no dependa de memoria, "vuelvo con el
+número" es una promesa sin dueño: nadie tiene el pendiente escrito en ningún lado que se revise
+solo.
+
+Segunda pregunta de Esteban: con sólo 3 repos con ciclos SDD completos (verificado por él
+mismo contra permisos de escritura: AI-Forge, Odoo-Addons, Documentos_Customer_Experience —
+`bisalta-implementaciones` tiene el doc de gates pero cero verification reports, no cuenta) y 3
+personas usando el plugin, "un par de ciclos" sin fecha puede no ocurrir en semanas sin que
+nadie lo note.
+
+## Decisión de diseño (cerrada)
+
+**Ledger dedicado, no una columna nueva en `SDD/retro.md`.** `retro.md` ya tiene 16 filas con
+celdas largas mezclando ESCALATEs, BLOCKEDs y hallazgos generales — retrofitear una columna
+ahí exige tocar las 16 filas existentes con una clasificación que hoy nadie verificó fila por
+fila, que es exactamente la falsa precisión que este mismo R6 existe para evitar. `SDD/escalations.md`
+es un archivo nuevo, de un solo propósito: un evento por fila, sólo `ESCALATE`/`REJECTED`/
+`blocked`-repetido, con `Clase` como campo cerrado y grepeable.
+
+**La clasificación GEN-94 se backfillea una vez, con el método declarado adentro del archivo**
+(grep de `ESCALATE|REJECTED` contra el historial de versiones del contract, cruzado contra las
+filas de retro que ya nombraban la causa raíz) — no se inventa ni se deja en blanco. A partir de
+ahí, **toda fila nueva la escribe el planner en el mismo acto de resolver el evento** (regla ya
+agregada a `commands/sdd.md`, sección Retro) — igual que `Mutación:` en quality-gates.md §10.
+
+**El tally es un conteo, no un clasificador.** `sdd-escalation-tally.sh` suma lo que la tabla ya
+dice; no infiere causa. Si una fila no tiene `Clase` reconocida, el script sale con código
+distinto de 0 y la nombra — silenciarla en el conteo sería el mismo defecto que `D6`
+(`secret-scan.sh`): un charset que deja pasar la forma que no anticipó.
+
+**No se propaga a los otros dos repos desde acá.** Cada repo tiene su propia copia versionada de
+los scripts del plugin. Este contract sólo puede tocar `AI-Forge`. El checkpoint (abajo) verifica
+si Odoo-Addons y Documentos_Customer_Experience ya la tienen antes de tallarlos — si no,
+reporta "no propagado", nunca "0 eventos" (0 eventos y "no tengo el mecanismo todavía" no son
+el mismo hecho, y confundirlos es otra forma de medición que no mide lo que dice medir).
+
+**Checkpoint con fecha real, no orgánico.** Tarea en Proxima (proyecto `GEN`, fase `Análisis`)
+con `startAt`/`endAt` fijos — visible en el tablero, no dependiente de que alguien recuerde este
+hilo de Slack.
+
+## Architectural Delta
+
+| Archivo | Cambio |
+|---|---|
+| `SDD/escalations.md` | **NEW** — ledger, formato y clase cerrados, backfill de GEN-94 (3 filas, las 3 `plan`) |
+| `SDD/scripts/sdd-escalation-tally.sh` | **NEW** — cuenta el ledger por Clase, detecta filas sin clasificar |
+| `plugins/sdd-flow/commands/sdd.md` | Regla de Retro ampliada: `ESCALATE`/`REJECTED` también escriben una fila en `escalations.md` |
+| Proxima (proyecto `GEN`) | Tarea nueva: checkpoint con fecha para tallar los 3 repos |
+
+## Acceptance criteria
+
+| # | Criterio |
+|---|---|
+| AC21 | `SDD/escalations.md` existe, tiene exactamente 3 filas de evento (`E1`-`E3`), las 3 del ciclo `sicop-hardening`, las 3 con `Clase: plan`. |
+| AC22 | `sdd-escalation-tally.sh --version` imprime `sdd-escalation-tally 0.1.0` y sale 0. |
+| AC23 | `sdd-escalation-tally.sh` contra `SDD/escalations.md` imprime `TOTAL 3` y `plan 3` (`decisión`/`medición`/`otro` en 0), exit 0. |
+| AC24 | Una fila del ledger con `Clase` vacía o fuera del enum cerrado hace que el script salga con código 3 y nombre esa fila — no la cuenta en silencio como ninguna categoría. |
+| AC25 | `commands/sdd.md`, regla de Retro, referencia `SDD/escalations.md` y `sdd-escalation-tally.sh`. |
+| AC26 | Existe una tarea en Proxima (proyecto `GEN`) con `startAt` en el futuro, cuyo título nombra el checkpoint de R6. **Satisfecho**: `GEN-102`, `startAt` 2026-09-22T14:00:00-06:00, título "Checkpoint R6 — tallar ESCALATE de plan en AI-Forge, Odoo-Addons y Documentos_Customer_Experience". |
+
+**AC de detección** (`quality-gates.md` §10): AC23 y AC24 afirman que el tally **cuenta
+correctamente** y **detecta** clasificación ausente, respectivamente.
+
+> **Mutación (AC23)**: sobre una copia del ledger, agregar una cuarta fila `E4` con
+> `Clase: decisión` · antes del backfill note · queda revertida. El triple prueba que el
+> conteo responde a lo que el archivo dice, no a un `3` fijo en el script.
+
+> **Mutación (AC24)**: sobre una copia del ledger, vaciar el campo `Clase` de la fila `E2`
+> (dejarlo `|  |`) · en la fila de `E2` · queda revertida. El triple prueba que una fila sin
+> clasificar se reporta, no se pierde en el total.
+
+AC21, AC22, AC25 y AC26 no son de detección: afirman un estado observable (contenido de un
+archivo, una cadena de versión, una referencia presente, una tarea creada), no una condición que
+el sistema deba fallar bajo mutación.
+
+## AC ↔ test binding
+
+| AC | Test |
+|---|---|
+| AC21 | `SDD/tests/test_escalation_ledger.sh` → `test_backfill_gen94_completo` |
+| AC22 | `SDD/tests/test_escalation_ledger.sh` → `test_version` |
+| AC23 | `SDD/tests/test_escalation_ledger.sh` → `test_tally_cuenta_correcto` |
+| AC24 | `SDD/tests/test_escalation_ledger.sh` → `test_tally_detecta_clase_ausente` |
+| AC25 | `SDD/tests/test_escalation_ledger.sh` → `test_regla_retro_ampliada` |
+| AC26 | Verificación manual contra la respuesta de `proxima_create_task` (arquetipo `infra`; Proxima no tiene test de repo — el binding es el `id`/`key` devuelto, pegado en el verification report) |
+
+## Checklist del arquetipo `refactor`
+
+| Ítem | Estado |
+|---|---|
+| El comportamiento observable no cambia | **No aplica tal cual** — agrega un archivo y un paso a una regla existente; no modifica comportamiento previo. El paso nuevo es aditivo: si algún ciclo no genera `ESCALATE`, no escribe nada distinto a hoy |
+| Cobertura previa al cambio | `N/A` — no existía este mecanismo antes; no hay comportamiento previo que preservar |
+| Sin cambio de interfaz pública | Cumplido — no toca `orchestration.md` §2 (el contrato `sdd.result`/`sdd.review`) |
+| Alcance acotado y declarado | Cumplido — 2 archivos nuevos + 1 línea ampliada + 1 tarea Proxima |

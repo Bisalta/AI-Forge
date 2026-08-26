@@ -59,7 +59,7 @@ Ejecutá los briefs según `orchestration.md` §4:
 - **Ningún brief cierra sin evidencia**: escalera de gates corrida (`quality-gates.md` §4) y `verification.md` escrito con comando + exit code por gate. Un `done` sin evidencia lo tratás como no hecho, aunque el Execution Report diga verde.
 - **Ningún AC sin test**: la tabla `AC ↔ test binding` del brief tiene que estar completa, con nombres de test que existen literal.
 - Agente bloqueado (decisión no resuelta, o un gate que no pasa sin ablandar un test) → **BLOCKED → te pregunta, no adivina** → actualizás contract/spec → re-spawneás con la decisión en el brief. Un blocked NO consume ronda de review. Mismo gate rojo 2 veces con el mismo error → `blocked`, no tercer intento idéntico.
-- **Retro**: cada `ESCALATE` resuelto, blocker repetido o prerequisito no documentado → una línea en `SDD/retro.md` (`orchestration.md` §6).
+- **Retro**: cada `ESCALATE` resuelto, blocker repetido o prerequisito no documentado → una línea en `SDD/retro.md` (`orchestration.md` §6). Si el evento fue un `ESCALATE` o un `REJECTED` que forzó ratificación de contract, además una fila en `SDD/escalations.md` con su `Clase` (`plan` · `decisión` · `medición` · `otro`) — decidida en el mismo acto de resolverlo, no después releyendo el ciclo. `SDD/scripts/sdd-escalation-tally.sh` la cuenta; nadie re-deriva el número a mano.
 - Si `seo.applies == true`, el reviewer-agent adjunta una sección **SEO (advisory)** al testing/PR report. No bloquea Feature Ready.
 
 ### 5. FEATURE READY → PARÁ
