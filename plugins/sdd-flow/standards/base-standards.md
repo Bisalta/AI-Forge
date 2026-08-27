@@ -48,6 +48,42 @@ Proxima es ortogonal a la capa de integración: puede haber tracking Proxima en 
 - **Integración** según capa: con remote → **PR** (a CODEOWNERS) hacia la base; sin remote → **merge local `--no-ff`** tras review. Tests verdes obligatorio en ambas. Nunca commit directo a la base.
 - **Cierre Proxima**: la tarea/subtask pasa a `done` **cuando se integra** (PR mergeado, o merge local hecho) — no antes. Solo el planner llama al MCP `proxima`; los implementing-agents reportan estado/integración por el canal file-based.
 
+## Modelos (tier, nunca versión)
+
+El plugin declara **tier**, nunca versión. En el frontmatter de agents, skills y commands va
+`opus`, `sonnet` o `haiku` — nada más. Los alias resuelven al último modelo de cada tier, así
+que se mantienen al día solos.
+
+**Nota de verificación** (agregada tras revisión externa, GEN-101): que el harness honre
+`model:` en el frontmatter de un **agent** o un **command** es superficie establecida. Que lo
+honre en el frontmatter de un **skill** cuando ese skill se invoca indirectamente (un command
+sin `model:` propio que a su vez llama al skill) no está verificado en este repo. Por eso,
+donde un skill de tier barato tiene también un command que lo invoca (ej. `write-pr-report` ↔
+`/sdd-pr`), **el command declara su propio `model:` en vez de asumir que hereda el del skill**
+— defensivo, no una confirmación de que la herencia funciona.
+
+**Un identificador de modelo con número de versión en cualquier archivo del plugin es un
+defecto** (`claude-opus-4-8`, `claude-sonnet-4-6`, «Opus 4.8», «Sonnet 4.6»). No porque el
+modelo sea peor, sino porque el archivo empieza a mentir el día que sale el siguiente y nadie
+lo nota: el alias sigue resolviendo bien mientras la prosa dice otra cosa.
+
+Dos excepciones, ambas por la misma razón — registran un hecho pasado en vez de seleccionar
+un modelo futuro:
+
+- El trailer `Co-Authored-By:` de un commit, que atribuye el trabajo al modelo que lo hizo.
+- El `CHANGELOG.md` y los design specs, que narran qué pasó y cuándo.
+
+Asignación por tarea (la decide el planner, `sdd-plan` Fase B):
+
+| Tier | Cuándo |
+|---|---|
+| `opus` | Planner y reviewer, siempre. Tarea pesada o arquitectónica. |
+| `sonnet` | Default de todo implementing agent. |
+| `haiku` | Trabajo mecánico de contexto acotado, y briefs triviales según el criterio cerrado de `archetypes.md`. |
+
+**El reviewer no baja de `opus`.** Es el detector: en el ciclo GEN-94 encontró ocho defectos y
+seis eran del plan, no del código. Abaratarlo ahorra en el único lugar donde el error es caro.
+
 ## AI agent behavior
 - Scope acotado al task brief. Escalá (BLOCKED) ante decisión faltante — no adivines.
 - Confirmá operaciones destructivas.

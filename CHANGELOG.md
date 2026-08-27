@@ -12,6 +12,24 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ## sdd-flow
 
+### 0.12.0 — 2026-08-27
+
+Validación de consumo del propio plugin (`GEN-101`), a pedido de Gabriel tras medir una sesión
+real de `/sdd`: **87% de la factura de Opus no era razonamiento, era contexto re-leído** (96%
+de cache hit ya agotado). Cuatro requerimientos de ahorro + uno de instrumentación, con revisión
+externa de Esteban Fait sobre el diseño y tres rondas de `reviewer-agent` sobre el código —
+la tercera terminó en `ESCALATE` (cap de rondas alcanzado, `quality-gates.md` §7.4); Gabriel
+decidió ratificar aceptando 15 puntos de deuda documental (`SDD/debt.md` D16-D30) en vez de una
+cuarta ronda — ninguno afecta código en ejecución, todos son prosa de contract/evidencia
+desincronizada que una ronda de fixes reemplaza por otra en un lugar distinto. Detalle completo
+en `SDD/contracts/2026-08-25-consumption-optimization.md` (v1→v9) y `SDD/retro.md` (RT1-RT21).
+
+- **El linter detecta secciones obligatorias ausentes.** `sdd-lint-contract.sh` (0.10.0→0.12.0) suma un tercer chequeo, cerrado y enumerativo, con dos ámbitos — contract (`Objective`, `Out of scope`, `Threat model`, declaración de `concerns`) y requerimiento (`Architectural Delta`, `Acceptance criteria`, `Checklist del arquetipo`). Motivo medido: en `GEN-94` un contract sin threat model se auto-aprobó y el defecto costó una ronda entera de review — un grep lo detecta antes. Acepta la declaración de concerns en sus dos formas reales (YAML y prosa `**Concerns**: ...`, y ahora también blockquote/tabla) — aceptar sólo una forma marca en rojo un contract válido.
+- **El plugin declara tier, nunca versión.** La prosa nombraba `Opus 4.8` a mano en cinco lugares; los agents siempre usaron alias de tier (`opus`/`sonnet`/`haiku`) y ya corrían el último modelo de cada tier en runtime — lo desactualizado era sólo la prosa, y corregirla no cambia comportamiento ni ahorra nada por sí sola. Regla escrita una vez en `standards/base-standards.md`, con dos excepciones explícitas (el trailer `Co-Authored-By:` de un commit, y `CHANGELOG.md`/design specs) que registran un hecho pasado en vez de seleccionar un modelo futuro.
+- **Haiku donde el contexto es chico.** `write-pr-report` y `sdd-status` bajan a `model: haiku`; el slot "haiku si trivial" del implementing-agent — sin uso desde v0.1 — gana un criterio cerrado de cuatro condiciones en `standards/archetypes.md`. El reviewer y el planner no bajan de tier: en `GEN-94`, seis de ocho defectos que el review encontró eran del plan, no del código.
+- **Ledger de clasificación de eventos contables.** `SDD/escalations.md` + `sdd-escalation-tally.sh` (nuevos, canónicos en `plugins/sdd-flow/scripts/` para que `/sdd-init` los propague a otros repos) reemplazan "vuelvo con el número" por un mecanismo: cada `ESCALATE`/`REJECTED`/`BLOCKED`-que-ratifica se clasifica (`plan`/`decisión`/`medición`/`otro`) en el mismo acto de resolverlo — definición cerrada en `standards/orchestration.md` §6.1 — y un script cuenta, no clasifica. Motivado por revisión externa de Esteban Fait sobre cómo se sabría, en ciclos futuros, si el linter de arriba realmente baja la tasa de defecto de plan.
+- **Instrumentación de contexto estático por rol.** `sdd-context-budget.sh` (nuevo, canónico) mide cuántos archivos y tokens aproximados carga cada rol (`planner`/`implementing`/`reviewer`) del ciclo SDD, derivando la lista **en vivo** por grep de los puntos de entrada de cada rol (forma prefijada y pelada de las citas a `standards/`) — no de una lista congelada. Es el insumo para decidir si conviene seccionar `quality-gates.md`/`archetypes.md`/`concerns.md` por rol, que queda fuera de este ciclo, bloqueado a revisión externa.
+
 ### 0.11.0 — 2026-08-13
 
 Seis cambios pedidos por **SICOP** y **Taller de Servicio** tras medir el proceso en producción, más el scaffold que este repo necesitaba para poder probarse a sí mismo. Todos atacan la misma familia de defecto: **un artefacto que afirma una propiedad que no puede sostener**. Salieron de un ciclo `/sdd` completo (`GEN-94`, PR #8), con veredicto `APPROVED` de review adversarial en los seis.

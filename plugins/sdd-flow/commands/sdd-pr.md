@@ -1,5 +1,6 @@
 ---
 description: Genera la descripcion de Pull Request a partir de los cambios actuales del repo.
+model: haiku
 ---
 
 # /sdd-pr — Pull Request Report

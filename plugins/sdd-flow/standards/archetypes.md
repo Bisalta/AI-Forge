@@ -130,6 +130,32 @@ Cubre el trabajo cuyo entregable es una conclusión o una cifra que alimenta una
 
 ---
 
+## Criterio de brief trivial (asignación de `haiku`)
+
+Un brief es **trivial** cuando cumple **las cuatro** condiciones. Si falla una, no es trivial.
+La duda resuelve a no-trivial.
+
+| # | Condición |
+|---|---|
+| 1 | Toca **≤2 archivos de fuente o test** (no cuenta el verification report ni evidencia — todo brief los escribe, así que contarlos haría que ningún brief fuera nunca trivial) |
+| 2 | **No agrega dependencias** |
+| 3 | Su arquetipo es `refactor` o `infra` |
+| 4 | **Ninguno de sus ACs es de detección** (`quality-gates.md` §10.1) |
+
+La cuarta es la que más filtra, y a propósito: un AC de detección exige el triple de mutación,
+que es donde un modelo barato falla caro — no por no saber aplicar la mutación, sino por no
+notar que las tres corridas salieron iguales (`SDD/retro.md` RT11).
+
+**`bugfix` no entra en la condición 3, a propósito** (corregido tras revisión externa, GEN-101):
+`quality-gates.md` §4 exige que la evidencia de un bugfix sea el par rojo→verde de su test de
+reproducción — el mismo modo de falla que la condición 4 existe para evitar (no notar que dos
+corridas no se distinguen). Admitir `bugfix` como trivial mientras la condición 4 lo excluye por
+la misma razón habría dejado el criterio tirando en dos direcciones para ese arquetipo.
+
+Este criterio existe porque «`haiku` si trivial» sin definición no se usó nunca: en el ciclo
+GEN-94 los seis agentes fueron `sonnet`×4 y `opus`×2, `haiku`×0. Un default sin criterio es un
+default que nadie ejerce.
+
 ## Cómo lo usa el pipeline
 
 1. **`enrich-user-story`** pregunta/confirma el arquetipo (dimensión obligatoria) y cierra las NFR que el arquetipo exige — bloque `nfr:` en el requerimiento.

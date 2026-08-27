@@ -17,7 +17,7 @@ Install para cualquier dev:
 
 ## El plugin sdd-flow — concepto
 
-Pipeline SDD: **planner Opus 4.8** cierra decisiones y corta tareas → **subagentes** las ejecutan (Sonnet default, Opus si pesada, Haiku si trivial) → coordinación file-based multi-repo con topología flexible `AGENT_{uuid}` (cada agente = repo + branch + working-dir).
+Pipeline SDD: **planner Opus** cierra decisiones y corta tareas → **subagentes** las ejecutan (Sonnet default, Opus si pesada, Haiku si trivial) → coordinación file-based multi-repo con topología flexible `AGENT_{uuid}` (cada agente = repo + branch + working-dir).
 
 ### Ciclo (basado en el "Ciclo de desarrollo SDD" de LIDR)
 ```
@@ -61,7 +61,7 @@ Empaqueta el skill personal `project-foundation` (que ya vivía en `~/.claude-pe
 AI-Forge/
 ├── .claude-plugin/marketplace.json   índice (owner: Bisalta Ltda)
 ├── plugins/sdd-flow/
-│   ├── .claude-plugin/plugin.json    v0.11.0
+│   ├── .claude-plugin/plugin.json    v0.12.0
 │   ├── commands/   sdd-init · sdd · sdd-enrich · sdd-contract · sdd-verify · sdd-status · sdd-pr · sdd-fixes · sdd-agents · sdd-seo
 │   ├── skills/     sdd-init · enrich-user-story · sdd-plan · sdd-verify · sdd-seo · write-pr-report
 │   ├── agents/     implementing-agent (sonnet) · reviewer-agent (opus)
@@ -77,7 +77,23 @@ AI-Forge/
 ├── CHANGELOG.md · README.md · .gitignore
 ```
 
-## Estado actual: v0.11.0 — la evidencia no puede mentir por descuido
+## Estado actual: v0.12.0 — el consumo se mide antes de prometerse
+
+**v0.12.0** (ciclo `/sdd` `GEN-101`, sin PR aún al escribir esto): Gabriel pidió validar el
+consumo de tokens del propio plugin tras ver la factura de una sesión real. Hallazgo: **87% de
+la factura de Opus no era razonamiento, era contexto re-leído** (96% de cache hit, ya agotado
+como palanca). Cuatro requerimientos de ahorro + uno de instrumentación — detalle completo en
+`CHANGELOG.md` 0.12.0 y en `SDD/contracts/2026-08-25-consumption-optimization.md` (v1→v9).
+
+- **El linter detecta secciones obligatorias ausentes** (`sdd-lint-contract.sh` 0.10.0→0.12.0) — el primero de tres huecos de plan que `GEN-94` había dejado pendientes (pendiente #1, abajo).
+- **Tier, nunca versión** — la prosa nombraba `Opus 4.8` a mano; los agents ya usaban alias de tier. Regla en `standards/base-standards.md`.
+- **Haiku donde el contexto es chico** — `write-pr-report`, `sdd-status`, y un criterio cerrado de 4 condiciones para el implementing-agent en `standards/archetypes.md`.
+- **Ledger de eventos contables** (`SDD/escalations.md` + `sdd-escalation-tally.sh`, canónicos) — clasificar `ESCALATE`/`REJECTED`/`BLOCKED`-que-ratifica deja de depender de que alguien se acuerde. Definición cerrada en `standards/orchestration.md` §6.1.
+- **Instrumentación de contexto por rol** (`sdd-context-budget.sh`, canónico) — mide qué carga cada rol, derivado en vivo, no congelado.
+
+**Lo que dejó el kilometraje de este ciclo**: la primera revisión adversarial de este plugin que no fue el propio planner revisándose a sí mismo. Tres rondas de `reviewer-agent`, la tercera terminó en `ESCALATE` (cap de `quality-gates.md` §7.4) — Gabriel decidió ratificar aceptando 15 puntos de deuda documental (`SDD/debt.md` D16-D30) en vez de una cuarta ronda. El hallazgo de fondo, distinto al de `GEN-94`: **el defecto no estaba en el código, estaba en la prosa que describe el código** — un valor corregido en un lugar (un script, un test) y no propagado a las otras citas de ese mismo valor (un AC adyacente, una tabla de Delta, `.sdd/state.json`, el propio verification report). La regla que la ronda 2 escribió para prevenirlo (`SDD/retro.md` RT20: "grep del valor viejo sobre el árbol completo antes de cerrar un fix") se aplicó en la ronda 3 y no evitó 9 instancias nuevas del mismo patrón, en archivos que esa regla no cubría porque no tenían el valor viejo — tenían una *referencia* a algo que había cambiado. Candidato de diseño que sale de acá, sin dueño ni fecha todavía: una herramienta que cruce cifras y paths entre contract, evidencia y `state.json`, porque tres rondas de disciplina manual más rápida no cerraron la clase.
+
+## Historial: v0.11.0 — la evidencia no puede mentir por descuido
 
 **v0.11.0** (PR #8, ciclo `/sdd` `GEN-94`): seis requerimientos pedidos por **SICOP** y **Taller de Servicio** tras medir el proceso en producción, más el `project-scaffold` que este repo necesitaba para poder probarse a sí mismo. Todos atacan la misma familia: **un artefacto que afirma una propiedad que no puede sostener**.
 
@@ -115,7 +131,7 @@ Los scripts versionan **independiente** del plugin a propósito: `sdd-init` usa 
 **Funciona de verdad**: bootstrap de docs (`sdd-init`), refinement (`enrich-user-story`), generación de contract (`sdd-plan`) y gates+evidencia (`sdd-verify`). Son prompts/skills reales. Componentes que **enforcean** sin depender de que el modelo obedezca: `hooks/guard-git.sh` y `scripts/sdd-check.sh`.
 
 **Pendiente**:
-1. ~~**Orquestador real `/sdd`**~~ — ✅ CERRADO en v0.11.0. El contrato se cerró en v0.9.0; el **kilometraje real** llegó con el ciclo `GEN-94`: seis requerimientos de punta a punta sobre este mismo repo, 42 ACs, 8 versiones de contract, tres `ESCALATE`/`REJECTED` resueltos. El parseo de `sdd.result` aguantó las 14 invocaciones sin un solo fallo. Lo que crujió está en `SDD/retro.md` (11 entradas) y `SDD/debt.md` (11 ítems), y varias entradas proponen ajustes concretos al plugin que **todavía no se implementaron** — en particular que `sdd-lint-contract.sh` detecte secciones obligatorias ausentes (hoy sólo mira frases y paths, y por eso un contract sin threat model se auto-aprobó) y que el self-review de `sdd-plan` verifique cada AC contra el out-of-scope de su propio requerimiento.
+1. ~~**Orquestador real `/sdd`**~~ — ✅ CERRADO en v0.11.0. El contrato se cerró en v0.9.0; el **kilometraje real** llegó con el ciclo `GEN-94`: seis requerimientos de punta a punta sobre este mismo repo, 42 ACs, 8 versiones de contract, tres eventos literalmente rotulados `ESCALATE`/`REJECTED` (una re-derivación más completa en `SDD/escalations.md`, hecha en GEN-101 y ampliada en su propia ronda 2 de review para incluir sus propios eventos, cuenta 8 — la definición de "evento contable" de `orchestration.md` §6.1 es más ancha que esas dos palabras literales). El parseo de `sdd.result` aguantó las 14 invocaciones sin un solo fallo. Lo que crujió está en `SDD/retro.md` y `SDD/debt.md`, y varias entradas propusieron ajustes concretos al plugin. **Actualizado en GEN-101 (v0.12.0)**: `sdd-lint-contract.sh` ya detecta secciones obligatorias ausentes (era la primera de tres propuestas). Las otras dos **siguen sin mecanismo** y quedaron registradas como deuda (`SDD/debt.md` D12): que el self-review de `sdd-plan` verifique cada AC contra el out-of-scope de su propio requerimiento, y que el Architectural Delta ubique bloques nuevos por la condición que deben cumplir, no por vecindad ("tras X").
 2. ~~**Bootstrap `AGENT_{uuid}`**~~ — ✅ CERRADO en v0.3.0 con `/sdd-agents`.
 3. ~~**statusline `state.json`**~~ — ✅ CERRADO en v0.9.0 (el orquestador lo escribe; la statusline muestra gates y ACs sin test).
 4. **Design doc formal** del plugin (el flujo de brainstorming quedó en diagrama, falta el doc en `docs/`).
@@ -127,8 +143,8 @@ Los scripts versionan **independiente** del plugin a propósito: `sdd-init` usa 
 
 - **Versionado**: SemVer por plugin en su `plugin.json`. Bumpear + anotar en `CHANGELOG.md` (orden descendente) + commit/push. Marketplace no tiene versión propia.
 - **Plugin nuevo**: `plugins/<nombre>/.claude-plugin/plugin.json` + registrar en `marketplace.json` (`source: "./plugins/<nombre>"`).
-- **Modelos**: Opus 4.8 = `claude-opus-4-8`, Sonnet 4.6 = `claude-sonnet-4-6`, Haiku 4.5 = `claude-haiku-4-5-20251001`. En agents frontmatter alcanza con `opus`/`sonnet`/`haiku`.
-- **Commits**: convención Construplaza `[TIPO] [TICKET] [Módulo] [Descripción]` (ADD/FIX/REF/IMP/REM/REV/MOV/REL). Cerrar con `Co-Authored-By: Claude Opus 4.8`.
+- **Modelos**: el plugin declara **tier**, nunca versión — `opus` · `sonnet` · `haiku` en el frontmatter de agents, skills y commands. Los alias resuelven al último modelo de cada tier, así que escribir un ID con número (`claude-opus-4-8`) envejece solo y es un defecto. Detalle en `plugins/sdd-flow/standards/base-standards.md`, sección Modelos.
+- **Commits**: convención Construplaza `[TIPO] [TICKET] [Módulo] [Descripción]` (ADD/FIX/REF/IMP/REM/REV/MOV/REL). Cerrar con `Co-Authored-By: Claude <modelo> <noreply@anthropic.com>` — acá **sí** va el modelo exacto que hizo el trabajo. Es atribución de un hecho pasado, no configuración que envejece: la regla de tier gobierna lo que *selecciona* un modelo, no lo que *registra* cuál corrió.
 - **Branching (regla dura, aplica también a ESTE repo)**: todo trabajo (feature/fix/lo que sea) nace en branch nueva — NUNCA commits directos a `main` ni ramas normales. Elegir y confirmar la rama base antes de crear la branch (`<MODULO>-<TICKET>`, sin ticket `<MODULO>-<desc>`). Integración SOLO vía PR.
 - Idioma: bilingüe ES/EN, match al thread.
 

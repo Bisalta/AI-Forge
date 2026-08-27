@@ -1,5 +1,6 @@
 ---
 name: write-pr-report
+model: haiku
 description: Generate a clean, human-readable Pull Request description from current repository changes. The output must be concise, structured, and reviewer-friendly, avoiding internal implementation noise.
 ---
 
