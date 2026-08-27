@@ -1,10 +1,37 @@
 # HLTC — sdd-flow · optimización de consumo (GEN-101)
 
-**Versión**: v8 · **Fecha**: 2026-08-25 · **Planner**: Opus 5
+**Versión**: v9 · **Fecha**: 2026-08-25 · **Planner**: Opus 5
 **Estado**: auto-aprobado (modo multi-agente, `sdd-plan` Fase A)
 **Branch**: `refactor-GEN-101-optimizacion-consumo` · base `origin/prod`
 
 ## Ratificaciones
+
+- **v9** (`ESCALATE` de la ronda 3 del reviewer — cap de 3 rondas alcanzado, `quality-gates.md`
+  §7.4; decisión de Gabriel Rojas entre las tres salidas que `ESCALATE` ofrece): **0 `BLOCKER`
+  quedan abiertos, 10 `MAJOR` y 5 `MINOR` se aceptan como deuda registrada** en vez de una
+  cuarta ronda de fixes.
+
+  Los 2 `BLOCKER` de la ronda 3 (B1: los triples de AC23/AC24 en el verification report citaban
+  `TOTAL 6` contra un ledger que ya tenía 8 filas; B2: la mutación declarada de AC23 en este
+  contract describía una fila `E7` que el test ya no ejecutaba, ejecutaba `E9`) **sí se
+  corrigieron** — son evidencia que afirmaba un número falso, la clase de defecto que este
+  plugin existe para atrapar. Re-capturados con salida real, ambos re-verificados.
+
+  Los 10 `MAJOR` y 5 `MINOR` restantes comparten una naturaleza distinta: son **prosa del
+  contract, del verification report o de `.sdd/state.json` desincronizada de la realidad**
+  (tablas de Delta con una fila de menos, una versión de script no propagada, un conteo
+  desactualizado) — ninguno hace que un test falle, un gate salga rojo, o el código en ejecución
+  se comporte distinto de lo verificado. Quedan en `SDD/debt.md` D16-D30, cada uno con qué dice
+  mal, dónde, y por qué es el mismo patrón.
+
+  **Por qué no una cuarta ronda**: la ronda 2 ya había escrito la regla (`SDD/retro.md` RT20:
+  "grep del valor viejo sobre el árbol completo antes de cerrar un fix") y aplicarla en la
+  ronda 3 no impidió que aparecieran 9 instancias nuevas del mismo patrón, en archivos que esa
+  regla no cubría porque el valor viejo no estaba ahí — estaba la *referencia* a algo que había
+  cambiado. Tres rondas produjeron la misma clase de hallazgo. Es evidencia de que falta una
+  herramienta que cruce cifras y paths entre contract, evidencia y `state.json` — no más
+  disciplina manual aplicada más rápido. Construir esa herramienta es trabajo nuevo, no parte de
+  este ciclo; queda como candidato de diseño, no como ítem de deuda con dueño y fecha.
 
 - **v8** (revisión adversarial independiente, `reviewer-agent` Opus, ronda 2 — segunda
   `REJECTED` consecutiva, cap de 3 rondas): 0 `BLOCKER` (los 4 de ronda 1 se confirmaron
@@ -566,9 +593,13 @@ hilo de Slack.
 **AC de detección** (`quality-gates.md` §10): AC23 y AC24 afirman que el tally **cuenta
 correctamente** y **detecta** clasificación ausente, respectivamente.
 
-> **Mutación (AC23)**: sobre una copia del ledger, agregar una séptima fila `E7` con
-> `Clase: decisión` · antes del backfill note · queda revertida. El triple prueba que el
-> conteo responde a lo que el archivo dice, no a un `6` fijo en el script.
+> **Mutación (AC23)**: sobre una copia del ledger, agregar una novena fila `E9` (el ledger real
+> ya tiene E1-E8; usar "E7" — como en v7 — colisionaría con la fila real) con `Clase: decisión`
+> · antes del backfill note · queda revertida. El triple prueba que el conteo responde a lo que
+> el archivo dice, no a un `8` fijo en el script. **(v9: esta nota describía la mutación de v7 —
+> séptima fila, "no a un 6 fijo" — que ya no es la que el test ejecuta desde que el ledger subió
+> a 8 filas. El código (`test_escalation_ledger.sh`) siempre tuvo la versión correcta; la
+> prosa del contract no se había sincronizado. Hallazgo de ronda 3, BLOCKER B2.)**
 
 > **Mutación (AC24)**: sobre una copia del ledger, vaciar el campo `Clase` de la fila `E2`
 > (dejarlo `|  |`) · en la fila de `E2` · queda revertida. El triple prueba que una fila sin

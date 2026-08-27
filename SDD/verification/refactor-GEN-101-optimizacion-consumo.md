@@ -225,27 +225,79 @@ El error de variable no asignada ocurre **dentro de una sustitución de comando*
 
 ### AC23 — el tally cuenta correcto, responde al archivo real
 
-- **Mutación declarada**: agregar una séptima fila `E7` con `Clase: decisión` a una copia · antes del backfill note · queda revertida.
+**Re-capturado en v9** (ronda 3, BLOCKER B1): la tabla de abajo hasta v8 mostraba `TOTAL 6` —
+quedó sin actualizar cuando `SDD/escalations.md` subió a 8 filas (E7, E8) en la propia
+corrección de v8. El reviewer de ronda 3 re-corrió los tres estados por su cuenta y confirmó
+que los números vigentes son los de abajo, capturados de nuevo el 27-ago-2026 contra el ledger
+real de 8 filas.
+
+- **Mutación declarada**: agregar una novena fila `E9` con `Clase: decisión` a una copia · antes del backfill note · queda revertida.
 
 | # | Estado | Resultado |
 |---|---|---|
-| 1 | intacto | `TOTAL 6` / `plan 6` / `decisión 0` |
-| 2 | mutante (copia con `E7`) | `TOTAL 7` / `plan 6` / `decisión 1` |
-| 3 | revertido (ledger real, nunca tocado) | `TOTAL 6` / `plan 6` / `decisión 0` |
+| 1 | intacto | `TOTAL 8` / `plan 8` / `decisión 0` |
+| 2 | mutante (copia con `E9`) | `TOTAL 9` / `plan 8` / `decisión 1` |
+| 3 | revertido (ledger real, nunca tocado) | `TOTAL 8` / `plan 8` / `decisión 0` |
+
+```
+--- 1) intacto ---
+TOTAL 8
+  plan       8
+  decisión   0
+  medición   0
+  otro       0
+exit=0
+--- 2) mutante (novena fila E9) ---
+TOTAL 9
+  plan       8
+  decisión   1
+  medición   0
+  otro       0
+exit=0
+--- 3) revertido ---
+TOTAL 8
+  plan       8
+  decisión   0
+  medición   0
+  otro       0
+exit=0
+```
 
 ---
 
 ### AC24 — detecta `Clase` ausente, no la pierde en el total
 
+**Re-capturado en v9** (ronda 3, BLOCKER B1) — mismo motivo que AC23: la tabla quedó en `TOTAL 6`
+tras el ledger subir a 8 filas.
+
 - **Mutación declarada**: vaciar el campo `Clase` de la fila `E2` en una copia · queda revertida.
 
 | # | Estado | Exit | Resultado |
 |---|---|---|---|
-| 1 | intacto | **0** | `TOTAL 6` / `plan 6` |
-| 2 | mutante | **3** | `TOTAL 6` / `plan **5**` / `INVALIDA 1 fila(s): E2(clase='')` |
-| 3 | revertido (ledger real) | **0** | `TOTAL 6` / `plan 6` |
+| 1 | intacto | **0** | `TOTAL 8` / `plan 8` |
+| 2 | mutante | **3** | `TOTAL 8` / `plan **7**` / `INVALIDA 1 fila(s): E2(clase='')` |
+| 3 | revertido (ledger real) | **0** | `TOTAL 8` / `plan 8` |
 
-La fila inválida **no** se cuenta como ninguna categoría (`plan` bajó de 6 a 5, no se movió a
+```
+--- 1) intacto ---
+TOTAL 8
+  plan       8
+  ...
+exit=0
+--- 2) mutante (Clase de E2 vaciada) ---
+TOTAL 8
+  plan       7
+  ...
+INVALIDA 1 fila(s) sin Clase reconocida: E2(clase='')
+exit=3
+--- 3) revertido ---
+TOTAL 8
+  plan       8
+  ...
+exit=0
+```
+
+La fila inválida **no** se cuenta como ninguna categoría (`plan` bajó de 8 a 7, no se movió a
 otra columna) — se reporta aparte, que es exactamente lo que AC24 exige.
 
 ---
