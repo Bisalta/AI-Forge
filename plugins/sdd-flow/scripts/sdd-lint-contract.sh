@@ -28,7 +28,7 @@
 
 set -uo pipefail
 
-VERSION="0.11.0"
+VERSION="0.12.0"
 [ "${1:-}" = "--version" ] && { echo "sdd-lint-contract $VERSION"; exit 0; }
 
 CONTRACT="${1:-}"
@@ -70,7 +70,7 @@ while IFS= read -r line; do
   _c="$trimmed"
   while :; do
     case "$_c" in
-      ' '*|'-'*|'#'*|'*'*) _c="${_c#?}" ;;
+      ' '*|'-'*|'#'*|'*'*|'|'*|'>'*) _c="${_c#?}" ;;
       *) break ;;
     esac
   done

@@ -1,10 +1,26 @@
 # HLTC — sdd-flow · optimización de consumo (GEN-101)
 
-**Versión**: v6 · **Fecha**: 2026-08-25 · **Planner**: Opus 5
+**Versión**: v7 · **Fecha**: 2026-08-25 · **Planner**: Opus 5
 **Estado**: auto-aprobado (modo multi-agente, `sdd-plan` Fase A)
 **Branch**: `refactor-GEN-101-optimizacion-consumo` · base `origin/prod`
 
 ## Ratificaciones
+
+- **v7** (revisión adversarial independiente, `reviewer-agent` Opus, ronda 1 de este ciclo —
+  la primera revisión que no fui yo mismo): veredicto `REJECTED`, 4 `BLOCKER` · 8 `MAJOR` · 6
+  `MINOR`. Los defectos no estaban en el código en ejecución — estaban en la **evidencia** (no
+  existía verification report del agente para ningún requerimiento; AC19 tenía una pata de
+  triple fabricada, reusando la variable de la primera corrida en vez de correr una tercera vez
+  — el mismo defecto exacto que RT11/RT15 existen para prevenir, reproducido en el mismo ciclo
+  que los escribió) y en el **plan** (R6 no llegaba a los otros 2 repos aunque se
+  sincronizaran, porque el mecanismo nunca se canonizó en el plugin; el backfill de GEN-94
+  contaba 3 eventos cuando eran 6, porque el método de búsqueda no podía ver eventos que no
+  usaran el literal "ESCALATE"/"REJECTED"; la cifra insignia de R1 subestimaba el rol reviewer
+  23,6% porque la lista de archivos estaba congelada en vez de derivada en vivo — exactamente lo
+  que su propia cabecera afirmaba hacer). Corregido punto por punto en esta versión; detalle en
+  cada sección (R1, R3, R4, R6) y en `SDD/retro.md` (RT18-RT21). Los 4 BLOCKER y 8 MAJOR quedan
+  resueltos acá; los 6 MINOR también, salvo dos que se registraron como deuda por ser límites
+  conocidos y angostos, no defectos a cerrar en este ciclo (`SDD/debt.md`).
 
 - **v6** (ampliación tras segunda ronda de revisión externa de Esteban Fait, Slack, 26-ago-2026):
   agrega **R6** — el ciclo original prometía "volver con el número" de ESCALATEs de plan en
@@ -64,7 +80,15 @@ rondas evitadas (escalón), contexto no cargado (lineal × turnos) y tier de mod
 
 - **Seccionar `quality-gates.md`, `archetypes.md` y `concerns.md`** (R5 del diseño). Bloqueado
   a la espera de revisión externa. Ningún AC de este contract se satisface tocando esos tres
-  archivos, salvo `archetypes.md` para agregar una fila de tabla en R3.
+  archivos, salvo `archetypes.md`, donde R3 agrega el criterio de brief trivial — una sección
+  normativa completa, no "una fila de tabla" como decía v6 (contradecía la propia Decisión de
+  diseño de R3 en el mismo contract; corregido en v7, hallazgo de revisión externa, MINOR 14).
+- **Las otras dos clases de defecto de plan que el diseño original nombraba para R4** — AC que
+  cruza su propio out-of-scope (self-review de `sdd-plan`), y Delta ubicado por vecindad en vez
+  de por condición — **no se implementaron**. R4 sólo entregó el chequeo de secciones ausentes.
+  La baja de scope no se había declarado en ningún lado (ni acá, ni en `SDD/debt.md`, ni en
+  `retro.md`) hasta que revisión externa lo encontró (MAJOR 12). Quedan como dos ítems de
+  `SDD/debt.md`, MAJOR, dueño Gabriel — no entran en este contract.
 - **Propagar `escalations.md` y el tally a Odoo-Addons y Documentos_Customer_Experience** (R6).
   Esos repos tienen su propia copia de los scripts del plugin (`/sdd-init` los copia versionados,
   `--version` decide si actualiza) — no se editan desde acá. El checkpoint de R6 depende de que
@@ -192,6 +216,7 @@ trabajo del reviewer, no del linter.
 | AC7 | `## Threat model (standards/security.md §6)` cuenta como presente — el sufijo anotado no produce falso BLOCKER. |
 | AC8 | `sdd-lint-contract.sh --version` imprime `sdd-lint-contract 0.11.0` y sale 0. La superficie de argv no cambia (concern `api-compat`). |
 | AC9 | Un contract con frase abierta **y** sección ausente reporta ambas y sale 2 una sola vez. |
+| AC27 | `concerns:` declarado como blockquote (`> **Concerns**: ...`) o como fila de tabla (`\| Concerns \| Estado \|`) no produce falso `BLOCKER` de `seccion-ausente`. **(v7 — hallazgo de revisión externa con fixtures propias, MINOR 19b: el strip-prefix sólo pelaba ' ', '-', '#', '*'; ahora también '\|' y '>'.)** |
 
 **AC de detección** (`quality-gates.md` §10): AC1, AC2, AC3, AC4, AC6, AC9 afirman que el
 linter **detecta** algo. Cada uno exige el triple verde → rojo → verde, con esta mutación
@@ -224,6 +249,7 @@ aprobación es un exit 0 observable. AC8 tampoco: afirma una cadena de salida.
 | AC7 | `SDD/tests/test_lint_contract_sections.sh` → `test_encabezado_anotado_no_falsea` |
 | AC8 | `SDD/tests/test_lint_contract_sections.sh` → `test_version_bump_y_argv` |
 | AC9 | `SDD/tests/test_lint_contract_sections.sh` → `test_frase_abierta_y_seccion_ausente` |
+| AC27 | `SDD/tests/test_lint_contract_sections.sh` → `test_concerns_formas_no_yaml` |
 
 ## Checklist del arquetipo `infra`
 
@@ -346,26 +372,30 @@ detección. Si falla una, no es trivial. La duda resuelve a no-trivial.
 | AC13 | `write-pr-report/SKILL.md` y `commands/sdd-status.md` tienen `model: haiku` en frontmatter, parseable como YAML. |
 | AC14 | `archetypes.md` contiene las cuatro condiciones de trivialidad, enumeradas. |
 | AC15 | `sdd-plan/SKILL.md` línea del modelo asignado referencia el criterio de `archetypes.md` y no contiene la palabra suelta «trivial» sin su definición. |
-| AC16 | `reviewer-agent.md` sigue en `model: opus`. Regresión sobre la decisión cerrada en contra. |
 
-**Mutación (AC16)**: cambiar `model: opus` a `model: haiku` en `reviewer-agent.md` ·
-frontmatter línea 4 · queda revertido.
+**AC16 se eliminó en v7** (hallazgo de revisión externa, MINOR 18): duplicaba AC12 palabra por
+palabra («`reviewer-agent.md` sigue en `model: opus`») y encima le declaraba mutación —
+`quality-gates.md` §10.1 reserva la mutación para ACs de detección, no para aserciones de
+contenido estático. AC12 (sección R2) ya cubre esta regresión, sin mutación, igual que
+AC21/AC22/AC25. Además: `write-pr-report/SKILL.md` invoca al harness de forma indirecta vía
+`/sdd-pr` — nada en este ciclo verificaba que `model:` en frontmatter de skill se herede a
+través de esa composición (MAJOR 11). Fix: `commands/sdd-pr.md` declara `model: haiku`
+directamente (nuevo en el Delta), sin asumir la herencia.
 
 ## AC ↔ test binding
 
 | AC | Test |
 |---|---|
-| AC13 | `SDD/tests/test_model_tier_policy.sh` → `test_skills_mecanicos_en_haiku` |
+| AC13 | `SDD/tests/test_model_tier_policy.sh` → `test_skills_mecanicos_en_haiku` (incluye la verificación de `commands/sdd-pr.md`) |
 | AC14 | `SDD/tests/test_model_tier_policy.sh` → `test_criterio_trivial_enumerado` |
 | AC15 | `SDD/tests/test_model_tier_policy.sh` → `test_sdd_plan_referencia_criterio` |
-| AC16 | `SDD/tests/test_model_tier_policy.sh` → `test_reviewer_sigue_en_opus` |
 
 ## Checklist del arquetipo `refactor`
 
 | Ítem | Estado |
 |---|---|
-| El comportamiento observable no cambia | **No cumplido, y es intencional** — tres skills cambian de modelo. El comportamiento que no cambia es el del reviewer y el planner (AC16) |
-| Cobertura previa al cambio | Cumplido — AC16 fija lo que no se mueve |
+| El comportamiento observable no cambia | **No cumplido, y es intencional** — tres artefactos cambian de modelo. El comportamiento que no cambia es el del reviewer y el planner (AC12) |
+| Cobertura previa al cambio | Cumplido — AC12 fija lo que no se mueve |
 | Sin cambio de interfaz pública | Cumplido — el frontmatter no es superficie de invocación |
 | Alcance acotado y declarado | Cumplido — los 5 archivos del Delta |
 
@@ -393,8 +423,11 @@ una cifra se bindea a la salida de la consulta que la re-deriva.
 
 ## Architectural Delta
 
-`SDD/scripts/sdd-context-budget.sh` — **NEW**. Lee las referencias a `standards/` de los
-artefactos de cada rol y suma el peso de los archivos citados.
+| Archivo | Cambio |
+|---|---|
+| `plugins/sdd-flow/scripts/sdd-context-budget.sh` | **NEW** (canónico, v0.2.0 tras v7 — v0.1.0 vivía sólo en `SDD/scripts/`, sin propagar). Deriva `FILES` en vivo grepeando `standards/` de los puntos de entrada de cada rol, no de una lista congelada — v0.1.0 tenía la lista hardcodeada y le faltaban `archetypes.md` y `seo-frontend.md` en el rol reviewer (23,6% de subestimación, hallazgo de revisión externa, MAJOR 10). |
+| `SDD/scripts/sdd-context-budget.sh` | Copia instalada, idéntica a la canónica — mismo patrón que `sdd-check.sh`/`sdd-lint-contract.sh`/`sdd-run-gates.sh` |
+| `SDD/docs/doc_quality_gates.md` | Gate 2 amplía su glob a `SDD/scripts/*.sh` (agregado durante la ejecución de R1 para que el linter cubra el script nuevo; no estaba declarado en ningún Delta hasta ahora — hallazgo de revisión externa, MAJOR 5). Dirección más estricta, no un ablandamiento. |
 
 ## Acceptance criteria
 
@@ -404,6 +437,7 @@ artefactos de cada rol y suma el peso de los archivos citados.
 | AC18 | La salida declara literalmente que la cifra de tokens es aproximada y cómo se deriva (`bytes / 3.6`). |
 | AC19 | Un rol desconocido sale 2 con un mensaje que enumera los tres roles válidos. |
 | AC20 | El total que reporta para el rol `implementing` coincide con la suma de los pesos que él mismo lista, re-derivada con `awk` en el propio test. |
+| AC27bis | La lista de archivos que reporta cada rol coincide con una re-derivación **independiente** (grep propio del test, no la lógica del script) de las referencias `standards/` en los puntos de entrada de ese rol. **(v7 — hallazgo de revisión externa, MAJOR 10: AC20 sólo validaba aritmética sobre lo que el script ya había impreso, autosatisfacible por el mismo error que pretendía detectar — misma clase que RT10.)** |
 
 **Mutación (AC19)**: quitar la validación de rol · en el bloque de argv · queda revertida.
 **Mutación (AC20)**: alterar el acumulador del total (sumar el peso dos veces para el primer
@@ -417,6 +451,7 @@ archivo) · en el bucle de suma · queda revertido.
 | AC18 | `SDD/tests/test_context_budget.sh` → `test_declara_aproximacion` |
 | AC19 | `SDD/tests/test_context_budget.sh` → `test_rol_invalido` |
 | AC20 | `SDD/tests/test_context_budget.sh` → `test_total_rederivado` |
+| AC27bis | `SDD/tests/test_context_budget.sh` → `test_poblacion_no_congelada` |
 
 ## Checklist del arquetipo `analysis`
 
@@ -483,16 +518,20 @@ hilo de Slack.
 
 | Archivo | Cambio |
 |---|---|
-| `SDD/escalations.md` | **NEW** — ledger, formato y clase cerrados, backfill de GEN-94 (3 filas, las 3 `plan`) |
-| `SDD/scripts/sdd-escalation-tally.sh` | **NEW** — cuenta el ledger por Clase, detecta filas sin clasificar |
-| `plugins/sdd-flow/commands/sdd.md` | Regla de Retro ampliada: `ESCALATE`/`REJECTED` también escriben una fila en `escalations.md` |
+| `SDD/escalations.md` | **NEW** — ledger, formato y clase cerrados, backfill de GEN-94. **Recontado en v7**: 6 filas (no 3 — el backfill original grepeaba sólo el literal `ESCALATE\|REJECTED` y no veía eventos que llegaron por "review APPROVED con gaps" o "re-review"; hallazgo de revisión externa, MAJOR 9), las 6 `plan` |
+| `plugins/sdd-flow/scripts/sdd-escalation-tally.sh` | **NEW, canónico** (v7 — v0.1.0 vivía sólo en `SDD/scripts/`, así que ningún repo consumidor podía obtenerlo vía `/sdd-init`; el propio Out of scope de v6 apoyaba el checkpoint de R6 en "re-sincronizar el plugin", premisa falsa si el plugin nunca lo distribuye — hallazgo de revisión externa, MAJOR 7) |
+| `SDD/scripts/sdd-escalation-tally.sh` | Copia instalada, idéntica a la canónica |
+| `plugins/sdd-flow/templates/escalations-ledger.md` | **NEW** — template para que `/sdd-init` seedee `SDD/escalations.md` en un repo sin el backfill de GEN-94 (tabla vacía) |
+| `plugins/sdd-flow/skills/sdd-init/SKILL.md` | Paso 8 amplía la lista de scripts a copiar (+ `sdd-context-budget.sh`, `sdd-escalation-tally.sh`); paso 8bis nuevo: seedear `escalations.md` desde el template si no existe |
+| `plugins/sdd-flow/standards/orchestration.md` | §6.1 nueva — definición cerrada de "evento contable", de la que `escalations.md` y `commands/sdd.md` ahora citan en vez de restatear cada uno la suya (v6 tenía tres definiciones distintas en tres documentos; hallazgo de revisión externa, MAJOR 8) |
+| `plugins/sdd-flow/commands/sdd.md` | Regla de Retro ampliada: `ESCALATE`/`REJECTED`/`BLOCKED`-que-ratifica también escriben una fila en `escalations.md`, citando `orchestration.md` §6.1 |
 | Proxima (proyecto `GEN`) | Tarea nueva: checkpoint con fecha para tallar los 3 repos |
 
 ## Acceptance criteria
 
 | # | Criterio |
 |---|---|
-| AC21 | `SDD/escalations.md` existe, tiene exactamente 3 filas de evento (`E1`-`E3`), las 3 del ciclo `sicop-hardening`, las 3 con `Clase: plan`. |
+| AC21 | `SDD/escalations.md` existe, tiene exactamente 6 filas de evento (`E1`-`E6`), las 6 del ciclo `sicop-hardening`, las 6 con `Clase: plan`. **(v7 — recontado tras hallazgo de revisión externa, MAJOR 9; era 3 en v6.)** |
 | AC22 | `sdd-escalation-tally.sh --version` imprime `sdd-escalation-tally 0.1.0` y sale 0. |
 | AC23 | `sdd-escalation-tally.sh` contra `SDD/escalations.md` imprime `TOTAL 3` y `plan 3` (`decisión`/`medición`/`otro` en 0), exit 0. |
 | AC24 | Una fila del ledger con `Clase` vacía o fuera del enum cerrado hace que el script salga con código 3 y nombre esa fila — no la cuenta en silencio como ninguna categoría. |
@@ -502,9 +541,9 @@ hilo de Slack.
 **AC de detección** (`quality-gates.md` §10): AC23 y AC24 afirman que el tally **cuenta
 correctamente** y **detecta** clasificación ausente, respectivamente.
 
-> **Mutación (AC23)**: sobre una copia del ledger, agregar una cuarta fila `E4` con
+> **Mutación (AC23)**: sobre una copia del ledger, agregar una séptima fila `E7` con
 > `Clase: decisión` · antes del backfill note · queda revertida. El triple prueba que el
-> conteo responde a lo que el archivo dice, no a un `3` fijo en el script.
+> conteo responde a lo que el archivo dice, no a un `6` fijo en el script.
 
 > **Mutación (AC24)**: sobre una copia del ledger, vaciar el campo `Clase` de la fila `E2`
 > (dejarlo `|  |`) · en la fila de `E2` · queda revertida. El triple prueba que una fila sin
@@ -523,13 +562,19 @@ el sistema deba fallar bajo mutación.
 | AC23 | `SDD/tests/test_escalation_ledger.sh` → `test_tally_cuenta_correcto` |
 | AC24 | `SDD/tests/test_escalation_ledger.sh` → `test_tally_detecta_clase_ausente` |
 | AC25 | `SDD/tests/test_escalation_ledger.sh` → `test_regla_retro_ampliada` |
-| AC26 | Verificación manual contra la respuesta de `proxima_create_task` (arquetipo `infra`; Proxima no tiene test de repo — el binding es el `id`/`key` devuelto, pegado en el verification report) |
+| AC26 | Verificación manual contra la respuesta de `proxima_create_task` (arquetipo `infra`; Proxima no tiene test de repo — el binding es el `id`/`key` devuelto, pegado en `SDD/verification/refactor-GEN-101-optimizacion-consumo-R6.md`, no sólo en este contract — v6 sólo lo pegó acá, que es donde vive el propio planner, no evidencia independiente; hallazgo de revisión externa, BLOCKER 4) |
 
-## Checklist del arquetipo `refactor`
+## Checklist del arquetipo `infra`
+
+**Corregido en v7** (hallazgo de revisión externa, MINOR 17): el binding de AC26 ya decía
+`infra`; el checklist de acá decía `refactor`. `archetypes.md` exige exactamente uno, y el ítem
+definitorio de `refactor` ("el comportamiento observable no cambia") no calzaba — R6 agrega
+archivos y amplía una regla existente de forma aditiva, que es la forma del arquetipo `infra`.
 
 | Ítem | Estado |
 |---|---|
-| El comportamiento observable no cambia | **No aplica tal cual** — agrega un archivo y un paso a una regla existente; no modifica comportamiento previo. El paso nuevo es aditivo: si algún ciclo no genera `ESCALATE`, no escribe nada distinto a hoy |
-| Cobertura previa al cambio | `N/A` — no existía este mecanismo antes; no hay comportamiento previo que preservar |
-| Sin cambio de interfaz pública | Cumplido — no toca `orchestration.md` §2 (el contrato `sdd.result`/`sdd.review`) |
-| Alcance acotado y declarado | Cumplido — 2 archivos nuevos + 1 línea ampliada + 1 tarea Proxima |
+| Cambio idempotente / re-ejecutable | Cumplido — el ledger es append-only, el tally es de solo lectura |
+| Rollback declarado | Cumplido — `git revert`; ningún consumidor externo depende todavía de `escalations.md` |
+| Efecto sobre consumidores existentes declarado | Cumplido — Odoo-Addons y Documentos_Customer_Experience reciben el mecanismo recién ahora que se canonizó (ver Delta); antes de v7 no podían tenerlo aunque re-sincronizaran |
+| Config nueva documentada | `N/A` — no agrega variables de entorno ni flags |
+| Corre en el entorno destino | Cumplido — mismo runtime que el resto de `SDD/scripts/` |

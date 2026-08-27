@@ -54,6 +54,14 @@ El plugin declara **tier**, nunca versión. En el frontmatter de agents, skills 
 `opus`, `sonnet` o `haiku` — nada más. Los alias resuelven al último modelo de cada tier, así
 que se mantienen al día solos.
 
+**Nota de verificación** (agregada tras revisión externa, GEN-101): que el harness honre
+`model:` en el frontmatter de un **agent** o un **command** es superficie establecida. Que lo
+honre en el frontmatter de un **skill** cuando ese skill se invoca indirectamente (un command
+sin `model:` propio que a su vez llama al skill) no está verificado en este repo. Por eso,
+donde un skill de tier barato tiene también un command que lo invoca (ej. `write-pr-report` ↔
+`/sdd-pr`), **el command declara su propio `model:` en vez de asumir que hereda el del skill**
+— defensivo, no una confirmación de que la herencia funciona.
+
 **Un identificador de modelo con número de versión en cualquier archivo del plugin es un
 defecto** (`claude-opus-4-8`, `claude-sonnet-4-6`, «Opus 4.8», «Sonnet 4.6»). No porque el
 modelo sea peor, sino porque el archivo empieza a mentir el día que sale el siguiente y nadie

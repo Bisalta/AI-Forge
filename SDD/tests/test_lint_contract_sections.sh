@@ -194,7 +194,12 @@ done
 mutante
 out_m="$(bash "$TMP/mutante.sh" "$TMP/sin_ninguna_de_contract.md" "$TMP" 2>&1)"
 assert_eq "$(count_ausentes "$out_m")" "1" \
-  "test_faltan_las_cuatro_de_contract — MUTANTE sólo deja concerns (la lista no lo gobierna)"
+  "test_faltan_las_cuatro_de_contract — MUTANTE sólo deja concerns (la lista no lo gobierna) (rojo esperado)"
+out_r="$(bash "$LINTER" "$TMP/sin_ninguna_de_contract.md" "$TMP" 2>&1)"
+assert_eq "$(count_ausentes "$out_r")" "4" \
+  "test_faltan_las_cuatro_de_contract — revertido vuelve a cuatro"
+assert_eq "$(count_ausentes "$out")-$(count_ausentes "$out_m")-$(count_ausentes "$out_r")" "4-1-4" \
+  "test_faltan_las_cuatro_de_contract — las tres corridas se distinguen"
 
 # ---------- AC3 ----------
 printf '\n-- test_requerimiento_sin_acceptance_criteria (AC3)\n'
@@ -205,6 +210,17 @@ assert_contains "$out" "R1: Acceptance criteria" \
 assert_eq "$(count_ausentes "$out")" "1" \
   "test_requerimiento_sin_acceptance_criteria — R0 completo no aporta hallazgos"
 
+# triple de mutación (AC3): vaciar SECTIONS_REQ hace que ni siquiera R1 le
+# exija Acceptance criteria — el rojo es que el hallazgo DESAPAREZCA.
+out_m="$(bash "$TMP/mutante.sh" "$TMP/r1_sin_acceptance.md" "$TMP" 2>&1)"
+assert_eq "$(count_ausentes "$out_m")" "0" \
+  "test_requerimiento_sin_acceptance_criteria — MUTANTE deja de exigirlo (rojo esperado)"
+out_r="$(bash "$LINTER" "$TMP/r1_sin_acceptance.md" "$TMP" 2>&1)"
+assert_eq "$(count_ausentes "$out_r")" "1" \
+  "test_requerimiento_sin_acceptance_criteria — revertido vuelve a exigirlo"
+assert_eq "$(count_ausentes "$out")-$(count_ausentes "$out_m")-$(count_ausentes "$out_r")" "1-0-1" \
+  "test_requerimiento_sin_acceptance_criteria — las tres corridas se distinguen"
+
 # ---------- AC4 ----------
 printf '\n-- test_sin_bloques_R_documento_entero (AC4)\n'
 out="$(bash "$LINTER" "$TMP/sin_bloques_r.md" "$TMP" 2>&1)"; rc=$?
@@ -212,6 +228,17 @@ assert_exit 2 "$rc" "test_sin_bloques_R_documento_entero"
 assert_contains "$out" "Architectural Delta" \
   "test_sin_bloques_R_documento_entero — exige la sección de requerimiento"
 assert_eq "$(count_ausentes "$out")" "1" "test_sin_bloques_R_documento_entero — sólo la faltante"
+
+# triple de mutación (AC4): vaciar SECTIONS_REQ hace que el documento-como-
+# requerimiento-único deje de exigir Architectural Delta.
+out_m="$(bash "$TMP/mutante.sh" "$TMP/sin_bloques_r.md" "$TMP" 2>&1)"
+assert_eq "$(count_ausentes "$out_m")" "0" \
+  "test_sin_bloques_R_documento_entero — MUTANTE deja de exigirlo (rojo esperado)"
+out_r="$(bash "$LINTER" "$TMP/sin_bloques_r.md" "$TMP" 2>&1)"
+assert_eq "$(count_ausentes "$out_r")" "1" \
+  "test_sin_bloques_R_documento_entero — revertido vuelve a exigirlo"
+assert_eq "$(count_ausentes "$out")-$(count_ausentes "$out_m")-$(count_ausentes "$out_r")" "1-0-1" \
+  "test_sin_bloques_R_documento_entero — las tres corridas se distinguen"
 
 # ---------- AC5 ----------
 printf '\n-- test_este_contract_sale_limpio (AC5)\n'
@@ -250,7 +277,7 @@ assert_eq "$(count_ausentes "$out")" "0" \
 printf '\n-- test_version_bump_y_argv (AC8)\n'
 out="$(bash "$LINTER" --version 2>&1)"; rc=$?
 assert_exit 0 "$rc" "test_version_bump_y_argv"
-assert_eq "$out" "sdd-lint-contract 0.11.0" "test_version_bump_y_argv — versión bumpeada"
+assert_eq "$out" "sdd-lint-contract 0.12.0" "test_version_bump_y_argv — versión bumpeada"
 out="$(bash "$LINTER" 2>&1)"; rc=$?
 assert_exit 3 "$rc" "test_version_bump_y_argv — sin argumentos sigue saliendo 3"
 
@@ -260,6 +287,82 @@ out="$(bash "$LINTER" "$TMP/abierta_y_ausente.md" "$TMP" 2>&1)"; rc=$?
 assert_exit 2 "$rc" "test_frase_abierta_y_seccion_ausente"
 assert_contains "$out" "frase-abierta" "test_frase_abierta_y_seccion_ausente — reporta la frase"
 assert_contains "$out" "seccion-ausente" "test_frase_abierta_y_seccion_ausente — reporta la sección"
+
+# triple de mutación (AC9): vaciar SECTIONS_CONTRACT hace desaparecer
+# seccion-ausente pero frase-abierta (chequeo 1, no tocado) se mantiene — el
+# rojo es parcial, y eso es justamente lo que hay que probar: que los dos
+# chequeos son independientes, no que uno arrastre al otro.
+out_m="$(bash "$TMP/mutante.sh" "$TMP/abierta_y_ausente.md" "$TMP" 2>&1)"
+assert_contains "$out_m" "frase-abierta" \
+  "test_frase_abierta_y_seccion_ausente — MUTANTE conserva frase-abierta (chequeo 1 intacto)"
+assert_eq "$(count_ausentes "$out_m")" "0" \
+  "test_frase_abierta_y_seccion_ausente — MUTANTE pierde seccion-ausente (rojo esperado, sólo ese chequeo)"
+out_r="$(bash "$LINTER" "$TMP/abierta_y_ausente.md" "$TMP" 2>&1)"
+assert_contains "$out_r" "seccion-ausente" \
+  "test_frase_abierta_y_seccion_ausente — revertido recupera seccion-ausente"
+assert_eq "$(count_ausentes "$out")-$(count_ausentes "$out_m")-$(count_ausentes "$out_r")" "1-0-1" \
+  "test_frase_abierta_y_seccion_ausente — las tres corridas se distinguen"
+
+# ---------- AC27 (v7 — hallazgo de revisión externa, MINOR 19b) ----------
+printf '\n-- test_concerns_formas_no_yaml (AC27)\n'
+# Regresión: `concerns:` en forma tabla o blockquote (no YAML) no debe dar
+# falso BLOCKER. Encontrado por el reviewer-agent con fixtures propias en la
+# ronda 1 de este mismo ciclo — el strip-prefix sólo pelaba ' ', '-', '#', '*'.
+fixture concerns_blockquote <<'EOF'
+# HLTC — fixture
+## Objective
+x
+## Out of scope
+x
+## Threat model
+N/A
+> **Concerns**: security n/a.
+# R0 — x
+## Architectural Delta
+x
+## Acceptance criteria
+x
+## Checklist del arquetipo `infra`
+x
+EOF
+fixture concerns_tabla <<'EOF'
+# HLTC — fixture
+## Objective
+x
+## Out of scope
+x
+## Threat model
+N/A
+| Concerns | Estado |
+|---|---|
+| security | n/a |
+# R0 — x
+## Architectural Delta
+x
+## Acceptance criteria
+x
+## Checklist del arquetipo `infra`
+x
+EOF
+out="$(bash "$LINTER" "$TMP/concerns_blockquote.md" "$TMP" 2>&1)"; rc=$?
+assert_exit 0 "$rc" "test_concerns_formas_no_yaml — blockquote no produce BLOCKER"
+assert_eq "$(count_ausentes "$out")" "0" "test_concerns_formas_no_yaml — blockquote, cero seccion-ausente"
+out="$(bash "$LINTER" "$TMP/concerns_tabla.md" "$TMP" 2>&1)"; rc=$?
+assert_exit 0 "$rc" "test_concerns_formas_no_yaml — fila de tabla no produce BLOCKER"
+assert_eq "$(count_ausentes "$out")" "0" "test_concerns_formas_no_yaml — fila de tabla, cero seccion-ausente"
+
+# Triple de mutación: el fix agregó '|' y '>' al strip-prefix. Revertirlo debe
+# reproducir el falso positivo (rojo), y no debe cegar el caso genuinamente
+# ausente (que sigue detectándose sin la fixture).
+sed "s/' '\*|'-'\*|'#'\*|'\*'\*|'|'\*|'>'\*)/' '*|'-'*|'#'*|'*'*)/" "$LINTER" > "$TMP/mutante_strip.sh"
+out_m="$(bash "$TMP/mutante_strip.sh" "$TMP/concerns_blockquote.md" "$TMP" 2>&1)"
+assert_eq "$(count_ausentes "$out_m")" "1" \
+  "test_concerns_formas_no_yaml — MUTANTE reproduce el falso positivo (rojo esperado)"
+out_r="$(bash "$LINTER" "$TMP/concerns_blockquote.md" "$TMP" 2>&1)"
+assert_eq "$(count_ausentes "$out_r")" "0" \
+  "test_concerns_formas_no_yaml — revertido vuelve a limpio"
+assert_eq "0-$(count_ausentes "$out_m")-$(count_ausentes "$out_r")" "0-1-0" \
+  "test_concerns_formas_no_yaml — las tres corridas se distinguen"
 
 printf '\n'
 test_summary; exit $?

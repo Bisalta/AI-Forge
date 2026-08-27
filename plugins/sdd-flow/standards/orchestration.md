@@ -166,3 +166,15 @@ Al arrancar, `/sdd` chequea si existe `.sdd/state.json` con `phase < 5`:
 ```
 
 Se escribe en el momento (al resolver un `ESCALATE`, al cerrar un blocker repetido, al descubrir un prerequisito no documentado). En Feature Ready el planner la relee: si un patrón se repite, propone el ajuste al doc que corresponda (`doc_architecture`, `doc_quality_gates`, standards). Sin esto, cada ciclo tropieza con la misma piedra.
+
+### 6.1 Evento contable (para `SDD/escalations.md`)
+
+Un subconjunto de lo anterior necesita clasificación explícita, no sólo una línea narrativa: **toda ratificación de contract (bump de versión) motivada por un defecto**, sea cual sea la puerta procedural por la que llegó —
+
+- `ESCALATE` (rondas agotadas) o `REJECTED` con causa que exigió cambiar el contract;
+- `BLOCKED` cuya resolución fue ratificar el contract, no sólo responder una pregunta dejándolo intacto;
+- una re-review (incluida una que resultó en `APPROVED` del trabajo) que encontró que **el contract mismo** incumplía una regla que él mismo declaraba.
+
+**No cuenta** una ratificación que sólo amplía scope por una decisión externa, sin que nada de lo ya escrito estuviera mal (agregar un requerimiento nuevo porque llegó un pedido, no porque el anterior tuviera un defecto).
+
+La `Clase` de cada evento (`plan` · `decisión` · `medición` · `otro`) la decide el planner en el mismo acto de ratificar — ver `SDD/escalations.md` para el formato y `SDD/scripts/sdd-escalation-tally.sh` para el conteo. `plan` cubre las dos formas: el implementador cumplió literalmente lo pedido y estaba mal, **o** lo detectó antes de implementarlo y preguntó (`BLOCKED`) — en ambas el defecto vive en lo que el contract pedía, no en el juicio de quien lo ejecutó.

@@ -1,13 +1,16 @@
 # shellcheck shell=bash
 # SDD/tests/test_model_tier_policy.sh
 #
-# AC10-AC16 del contract SDD/contracts/2026-08-25-consumption-optimization.md
+# AC10-AC15 del contract SDD/contracts/2026-08-25-consumption-optimization.md
 # (R2: el plugin declara tier, nunca versión · R3: haiku donde el contexto es chico).
+# AC16 se eliminó en v7 — duplicaba AC12 y le aplicaba mutación indebida
+# (§10.1 la reserva para ACs de detección, no para aserciones de contenido
+# estático). Ver la nota en el lugar donde vivía.
 #
 # Bash 3.2 puro. Los assert_* salen de lib.sh.
 #
-# MUTACIÓN (quality-gates.md §10): AC10 y AC16 son ACs de detección. Sus mutaciones
-# se aplican sobre una COPIA del árbol en el tmpdir — nunca sobre el repo. Mutar
+# MUTACIÓN (quality-gates.md §10): AC10 es AC de detección. Su mutación se
+# aplica sobre una COPIA del árbol en el tmpdir — nunca sobre el repo. Mutar
 # archivos versionados en un test deja el árbol sucio si el proceso muere, y un
 # árbol sucio hace que sdd-run-gates.sh se niegue a sellar evidencia (exit 4).
 
@@ -101,6 +104,14 @@ assert_eq "$(frontmatter_model "$REPO_ROOT/plugins/sdd-flow/commands/sdd-status.
 # sdd-fixes NO baja de tier: su triage declara mutaciones (contract v4)
 assert_eq "$(frontmatter_model "$REPO_ROOT/plugins/sdd-flow/commands/sdd-fixes.md")" "" \
   "test_skills_mecanicos_en_haiku — sdd-fixes queda en el default (declara mutaciones)"
+# v7: write-pr-report es un skill invocado tanto directo como desde /sdd-pr.
+# Nada en este ciclo verifica que el harness honre `model:` en el frontmatter
+# de un SKILL de la misma forma que en un agent o un command (hallazgo de
+# revisión externa, MAJOR 11) — fix defensivo: declarar el mismo model:haiku
+# también en el COMMAND que lo invoca, donde el campo sí es superficie
+# soportada sin ambigüedad.
+assert_eq "$(frontmatter_model "$REPO_ROOT/plugins/sdd-flow/commands/sdd-pr.md")" "haiku" \
+  "test_skills_mecanicos_en_haiku — sdd-pr.md declara haiku directamente (defensivo, no asume composición skill→command)"
 
 # ---------- AC14 ----------
 printf '\n-- test_criterio_trivial_enumerado (AC14)\n'
@@ -121,23 +132,13 @@ assert_contains "$linea" "cuatro condiciones" "test_sdd_plan_referencia_criterio
 assert_eq "$(printf '%s' "$linea" | grep -c 'si trivial')" "0" \
   "test_sdd_plan_referencia_criterio — ya no dice «si trivial» sin definición"
 
-# ---------- AC16 ----------
-printf '\n-- test_reviewer_sigue_en_opus (AC16)\n'
-assert_eq "$(frontmatter_model "$AG/reviewer-agent.md")" "opus" \
-  "test_reviewer_sigue_en_opus — decisión cerrada en contra de abaratarlo"
-
-# Triple de mutación (AC16): bajar el reviewer a haiku en la copia.
-T="$(arbol_copia)"
-RV="$T/plugins/sdd-flow/agents/reviewer-agent.md"
-m_verde="$(frontmatter_model "$RV")"
-sed -i.bak 's/^model: opus$/model: haiku/' "$RV" && rm -f "$RV.bak"
-m_rojo="$(frontmatter_model "$RV")"
-sed -i.bak 's/^model: haiku$/model: opus/' "$RV" && rm -f "$RV.bak"
-m_revert="$(frontmatter_model "$RV")"
-assert_eq "$m_verde-$m_rojo-$m_revert" "opus-haiku-opus" \
-  "test_reviewer_sigue_en_opus — las tres corridas se distinguen"
-assert_eq "$(frontmatter_model "$AG/reviewer-agent.md")" "opus" \
-  "test_reviewer_sigue_en_opus — el repo real nunca se tocó"
+# AC16 se borró en v7 (hallazgo de revisión externa, MINOR 18): duplicaba la
+# aserción de AC12 palabra por palabra, y encima le pegaba una mutación —
+# quality-gates.md §10.1 reserva la mutación para ACs de DETECCIÓN (guardas,
+# validaciones), no para "este archivo sigue diciendo X", que es exactamente
+# lo que AC12 ya cubre sin mutación (mismo motivo por el que AC21/AC22/AC25
+# tampoco la llevan). El "triple" de AC16 mutaba una copia y la releía: eso
+# prueba que `sed` funciona, no que un control detecta algo.
 
 printf '\n'
 test_summary; exit $?
