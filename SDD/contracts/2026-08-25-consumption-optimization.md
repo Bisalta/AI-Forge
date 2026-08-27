@@ -1,10 +1,33 @@
 # HLTC — sdd-flow · optimización de consumo (GEN-101)
 
-**Versión**: v7 · **Fecha**: 2026-08-25 · **Planner**: Opus 5
+**Versión**: v8 · **Fecha**: 2026-08-25 · **Planner**: Opus 5
 **Estado**: auto-aprobado (modo multi-agente, `sdd-plan` Fase A)
 **Branch**: `refactor-GEN-101-optimizacion-consumo` · base `origin/prod`
 
 ## Ratificaciones
+
+- **v8** (revisión adversarial independiente, `reviewer-agent` Opus, ronda 2 — segunda
+  `REJECTED` consecutiva, cap de 3 rondas): 0 `BLOCKER` (los 4 de ronda 1 se confirmaron
+  genuinamente cerrados — el reviewer re-corrió los tests, rompió mutantes a mano, re-derivó
+  el conteo de GEN-94 por su cuenta), **7 `MAJOR`** y 5 `MINOR`. El patrón: 5 de los 7 MAJOR
+  fueron el mismo defecto — un valor se corrigió en un lugar (script, test) y no se propagó a
+  todas las citas de ese valor en el contract (AC23 seguía en "TOTAL 3" cuando AC21 ya decía 6;
+  AC8 seguía en `0.11.0` cuando el script y el test ya estaban en `0.12.0`; AC17 nombraba
+  `planner` pero el test bindeado corría `reviewer`; la ratificación v7 citaba `SDD/retro.md`
+  RT18-RT21, que nunca se escribieron; el binding de AC26 apuntaba a un archivo que el propio
+  commit de v7 había renombrado). Los otros dos son sustantivos: la corrección de MAJOR 10
+  (ronda 1, la subestimación del rol reviewer) sólo cubría la forma prefijada de las citas a
+  `standards/` y dejaba `base-standards.md` pelado sin contar (9,2% de subestimación residual);
+  y el propio mecanismo de R6 no se usó sobre su primer evento calificado — el `REJECTED` de la
+  ronda 1 — en el mismo commit que lo construyó.
+
+  Corregido en esta versión: AC17/AC17bis separan el rol que el AC nombra (`planner`, ahora
+  con test propio) del caso que originó MAJOR 10 (`reviewer`, regresión aparte); el grep de
+  `sdd-context-budget.sh` (0.3.0) ahora cubre forma prefijada y pelada, derivada contra los
+  archivos reales de `standards/`; `SDD/escalations.md` gana E7 y E8 (las dos `REJECTED` de
+  este mismo ciclo) y sube a 8 eventos; `SDD/retro.md` gana RT18-RT21 con contenido real; AC8,
+  AC21, AC23 y el binding de AC26 se sincronizaron con el estado real. Detalle en cada sección
+  y en `SDD/retro.md` RT18-RT21.
 
 - **v7** (revisión adversarial independiente, `reviewer-agent` Opus, ronda 1 de este ciclo —
   la primera revisión que no fui yo mismo): veredicto `REJECTED`, 4 `BLOCKER` · 8 `MAJOR` · 6
@@ -189,7 +212,7 @@ trabajo del reviewer, no del linter.
 
 ## Architectural Delta
 
-`plugins/sdd-flow/scripts/sdd-lint-contract.sh` — versión `0.10.0` → `0.11.0`.
+`plugins/sdd-flow/scripts/sdd-lint-contract.sh` — versión `0.10.0` → `0.12.0`. **(v7 corrigió el propio Delta a `0.11.0`; el bump real llegó a `0.12.0` en el mismo commit, por el fix de MINOR 19b — la corrección de versión no se propagó dos veces. Hallazgo de ronda 2, MAJOR M2.)**
 
 1. **Dos pasadas, no una.** El bucle actual es una pasada por línea que decide sobre esa
    línea sola. La presencia de una sección es una propiedad del archivo, no de una línea, así
@@ -214,7 +237,7 @@ trabajo del reviewer, no del linter.
 | AC5 | Este mismo contract (`SDD/contracts/2026-08-25-consumption-optimization.md`) sale exit 0: cero `seccion-ausente`. Es el caso positivo que prueba que el chequeo no marca lo sano. |
 | AC6 | El contract de GEN-94 (`SDD/contracts/2026-08-13-sicop-hardening.md`), que está completo, no produce ninguna línea `seccion-ausente`. Regresión sobre un artefacto real que nadie escribió para este test. |
 | AC7 | `## Threat model (standards/security.md §6)` cuenta como presente — el sufijo anotado no produce falso BLOCKER. |
-| AC8 | `sdd-lint-contract.sh --version` imprime `sdd-lint-contract 0.11.0` y sale 0. La superficie de argv no cambia (concern `api-compat`). |
+| AC8 | `sdd-lint-contract.sh --version` imprime `sdd-lint-contract 0.12.0` y sale 0. La superficie de argv no cambia (concern `api-compat`). **(v7 quedó en `0.11.0`; corregido a `0.12.0`, hallazgo de ronda 2, MAJOR M2.)** |
 | AC9 | Un contract con frase abierta **y** sección ausente reporta ambas y sale 2 una sola vez. |
 | AC27 | `concerns:` declarado como blockquote (`> **Concerns**: ...`) o como fila de tabla (`\| Concerns \| Estado \|`) no produce falso `BLOCKER` de `seccion-ausente`. **(v7 — hallazgo de revisión externa con fixtures propias, MINOR 19b: el strip-prefix sólo pelaba ' ', '-', '#', '*'; ahora también '\|' y '>'.)** |
 
@@ -433,7 +456,8 @@ una cifra se bindea a la salida de la consulta que la re-deriva.
 
 | # | Criterio |
 |---|---|
-| AC17 | `sdd-context-budget.sh planner` emite una línea por archivo con su peso en bytes y tokens aproximados, y una línea `TOTAL`, y sale 0. |
+| AC17 | `sdd-context-budget.sh planner` emite una línea por archivo con su peso en bytes y tokens aproximados, y una línea `TOTAL`, y sale 0. **(v8: el test bindeado corría `reviewer`, no `planner` como dice literalmente este AC — nada ejercitaba el bucle multi-punto-de-entrada, el único caso con 3 puntos. Hallazgo de ronda 2, MAJOR M3.)** |
+| AC17bis | Regresión sobre el rol `reviewer` (el caso que originó MAJOR 10): la salida sigue coincidiendo con la re-derivación independiente tras el fix de M4. |
 | AC18 | La salida declara literalmente que la cifra de tokens es aproximada y cómo se deriva (`bytes / 3.6`). |
 | AC19 | Un rol desconocido sale 2 con un mensaje que enumera los tres roles válidos. |
 | AC20 | El total que reporta para el rol `implementing` coincide con la suma de los pesos que él mismo lista, re-derivada con `awk` en el propio test. |
@@ -447,7 +471,8 @@ archivo) · en el bucle de suma · queda revertido.
 
 | AC | Test |
 |---|---|
-| AC17 | `SDD/tests/test_context_budget.sh` → `test_salida_por_rol` |
+| AC17 | `SDD/tests/test_context_budget.sh` → `test_salida_por_rol` (corre contra `planner`, v8) |
+| AC17bis | `SDD/tests/test_context_budget.sh` → `test_salida_por_rol_reviewer` |
 | AC18 | `SDD/tests/test_context_budget.sh` → `test_declara_aproximacion` |
 | AC19 | `SDD/tests/test_context_budget.sh` → `test_rol_invalido` |
 | AC20 | `SDD/tests/test_context_budget.sh` → `test_total_rederivado` |
@@ -461,7 +486,7 @@ archivo) · en el bucle de suma · queda revertido.
 | La unidad está declarada y es la correcta | Cumplido — bytes medidos; tokens **aproximados** y así etiquetados (AC18) |
 | La cifra se puede re-derivar desde la fuente | Cumplido — AC20 la re-deriva con `awk` independiente |
 | El método de agregación está escrito | Cumplido — suma simple sobre los archivos listados |
-| Las limitaciones están declaradas | Cumplido — mide contexto **estático**; no mide turnos ni contexto acumulado. Escrito en la cabecera del script |
+| Las limitaciones están declaradas | Cumplido — mide contexto **estático**; no mide turnos ni contexto acumulado. Escrito en la cabecera del script. **(v8, hallazgo de ronda 2, MAJOR M4): en v7 esta fila era falsa** — el script cubría sólo la forma prefijada (`standards/x.md`) y la cabecera afirmaba lo contrario ("un standards/ nuevo... aparece solo"), mientras `base-standards.md` pelado en `reviewer-agent.md` quedaba afuera (9,2% de subestimación medida). v8 cubre ambas formas; la limitación residual —una referencia que no use el nombre de archivo literal en ninguna forma (ej. una paráfrasis)— sí queda declarada, en la cabecera del script y acá. |
 | La conclusión no excede lo que el dato sostiene | Cumplido — el script no concluye, reporta |
 | Potencia / significancia | `N/A` — no hay inferencia estadística; es un conteo exhaustivo, no una muestra |
 
@@ -531,9 +556,9 @@ hilo de Slack.
 
 | # | Criterio |
 |---|---|
-| AC21 | `SDD/escalations.md` existe, tiene exactamente 6 filas de evento (`E1`-`E6`), las 6 del ciclo `sicop-hardening`, las 6 con `Clase: plan`. **(v7 — recontado tras hallazgo de revisión externa, MAJOR 9; era 3 en v6.)** |
+| AC21 | `SDD/escalations.md` existe, tiene exactamente 8 filas de evento (`E1`-`E8`): 6 del ciclo `sicop-hardening` y 2 de este mismo ciclo (`consumo GEN-101`, las dos `REJECTED` de ronda 1 y ronda 2), las 8 con `Clase: plan`. **(v8 — MAJOR 9 de ronda 1 lo llevó de 3 a 6; MAJOR M5 de ronda 2 encontró que el propio ciclo no había registrado sus dos eventos, llevándolo a 8.)** |
 | AC22 | `sdd-escalation-tally.sh --version` imprime `sdd-escalation-tally 0.1.0` y sale 0. |
-| AC23 | `sdd-escalation-tally.sh` contra `SDD/escalations.md` imprime `TOTAL 3` y `plan 3` (`decisión`/`medición`/`otro` en 0), exit 0. |
+| AC23 | `sdd-escalation-tally.sh` contra `SDD/escalations.md` imprime `TOTAL 8` y `plan 8` (`decisión`/`medición`/`otro` en 0), exit 0. **(v7 corrigió AC21 a 6 pero no ésta — quedó en 3 — hallazgo de ronda 2, MAJOR M1. v8: ambas a 8, el nuevo total tras MAJOR M5.)** |
 | AC24 | Una fila del ledger con `Clase` vacía o fuera del enum cerrado hace que el script salga con código 3 y nombre esa fila — no la cuenta en silencio como ninguna categoría. |
 | AC25 | `commands/sdd.md`, regla de Retro, referencia `SDD/escalations.md` y `sdd-escalation-tally.sh`. |
 | AC26 | Existe una tarea en Proxima (proyecto `GEN`) con `startAt` en el futuro, cuyo título nombra el checkpoint de R6. **Satisfecho**: `GEN-102`, `startAt` 2026-09-22T14:00:00-06:00, título "Checkpoint R6 — tallar ESCALATE de plan en AI-Forge, Odoo-Addons y Documentos_Customer_Experience". |
@@ -562,7 +587,7 @@ el sistema deba fallar bajo mutación.
 | AC23 | `SDD/tests/test_escalation_ledger.sh` → `test_tally_cuenta_correcto` |
 | AC24 | `SDD/tests/test_escalation_ledger.sh` → `test_tally_detecta_clase_ausente` |
 | AC25 | `SDD/tests/test_escalation_ledger.sh` → `test_regla_retro_ampliada` |
-| AC26 | Verificación manual contra la respuesta de `proxima_create_task` (arquetipo `infra`; Proxima no tiene test de repo — el binding es el `id`/`key` devuelto, pegado en `SDD/verification/refactor-GEN-101-optimizacion-consumo-R6.md`, no sólo en este contract — v6 sólo lo pegó acá, que es donde vive el propio planner, no evidencia independiente; hallazgo de revisión externa, BLOCKER 4) |
+| AC26 | Verificación manual contra la respuesta de `proxima_create_task` (arquetipo `infra`; Proxima no tiene test de repo — el binding es el `id`/`key` devuelto, pegado en `SDD/verification/refactor-GEN-101-optimizacion-consumo.md`, no sólo en este contract — v6 sólo lo pegó acá, que es donde vive el propio planner, no evidencia independiente; hallazgo de ronda 1, BLOCKER 4). **(v8: el nombre de archivo de este binding quedó apuntando a `-R6.md`, renombrado a `-R6-gates.md` en el mismo commit que fijó BLOCKER 4 — `sdd-lint-contract.sh` lo marcó como `WARN path-inexistente` y se despachó igual, sepultado entre 14 WARN benignos. Corregido al nombre real. Hallazgo de ronda 2, MAJOR M7.)** |
 
 ## Checklist del arquetipo `infra`
 

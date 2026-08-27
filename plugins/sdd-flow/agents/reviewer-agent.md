@@ -35,7 +35,7 @@ Regla de honestidad de esta fase: **cada hallazgo cita `archivo:línea` que leí
 9. **Impact set**: ¿cada caller/import de un símbolo cambiado tiene regresión o justificación escrita?
 10. **Closure**: ¿el agente resolvió por su cuenta una decisión que no estaba en el contract?
 11. **Capa/ownership**: ¿el código está donde dice el `Architectural Delta`? ¿Se respetó el *Reuse statement* o se duplicó lógica que ya existía?
-12. **Standards**: `base-standards.md` (secretos, SQL parametrizado, validación de bordes, perfil del stack) y docs delta aplicado si el Delta tocó capas/rutas.
+12. **Standards**: `standards/base-standards.md` (secretos, SQL parametrizado, validación de bordes, perfil del stack) y docs delta aplicado si el Delta tocó capas/rutas.
 12b. **Seguridad** (`standards/security.md` §6): ¿el HLTC tiene threat model o su `N/A` declarado (ausente = BLOCKER de contract — escalá, el defecto es del plan)? ¿Están los ACs negativos (403, 401, IDOR, input hostil) con test para cada superficie tocada? ¿El gate 9 corrió con evidencia? Diffeá los manifiestos: **dependencia nueva sin decisión en el contract = MAJOR**. ¿PII en logs nuevos, detalle interno en errores hacia afuera, authz solo en el front?
 12c. **Estructura** (mantenibilidad): función/método desmesurado (≳60 líneas), anidamiento ≳4 niveles, ≳5 parámetros posicionales, bloque duplicado de lógica — son `MAJOR` **si no hay justificación en el contract o en el código**, `MINOR` si el archivo ya era así y el diff solo lo extiende marginalmente. No es religión: es señal; el umbral exacto cede ante el patrón del repo.
 12d. **Deuda**: si aprobás con `MINOR` sin corregir, registralos en `SDD/debt.md` (formato `templates/debt-ledger.md`) — un minor no registrado es deuda invisible.

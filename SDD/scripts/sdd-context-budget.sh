@@ -29,7 +29,7 @@
 
 set -uo pipefail
 
-VERSION="0.2.0"
+VERSION="0.3.0"
 [ "${1:-}" = "--version" ] && { echo "sdd-context-budget $VERSION"; exit 0; }
 
 DIVISOR="3.6"
@@ -63,12 +63,31 @@ case "$ROLE" in
   reviewer)     ENTRY_POINTS="agents/reviewer-agent.md" ;;
 esac
 
-# --- FILES = puntos de entrada + toda referencia standards/*.md que ESOS
+# --- FILES = puntos de entrada + toda referencia a standards/*.md que ESOS
 # puntos de entrada contengan, grepeada ahora, no recordada de una corrida
-# vieja. ---
+# vieja. Dos formas, las dos reales en el plugin — verificado con un barrido:
+# la prefijada ("standards/base-standards.md") Y la pelada ("base-standards.md"
+# a secas, común en prosa que ya nombró el archivo completo antes). v0.2.0
+# sólo cubría la primera forma y le faltaba `base-standards.md` pelado en
+# reviewer-agent.md — 9,2% de subestimación medida, hallazgo de ronda 2 del
+# reviewer (MAJOR M4). La forma pelada se deriva contra los archivos REALES
+# de standards/ (verdad de terreno), no contra un patrón de nombre — así un
+# archivo nuevo en standards/ entra solo, sin editar este script.
+STANDARDS_BASENAMES="$(
+  for _sf in "$PLUGIN"/standards/*.md; do
+    [ -e "$_sf" ] && basename "$_sf"
+  done
+)"
 STANDARDS_REFS="$(
   for ep in $ENTRY_POINTS; do
-    [ -f "$PLUGIN/$ep" ] && grep -ohE 'standards/[a-z-]+\.md' "$PLUGIN/$ep"
+    [ -f "$PLUGIN/$ep" ] || continue
+    grep -ohE 'standards/[a-z-]+\.md' "$PLUGIN/$ep"
+    OLDIFS2="$IFS"; IFS='
+'
+    for bn in $STANDARDS_BASENAMES; do
+      grep -qF "$bn" "$PLUGIN/$ep" 2>/dev/null && printf 'standards/%s\n' "$bn"
+    done
+    IFS="$OLDIFS2"
   done | sort -u
 )"
 FILES="$(printf '%s\n%s\n' "$ENTRY_POINTS" "$STANDARDS_REFS" | tr ' ' '\n' | grep -v '^$' | sort -u)"

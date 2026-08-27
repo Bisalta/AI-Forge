@@ -42,20 +42,56 @@ poblacion_independiente() {
     implementing) eps="agents/implementing-agent.md" ;;
     reviewer)     eps="agents/reviewer-agent.md" ;;
   esac
-  standards="$(for ep in $eps; do grep -ohE 'standards/[a-z-]+\.md' "$PLUGIN/$ep" 2>/dev/null; done | sort -u)"
+  # v8: cubre las dos formas (prefijada y pelada) — la v7 de este helper sólo
+  # cubría la prefijada, así que compartía el punto ciego del script bajo
+  # prueba (MAJOR M4, ronda 2): ninguna de las dos veía `base-standards.md`
+  # pelado en reviewer-agent.md. "Independiente" acá significa que no llama
+  # al código del script — no que use un algoritmo distinto; lo que prueba es
+  # que la salida coincide con la comprensión escrita a mano del criterio,
+  # no que el script se llame a sí mismo y compare contra su propio eco.
+  standards_prefijada="$(for ep in $eps; do grep -ohE 'standards/[a-z-]+\.md' "$PLUGIN/$ep" 2>/dev/null; done)"
+  standards_pelada="$(
+    for ep in $eps; do
+      for sf in "$PLUGIN"/standards/*.md; do
+        [ -e "$sf" ] || continue
+        bn="$(basename "$sf")"
+        grep -qF "$bn" "$PLUGIN/$ep" 2>/dev/null && printf 'standards/%s\n' "$bn"
+      done
+    done
+  )"
+  standards="$(printf '%s\n%s\n' "$standards_prefijada" "$standards_pelada" | grep -v '^$' | sort -u)"
   printf '%s\n%s\n' "$eps" "$standards" | tr ' ' '\n' | grep -v '^$' | sort -u
 }
 
 # ---------- AC17 ----------
 printf '\n-- test_salida_por_rol (AC17)\n'
-out="$(bash "$BUDGET" reviewer "$REPO_ROOT" 2>&1)"; rc=$?
+# v8: el AC nombra literalmente `planner`, pero la ronda 1 de este archivo
+# corría el ejemplo contra `reviewer` — ningún test ejercitaba `planner`, que
+# es el único rol con 3 puntos de entrada (el único que recorre el bucle
+# multi-EP de la derivación en vivo). Hallazgo de ronda 2, MAJOR M3.
+out="$(bash "$BUDGET" planner "$REPO_ROOT" 2>&1)"; rc=$?
 assert_exit 0 "$rc" "test_salida_por_rol"
 n_files_script="$(printf '%s\n' "$out" | grep -cE '^  +[0-9]+ +[0-9]+ +[a-z]')"
-n_files_independiente="$(poblacion_independiente reviewer | grep -c .)"
+n_files_independiente="$(poblacion_independiente planner | grep -c .)"
 assert_eq "$n_files_script" "$n_files_independiente" \
   "test_salida_por_rol — el script lista tantos archivos como la re-derivación independiente ($n_files_independiente)"
 assert_contains "$out" "TOTAL" "test_salida_por_rol — trae línea TOTAL"
 assert_contains "$out" "quality-gates.md" "test_salida_por_rol — nombra los archivos, no sólo el total"
+# planner tiene 3 puntos de entrada (commands/sdd.md, sdd-plan/SKILL.md,
+# enrich-user-story/SKILL.md) — verificar que el bucle realmente los recorre
+# los tres, no sólo el primero.
+assert_contains "$out" "commands/sdd.md" "test_salida_por_rol — punto de entrada 1"
+assert_contains "$out" "sdd-plan/SKILL.md" "test_salida_por_rol — punto de entrada 2"
+assert_contains "$out" "enrich-user-story/SKILL.md" "test_salida_por_rol — punto de entrada 3"
+
+# ---------- AC17bis (regresión sobre reviewer, el caso que originó MAJOR 10) ----------
+printf '\n-- test_salida_por_rol_reviewer (AC17bis)\n'
+out_rev0="$(bash "$BUDGET" reviewer "$REPO_ROOT" 2>&1)"; rc_rev0=$?
+assert_exit 0 "$rc_rev0" "test_salida_por_rol_reviewer"
+n_files_script_rev="$(printf '%s\n' "$out_rev0" | grep -cE '^  +[0-9]+ +[0-9]+ +[a-z]')"
+n_files_independiente_rev="$(poblacion_independiente reviewer | grep -c .)"
+assert_eq "$n_files_script_rev" "$n_files_independiente_rev" \
+  "test_salida_por_rol_reviewer — coincide con la re-derivación independiente ($n_files_independiente_rev)"
 
 # ---------- AC18 ----------
 printf '\n-- test_declara_aproximacion (AC18)\n'
@@ -76,11 +112,16 @@ bash "$BUDGET" >/dev/null 2>&1; rc_none=$?
 assert_exit 2 "$rc_none" "test_rol_invalido — sin argumentos"
 
 # Triple de mutación (AC19): quitar la validación de rol del bloque de argv.
-# El mutante sale 1, no 0: al quitar la validación, $ROLE no matchea ningún
-# case de ENTRY_POINTS, ENTRY_POINTS queda sin asignar y `set -u` corta — la
-# validación es load-bearing por dos vías. Lo que el triple prueba es que la
-# DETECCIÓN se pierde (deja de salir 2), no un valor particular de reemplazo
-# (RT15: no se predice el exit code del mutante, se compara contra las otras
+# El mutante sale 0, no 2 — medido, no el 1 que un comentario anterior de
+# este archivo predecía (hallazgo de ronda 2, MINOR m1). $ROLE no matchea
+# ningún case de ENTRY_POINTS, así que ENTRY_POINTS queda sin asignar; la
+# referencia sin asignar ocurre DENTRO de una sustitución de comando
+# (`STANDARDS_REFS="$(for ep in $ENTRY_POINTS ...)"`), y bajo `set -u` sin
+# `-e` un error ahí no mata al script padre — la sustitución devuelve vacío
+# y la ejecución sigue, terminando con `TOTAL 0 0 0` y exit 0. Lo que el
+# triple prueba es que la DETECCIÓN se pierde (deja de salir 2), no un valor
+# particular de reemplazo (RT15: no se predice el exit code del mutante, se
+# compara contra las otras
 # corridas).
 awk '
   /^case " \$ROLES " in$/ { skip=1 }

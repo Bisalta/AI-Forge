@@ -24,14 +24,15 @@ printf '\n-- test_backfill_gen94_completo (AC21)\n'
 # v7: el backfill original (v6, "exactamente 3") sólo grepeaba ESCALATE|REJECTED
 # literal sobre el historial de versiones — no veía E4/E5 (llegaron por "review
 # APPROVED con gaps" y "re-review", nunca con esas palabras) ni E6 (BLOCKED).
-# Encontrado por revisión externa (reviewer-agent, ronda 1). Re-derivado leyendo
-# las 8 entradas completas del historial contra la definición de
-# orchestration.md §6.1: son 6, no 3.
+# Re-derivado a 6 en v7. v8: el propio ciclo GEN-101 no había registrado sus
+# dos REJECTED (ronda 1 y ronda 2 del reviewer) — hallazgo de la ronda 2 sobre
+# el propio mecanismo, MAJOR M5. Van E7/E8. Total: 8.
 n_eventos="$(grep -cE '^\| E[0-9]+ \|' "$LEDGER")"
-assert_eq "$n_eventos" "6" "test_backfill_gen94_completo — 6 filas de evento (recontadas tras el hallazgo de revisión externa)"
+assert_eq "$n_eventos" "8" "test_backfill_gen94_completo — 8 filas de evento (6 de GEN-94 + 2 del propio GEN-101)"
 n_plan="$(grep -cE '^\| E[0-9]+ \|.*\| plan \|' "$LEDGER")"
-assert_eq "$n_plan" "6" "test_backfill_gen94_completo — las 6 son Clase plan"
-assert_contains "$(cat "$LEDGER")" "sicop-hardening" "test_backfill_gen94_completo — ciclo nombrado"
+assert_eq "$n_plan" "8" "test_backfill_gen94_completo — las 8 son Clase plan"
+assert_contains "$(cat "$LEDGER")" "sicop-hardening" "test_backfill_gen94_completo — ciclo GEN-94 nombrado"
+assert_contains "$(cat "$LEDGER")" "consumo GEN-101" "test_backfill_gen94_completo — el propio ciclo también está registrado (no sólo el ajeno)"
 assert_contains "$(cat "$LEDGER")" "orchestration.md" "test_backfill_gen94_completo — referencia la definición cerrada de §6.1"
 
 # ---------- AC22 ----------
@@ -44,17 +45,19 @@ assert_eq "$out" "sdd-escalation-tally 0.1.0" "test_version — cadena exacta"
 printf '\n-- test_tally_cuenta_correcto (AC23)\n'
 out="$(bash "$TALLY" "$LEDGER" 2>&1)"; rc=$?
 assert_exit 0 "$rc" "test_tally_cuenta_correcto"
-assert_contains "$out" "TOTAL 6" "test_tally_cuenta_correcto — total"
-assert_contains "$out" "plan       6" "test_tally_cuenta_correcto — plan 6"
+assert_contains "$out" "TOTAL 8" "test_tally_cuenta_correcto — total"
+assert_contains "$out" "plan       8" "test_tally_cuenta_correcto — plan 8"
 
-# Triple de mutación (AC23): agregar una séptima fila con Clase decisión a una copia.
+# Triple de mutación (AC23): agregar una novena fila con Clase decisión a una
+# copia. ID "E9" a propósito — el ledger real ya tiene E1-E8, usar "E7" acá
+# (como en v7) ahora colisionaría visualmente con la fila real E7.
 cp "$LEDGER" "$TMP/ledger_mas_una.md"
-printf '| E7 | 2026-08-26 | fixture-test | evento de prueba | decisión | ninguna |\n' >> "$TMP/ledger_mas_una.md"
+printf '| E9 | 2026-08-27 | fixture-test | evento de prueba | decisión | ninguna |\n' >> "$TMP/ledger_mas_una.md"
 out_m="$(bash "$TALLY" "$TMP/ledger_mas_una.md" 2>&1)"
-assert_contains "$out_m" "TOTAL 7" "test_tally_cuenta_correcto — MUTANTE ve la fila nueva (rojo esperado)"
+assert_contains "$out_m" "TOTAL 9" "test_tally_cuenta_correcto — MUTANTE ve la fila nueva (rojo esperado)"
 assert_contains "$out_m" "decisión   1" "test_tally_cuenta_correcto — MUTANTE clasifica la fila nueva"
 out_r="$(bash "$TALLY" "$LEDGER" 2>&1)"
-assert_contains "$out_r" "TOTAL 6" "test_tally_cuenta_correcto — revertido (el ledger real nunca se tocó)"
+assert_contains "$out_r" "TOTAL 8" "test_tally_cuenta_correcto — revertido (el ledger real nunca se tocó)"
 
 # ---------- AC24 ----------
 printf '\n-- test_tally_detecta_clase_ausente (AC24)\n'

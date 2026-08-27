@@ -6,7 +6,7 @@ trabajo — acá, el planner corriendo inline sin spawn de subagentes (declarado
 acá **no corrió**, independientemente de lo que diga cualquier resumen previo en el chat.
 
 - **Branch**: `refactor-GEN-101-optimizacion-consumo`
-- **Contract**: `SDD/contracts/2026-08-25-consumption-optimization.md` v7
+- **Contract**: `SDD/contracts/2026-08-25-consumption-optimization.md` v8
 - **Commit evaluado**: HEAD al momento de escribir este archivo (ver el commit real en el log de git — este archivo se escribe antes del commit final del ciclo, así que no hay un sha fijo previo que citar sin mentir)
 - **Doc de gates del repo**: `SDD/docs/doc_quality_gates.md` — hash en cada reporte generado referenciado abajo
 
@@ -63,8 +63,10 @@ se genera y commitea junto con este archivo (mismo patrón que R1/R2-R3/R4/R6, s
 
 ## Prueba por mutación (ACs de detección)
 
-12 secciones — todas las ACs de detección del contract completo (R1: AC19, AC20 · R2: AC10 ·
-R4: AC1, AC2, AC3, AC4, AC6, AC9, AC27 · R6: AC23, AC24). Cada triple se corrió de verdad,
+12 secciones — las 11 ACs de detección del contract completo (R1: AC19, AC20 · R2: AC10 · R4:
+AC1, AC2, AC3, AC4, AC6, AC9 · R6: AC23, AC24) más AC27 (R4), que **no** es de detección por
+§10.1 pero lleva triple voluntario (ver su sección, corregida tras MINOR m4 de ronda 2). Cada
+triple se corrió de verdad,
 contra archivos reales o copias en tmpdir — nunca contra el repo commiteado (verificado:
 `git status --short` después de las 12 corridas no muestra ningún archivo tocado por una
 mutación, sólo los cambios intencionales de este ciclo).
@@ -171,7 +173,7 @@ ambas", no sólo "sale 2".
 
 ### AC27 — `concerns:` en blockquote no produce falso `BLOCKER` (v7, hallazgo de revisión externa)
 
-- **Mutación declarada**: revertir el fix del strip-prefix (quitar `'|'*|'>'*` del case) · reproduce el falso positivo · queda revertida.
+- **Triple voluntario, no exigido por §10.1** (corregido tras ronda 2, MINOR m4 — la versión previa de este archivo decía "mutación declarada", pero el contract clasifica AC27 junto a AC5/AC7 como afirmación de ausencia-de-falso-positivo, no como AC de detección; §10.1 no lo exige). Se documenta igual porque ya se ejecutó y es evidencia real de que el fix sostiene: revertir el strip-prefix (quitar `'|'*|'>'*` del case) reproduce el falso positivo.
 
 | # | Estado | Exit | Resultado |
 |---|---|---|---|
