@@ -148,3 +148,13 @@ Calidad **verificable** en vez de declarada. El plugin ya cerraba bien *qué* co
 - Agentes: `implementing-agent` (Sonnet), `reviewer-agent` (Opus).
 - Hook statusline + standards + templates de contexto.
 - Pendiente: cableo del orquestador real (spawn de subagentes, protocolo `AGENT_{uuid}`).
+
+## ver-video
+
+### 0.1.0 — 2026-08-31
+- Plugin nuevo: **Claude ve un video** — fotogramas por cambio de pantalla (ffmpeg, 1024 px para leer texto de UIs) + transcripción con **whisper corriendo local** (faster-whisper, CPU). Nada sale de la máquina: sin APIs externas ni keys; la única descarga es el modelo la primera vez. Nació de auditar el plugin público `claude-watch` (limpio de malware pero roto en ffmpeg 9, captions solo en inglés, y sube el audio a Groq/OpenAI — incompatible con la política de herramientas aprobadas).
+- Caso de uso principal: grabaciones de pantalla de usuarios haciendo trabajo manual — la skill produce un **mapa del proceso** (pasos por sistema, decisiones humanas vs. transporte de datos, fricciones, candidatos de automatización) en vez de un resumen. Validado con un expediente real de liquidación de importaciones (12 min, 6 sistemas).
+- Acepta rutas locales y URLs (descarga directa o Drive compartido-por-enlace; archivos restringidos → navegador o Drive for Desktop). `--start`/`--end` para re-pasadas densas (2 fps) sobre una sección.
+- Multiplataforma Windows/macOS/Linux: stdout UTF-8 forzado (sin crash de tildes en cp1252), detección de escenas con `-fps_mode` y fallback `-vsync` (ffmpeg viejo y 8+/9), preflight `--check` con comandos de instalación por OS. Degrada limpio a solo-fotogramas sin audio o sin faster-whisper.
+- 13 tests con videos sintéticos generados por ffmpeg (sin red); transcripción verificada palabra-perfecta en español (es-MX) con timestamps.
+- Nuevo comando `/ver-video:ver-video`; la skill también dispara sola cuando el usuario comparte un archivo de video.

@@ -1,0 +1,10 @@
+{
+  "name": "ver-video",
+  "version": "0.1.0",
+  "description": "Claude ve un video local o de Drive: extrae fotogramas con ffmpeg (por cambio de pantalla) y transcribe con whisper corriendo local — nada sale de la máquina, sin APIs externas. Pensado para grabaciones de pantalla de usuarios trabajando: mapear procesos manuales para automatizarlos, repros de bugs, demos.",
+  "author": {
+    "name": "Bisalta Ltda",
+    "url": "https://github.com/Bisalta"
+  },
+  "keywords": ["video", "screen-recording", "ffmpeg", "whisper", "transcripcion", "procesos", "automatizacion"]
+}
