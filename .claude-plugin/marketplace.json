@@ -17,6 +17,11 @@
       "name": "project-foundation",
       "source": "./plugins/project-foundation",
       "description": "Crea o back-fillea los seis documentos fundacionales de un proyecto (PRD, TRD, UI/UX Brief, App Flow, Backend Schema, Implementation Plan) desde cero o derivando de un codebase existente."
+    },
+    {
+      "name": "ver-video",
+      "source": "./plugins/ver-video",
+      "description": "Claude ve un video local o de Drive: fotogramas por cambio de pantalla (ffmpeg) + transcripcion con whisper local — nada sale de la maquina. Para mapear procesos manuales grabados y decidir como automatizarlos, repros de bugs y demos."
     }
   ]
 }
