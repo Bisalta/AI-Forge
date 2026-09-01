@@ -12,6 +12,34 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ## sdd-flow
 
+### 0.12.1 — 2026-09-01
+
+Bugfix, hallazgo externo: un ciclo SDD en Bisalta/WMS-Back (`WMS-34`, 2026-09-01), corriendo la
+copia cacheada del plugin, midió que `sdd-check.sh` arranca cualquier repo nuevo con su propio
+gate en rojo permanente. Cierra `SDD/debt.md` D11 (abierta desde `sicop-hardening`) — ver
+`SDD/retro.md` RT22 para el detalle completo, incluida una tercera forma del mismo defecto que
+apareció recién al escribir el test de regresión.
+
+- **`sdd-check.sh` ya no se detecta a sí mismo** (0.10.0 → 0.11.0). Las reglas `supresor` /
+  `test-skipeado` / `no-verify` necesariamente contienen los literales que buscan
+  (`@ts-ignore`, `eslint-disable`, `--no-verify`, `@Disabled`...) — sin exclusión, cualquier
+  repo que reciba el script recién copiado por `/sdd-init` arranca con el primer commit en rojo
+  permanente contra sí mismo. Fix con el precedente ya aceptado en el repo: auto-exclusión por
+  path, igual que `SDD/tests/secret-scan.sh` (nunca por directorio o extensión — eso ciega el
+  chequeo, `SDD/debt.md` D6).
+- **El loop de patrones custom (`sdd-check.patterns`) ahora comparte el guard `.md`** que las
+  tres reglas built-in ya tenían (AC42) y no había heredado. Sin esto, un reporte de evidencia
+  commiteado (`quality-gates.md` §5) que cita el literal de un patrón custom como parte de lo
+  que encontró se vuelve una violación nueva la próxima corrida — y como los reportes se
+  acumulan sin sobreescribirse (R1, R2, R3...), el falso positivo sólo crece.
+- **Auto-exclusión extendida al propio `sdd-check.patterns`**: el archivo de patrones declara
+  el ERE como texto plano, así que por construcción contiene el literal que busca — al
+  agregarse fresco (regla nueva, repo nuevo) se autodetectaba, misma clase que D11 un nivel más
+  abajo. Encontrado escribiendo el test de regresión, no en el reporte original.
+- Test nuevo: `SDD/tests/test_check_self_scoping.sh` (auto-detección, guard `.md` del loop
+  custom, y un caso de no-regresión que prueba que violaciones reales en archivos normales
+  siguen en rojo).
+
 ### 0.12.0 — 2026-08-27
 
 Validación de consumo del propio plugin (`GEN-101`), a pedido de Gabriel tras medir una sesión
