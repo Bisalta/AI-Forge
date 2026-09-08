@@ -1,0 +1,10 @@
+{
+  "name": "usage-monitor",
+  "version": "0.1.0",
+  "description": "Resumen de atribucion de consumo de Claude Code a partir de un log local de OTel console (CLAUDE_CODE_ENABLE_TELEMETRY) — costo y tokens por modelo, skill y agente, sin exponer session.id, email, ni ningun identificador del log crudo. Convencion descentralizada (opcion B): cada persona guarda su propio log y comparte solo el resumen.",
+  "author": {
+    "name": "Bisalta Ltda",
+    "url": "https://github.com/Bisalta"
+  },
+  "keywords": ["opentelemetry", "otel", "consumo", "costo", "tokens", "atribucion", "usage"]
+}

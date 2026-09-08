@@ -177,6 +177,15 @@ Calidad **verificable** en vez de declarada. El plugin ya cerraba bien *qué* co
 - Hook statusline + standards + templates de contexto.
 - Pendiente: cableo del orquestador real (spawn de subagentes, protocolo `AGENT_{uuid}`).
 
+## usage-monitor
+
+### 0.1.0 — 2026-09-08
+- Plugin nuevo: **resumen de atribución de consumo de Claude Code** desde un log local de OpenTelemetry (`OTEL_METRICS_EXPORTER=console`). Nace de una investigación real en `#bisalta-context-sdd` (Gabriel Rojas, ~$3k/mes de Opus — se había temido $10k) que descartó `/usage` a mano por sesgo de muestra (una foto de un momento elegido) y descartó centralizar telemetría (opción A, colector OTLP con infraestructura nueva y pregunta de política sin resolver) a favor de la opción **B**, descentralizada, que Patrick Ocampo confirmó el mismo día: cada persona guarda su propio log y comparte solo un resumen.
+- **El parser agrega en dos pasos, no en uno**: los contadores de OTel son acumulativos por sesión (la misma métrica se re-emite en cada intervalo de export con el total-a-la-fecha) — medido: un mismo valor repetido 40 veces en una sesión de segundos. Sumar todas las líneas sobreestimaría el costo real en ese factor. `parse-usage-log.js` toma el **máximo por (sesión, atribución)** y recién esos máximos se **suman entre sesiones**.
+- **El resumen nunca expone el log crudo**: `session.id`, `user.email`, `user.account_uuid`, `organization.id` y el resto de identificadores del log fuente no llegan al output — solo costo/tokens agregados por modelo y por fuente (skill/agente/MCP). Probado explícitamente en `SDD/tests/test_usage_summary.sh`, incluida una corrida mutada que confirma que el test detecta la fuga si el filtro se rompe.
+- Convención de ubicación (`~/.claude/usage-log/console.log`, configurable vía `$CLAUDE_USAGE_LOG`) documentada en `README.md` como la **propuesta** de Esteban Fait del 2026-09-07 — pendiente de confirmación explícita de Patrick al momento de este release.
+- Nuevo comando `/usage-monitor:usage-summary`.
+
 ## ver-video
 
 ### 0.1.0 — 2026-08-31

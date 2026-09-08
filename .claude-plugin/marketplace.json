@@ -22,6 +22,11 @@
       "name": "ver-video",
       "source": "./plugins/ver-video",
       "description": "Claude ve un video local o de Drive: fotogramas por cambio de pantalla (ffmpeg) + transcripcion con whisper local — nada sale de la maquina. Para mapear procesos manuales grabados y decidir como automatizarlos, repros de bugs y demos."
+    },
+    {
+      "name": "usage-monitor",
+      "source": "./plugins/usage-monitor",
+      "description": "Resumen de atribucion de consumo de Claude Code desde un log local de OTel console — costo y tokens por modelo, skill y agente, sin exponer session.id, email ni ningun identificador del log crudo."
     }
   ]
 }
