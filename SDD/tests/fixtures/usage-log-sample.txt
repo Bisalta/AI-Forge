@@ -1,0 +1,197 @@
+{
+  descriptor: {
+    name: "claude_code.session.count",
+    type: "COUNTER",
+    description: "Count of CLI sessions started",
+    unit: "",
+    valueType: 1,
+    advice: {},
+  },
+  dataPointType: 3,
+  dataPoints: [
+    {
+      attributes: {
+        "user.id": "fakehash-a",
+        "session.id": "session-A",
+        "organization.id": "fake-org-1",
+        "user.email": "test@example.com",
+        "user.account_uuid": "fake-uuid-a",
+        "user.account_id": "user_fakeA",
+        "terminal.type": "non-interactive",
+        start_type: "fresh",
+      },
+      startTime: [ 1000, 0 ],
+      endTime: [ 1001, 0 ],
+      value: 1,
+    }
+  ],
+}
+{
+  descriptor: {
+    name: "claude_code.cost.usage",
+    type: "COUNTER",
+    description: "Cost of the Claude Code session",
+    unit: "USD",
+    valueType: 1,
+    advice: {},
+  },
+  dataPointType: 3,
+  dataPoints: [
+    {
+      attributes: {
+        "user.id": "fakehash-a",
+        "session.id": "session-A",
+        "organization.id": "fake-org-1",
+        "user.email": "test@example.com",
+        "user.account_uuid": "fake-uuid-a",
+        "user.account_id": "user_fakeA",
+        "terminal.type": "non-interactive",
+        model: "claude-sonnet-5",
+        query_source: "main",
+        effort: "medium",
+      },
+      startTime: [ 1000, 0 ],
+      endTime: [ 1010, 0 ],
+      value: 0.3,
+    }
+  ],
+}
+{
+  descriptor: {
+    name: "claude_code.cost.usage",
+    type: "COUNTER",
+    description: "Cost of the Claude Code session",
+    unit: "USD",
+    valueType: 1,
+    advice: {},
+  },
+  dataPointType: 3,
+  dataPoints: [
+    {
+      attributes: {
+        "user.id": "fakehash-a",
+        "session.id": "session-A",
+        "organization.id": "fake-org-1",
+        "user.email": "test@example.com",
+        "user.account_uuid": "fake-uuid-a",
+        "user.account_id": "user_fakeA",
+        "terminal.type": "non-interactive",
+        model: "claude-sonnet-5",
+        query_source: "main",
+        effort: "medium",
+      },
+      startTime: [ 1000, 0 ],
+      endTime: [ 1020, 0 ],
+      value: 0.75,
+    }
+  ],
+}
+{
+  descriptor: {
+    name: "claude_code.cost.usage",
+    type: "COUNTER",
+    description: "Cost of the Claude Code session",
+    unit: "USD",
+    valueType: 1,
+    advice: {},
+  },
+  dataPointType: 3,
+  dataPoints: [
+    {
+      attributes: {
+        "user.id": "fakehash-a",
+        "session.id": "session-A",
+        "organization.id": "fake-org-1",
+        "user.email": "test@example.com",
+        "user.account_uuid": "fake-uuid-a",
+        "user.account_id": "user_fakeA",
+        "terminal.type": "non-interactive",
+        model: "claude-sonnet-5",
+        query_source: "subagent",
+        "skill.name": "sdd-flow:sdd-plan",
+        effort: "high",
+      },
+      startTime: [ 1000, 0 ],
+      endTime: [ 1030, 0 ],
+      value: 1.0,
+    }
+  ],
+}
+{
+  descriptor: {
+    name: "claude_code.token.usage",
+    type: "COUNTER",
+    description: "Number of tokens used",
+    unit: "tokens",
+    valueType: 1,
+    advice: {},
+  },
+  dataPointType: 3,
+  dataPoints: [
+    {
+      attributes: {
+        "user.id": "fakehash-a",
+        "session.id": "session-A",
+        "organization.id": "fake-org-1",
+        "user.email": "test@example.com",
+        "user.account_uuid": "fake-uuid-a",
+        "user.account_id": "user_fakeA",
+        "terminal.type": "non-interactive",
+        model: "claude-sonnet-5",
+        query_source: "main",
+        effort: "medium",
+        type: "input",
+      },
+      startTime: [ 1000, 0 ],
+      endTime: [ 1020, 0 ],
+      value: 500,
+    }, {
+      attributes: {
+        "user.id": "fakehash-a",
+        "session.id": "session-A",
+        "organization.id": "fake-org-1",
+        "user.email": "test@example.com",
+        "user.account_uuid": "fake-uuid-a",
+        "user.account_id": "user_fakeA",
+        "terminal.type": "non-interactive",
+        model: "claude-sonnet-5",
+        query_source: "main",
+        effort: "medium",
+        type: "output",
+      },
+      startTime: [ 1000, 0 ],
+      endTime: [ 1020, 0 ],
+      value: 300,
+    }
+  ],
+}
+{
+  descriptor: {
+    name: "claude_code.cost.usage",
+    type: "COUNTER",
+    description: "Cost of the Claude Code session",
+    unit: "USD",
+    valueType: 1,
+    advice: {},
+  },
+  dataPointType: 3,
+  dataPoints: [
+    {
+      attributes: {
+        "user.id": "fakehash-b",
+        "session.id": "session-B",
+        "organization.id": "fake-org-1",
+        "user.email": "test@example.com",
+        "user.account_uuid": "fake-uuid-b",
+        "user.account_id": "user_fakeB",
+        "terminal.type": "non-interactive",
+        model: "claude-sonnet-5",
+        query_source: "main",
+        effort: "low",
+      },
+      startTime: [ 2000, 0 ],
+      endTime: [ 2005, 0 ],
+      value: 2.0,
+    }
+  ],
+}
