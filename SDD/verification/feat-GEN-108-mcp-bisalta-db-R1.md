@@ -1,22 +1,22 @@
 # Gates run — generado por sdd-run-gates.sh v0.12.0
 
-- **Branch**: `feat-GEN-108-mcp-bisalta-db` · **Commit**: `8093281` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:a8f010a76c4f561a`) · **Fecha**: 2026-09-18T18:46:26Z
-- Tree: `d473492882905d6b10119938a3ff0536011fec76` — LIMPIO
+- **Branch**: `feat-GEN-108-mcp-bisalta-db` · **Commit**: `768f6f5` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-09-18T21:58:47Z
+- Tree: `f0b977396b20f79cb2e3b1310e976eb8dc2f3a9a` — LIMPIO
 - Este archivo lo escribió el runner, no un modelo. Editarlo a mano invalida la evidencia.
 
 | # | Gate | Comando | Exit | Timestamp UTC | Resultado |
 |---|---|---|---|---|---|
-| 1 | format / style | — | — | 2026-09-18T18:45:38Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
-| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-09-18T18:45:38Z | verde |
-| 3 | type-check | — | — | 2026-09-18T18:45:39Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
-| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-09-18T18:45:39Z | verde |
-| 5 | integration | — | — | 2026-09-18T18:46:02Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
-| 6 | build | — | — | 2026-09-18T18:46:02Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
-| 7 | e2e | — | — | 2026-09-18T18:46:02Z | [SKIPPED] sin comando en el doc (N/A) |
-| 8 | cobertura del diff | — | — | 2026-09-18T18:46:02Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
-| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-09-18T18:46:02Z | verde |
-| 10 | smoke manual | — | — | 2026-09-18T18:46:03Z | [SKIPPED] sin comando en el doc (N/A) |
-| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-09-18T18:46:03Z | verde |
+| 1 | format / style | — | — | 2026-09-18T21:57:44Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
+| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-09-18T21:57:44Z | verde |
+| 3 | type-check | — | — | 2026-09-18T21:57:45Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
+| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-09-18T21:57:45Z | verde |
+| 5 | integration | — | — | 2026-09-18T21:58:15Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
+| 6 | build | — | — | 2026-09-18T21:58:15Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
+| 7 | e2e | — | — | 2026-09-18T21:58:15Z | [SKIPPED] sin comando en el doc (N/A) |
+| 8 | cobertura del diff | — | — | 2026-09-18T21:58:15Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
+| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-09-18T21:58:15Z | verde |
+| 10 | smoke manual | — | — | 2026-09-18T21:58:16Z | [SKIPPED] sin comando en el doc (N/A) |
+| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-09-18T21:58:16Z | verde |
 
 ## Output por gate (últimas 15 líneas)
 
@@ -29,49 +29,48 @@
 ### Gate 4 — unit tests (exit 0)
 
 ```
-PASS  test_check_self_scoping.sh
-PASS  test_context_budget.sh
 PASS  test_doc_hash.sh
 PASS  test_escalation_ledger.sh
 PASS  test_guard_identity.sh
 PASS  test_harness.sh
 PASS  test_lint_contract_sections.sh
+PASS  test_lista_blanca.sh
 PASS  test_model_tier_policy.sh
 PASS  test_mutation_rule.sh
 PASS  test_run_gates_tree.sh
 PASS  test_run_gates.sh
 PASS  test_secret_scan.sh
+PASS  test_servidor_mcp.sh
 PASS  test_usage_summary.sh
 ---
-14 passed, 0 failed (14 total)
+17 passed, 0 failed (17 total)
 ```
 
 ### Gate 9 — security (exit 0)
 
 ```
-secret-scan: sin hallazgos sobre 148 archivos versionados (1 excluido: self)
+secret-scan: sin hallazgos sobre 163 archivos versionados (1 excluido: self)
 ```
 
 ### Gate — — suite completa (exit 0)
 
 ```
-PASS  test_check_self_scoping.sh
-PASS  test_context_budget.sh
 PASS  test_doc_hash.sh
 PASS  test_escalation_ledger.sh
 PASS  test_guard_identity.sh
 PASS  test_harness.sh
 PASS  test_lint_contract_sections.sh
+PASS  test_lista_blanca.sh
 PASS  test_model_tier_policy.sh
 PASS  test_mutation_rule.sh
 PASS  test_run_gates_tree.sh
 PASS  test_run_gates.sh
 PASS  test_secret_scan.sh
+PASS  test_servidor_mcp.sh
 PASS  test_usage_summary.sh
 ---
-14 passed, 0 failed (14 total)
+17 passed, 0 failed (17 total)
 ```
-
 
 ---
 
@@ -449,3 +448,117 @@ verde después de este trabajo — ronda 3 no tocó ningún script ni test que
 esa suite ejercite (los tres archivos cambiados son prosa/comentarios de
 `plugins/bisalta-db/aprovisionamiento/`, fuera del glob de `SDD/tests/`).
 
+
+---
+
+# Addendum de ronda 4 — reapertura v4→v5 (CCR de Patrick Ocampo, no rechazo de review)
+
+Este addendum se escribió cuando el bloque superior del archivo era la
+salida de `sdd-run-gates.sh` sellada en el commit `768f6f5` (tree
+`f0b977396b20f79cb2e3b1310e976eb8dc2f3a9a`, ver encabezado hasta arriba de
+este archivo). El runner **sobreescribe el archivo completo** (`> "$OUT"`,
+trampa conocida D34/D35) — este addendum, igual que los de rondas 1-3, se
+pega DESPUÉS de la última corrida del runner, sobre el árbol ya
+commiteado.
+
+## Por qué se reabrió esta ronda
+
+No es un rechazo de review: Patrick Ocampo (Slack, 18-sep-2026) midió el
+cluster de dev/qa y encontró que `pg_read_all_data` es una membresía de
+CLUSTER, y que Postgres concede `CONNECT` a PUBLIC por omisión en toda
+base. Consecuencia medida: un rol con esa membresía alcanza las **29**
+bases del cluster de dev/qa desde que existe, no las 2 que declara el
+catálogo de la aplicación. `postgres-parte-b.sql` nunca fue la barrera de
+acceso — contrario a lo que su prosa original afirmaba. Contract v4→v5
+(ratificado) pidió seis correcciones; las seis quedan implementadas en
+esta ronda, con AC41 y AC42 como los ACs nuevos que las verifican.
+
+## Prueba por mutación — AC9, re-corrida sobre el árbol de ronda 4
+
+`postgres-parte-a.sql` cambió de contenido en esta ronda (nueva cita a
+`postgres-parte-0.sql` en su encabezado), así que el triple se re-corre
+completo en vez de asumirse heredado de rondas 1-3.
+
+**Mutación declarada en el contract (AC9)**: insertar en
+`postgres-parte-a.sql` un literal con forma de credencial (clave,
+separador y valor contiguos); el scan tiene que salir distinto de 0
+nombrando el archivo y la línea sin imprimir el valor; revertir la línea.
+
+| # | Estado del sistema | Comando | Exit code | Resultado |
+|---|---|---|---|---|
+| 1 | intacto (163 archivos versionados, tras `git add -A` de esta ronda) | `bash SDD/tests/secret-scan.sh` | 0 | verde — `sin hallazgos sobre 163 archivos versionados (1 excluido: self)` |
+| 2 | mutado — línea agregada al final de `postgres-parte-a.sql`: clave `password`, separador ` = `, valor de relleno con forma de access key de AWS (prefijo `AKIA` + 16 caracteres alfanuméricos, construido en dos variables de shell para no quedar contiguo ni en el archivo ni en la transcripción de la sesión) | `bash SDD/tests/secret-scan.sh` | 1 | rojo — `plugins/bisalta-db/aprovisionamiento/postgres-parte-a.sql:62: posible secreto (standards/security.md §3) — valor no impreso` seguido de `secret-scan: hallazgos arriba — BLOCKER`. El valor detectado no se imprimió en ningún momento. |
+| 3 | revertido (`sed -i '' '$ d' postgres-parte-a.sql`, última línea eliminada) | `git diff -- plugins/bisalta-db/aprovisionamiento/postgres-parte-a.sql` → vacío (reversión exacta contra el índice, que ya tenía el archivo sin mutar por el `git add -A` previo) · luego `bash SDD/tests/secret-scan.sh` | 0 | verde — `sin hallazgos sobre 163 archivos versionados (1 excluido: self)` |
+
+Ningún fix de esta ronda tocó `secret-scan.sh` ni le agregó una exclusión
+por path. El literal de la mutación nunca se commiteó: se agregó, se
+corrió el scan, se revirtió con `sed`, todo dentro del mismo tramo de
+trabajo, antes de este commit final.
+
+## Verificación del gate 9 sobre el árbol final ya commiteado (trampa D34/D35)
+
+El runner sella el árbol en el commit `768f6f5` pero este mismo addendum
+se agrega DESPUÉS de esa corrida — por diseño del runner (trunca `-o`),
+el archivo de evidencia queda fuera del árbol que el runner selló. Por
+eso, después de pegar este addendum y comittear el resultado, se vuelve a
+correr `bash SDD/tests/secret-scan.sh` sobre el árbol final ya
+commiteado — ese es el único verde que cuenta para esta ronda, y su
+comando + exit code van citados en la sección "Validation Executed
+(ronda 4)" del brief (`SDD/briefs/R1-infra-accesos-lectura.md`), no acá,
+para no duplicar la misma corrida en dos archivos con riesgo de que uno
+quede desactualizado si el otro se corrige.
+
+## AC41 y AC42 — nuevos, `manual-only`, estado tras esta ronda
+
+Los dos requieren infraestructura real (un cluster Postgres para AC41, la
+instancia `Dev SQL` para AC42) que ningún harness de este repo levanta.
+Sus pasos exactos, con la mutación declarada del contract, quedan
+escritos en `RUNBOOK.md` (secciones "AC41 — la Parte 0 aborta por lo que
+el cluster CONTIENE, no por el nombre de la base" y "AC42 — el user tiene
+las dos membresías, y el `DENY` gana"). Estado: **pendiente-de-ejecucion**
+para las dos — no se declaran en verde sin haber corrido contra
+infraestructura real, mismo criterio que AC1–AC8 y AC10 desde ronda 1.
+
+## AC1–AC10 — sin cambio en la naturaleza de la evidencia
+
+AC1–AC8 y AC10 siguen `manual-only`/automatizable respectivamente, sin
+cambios de fondo en esta ronda más que la corrección de cifras (AC7,
+AC10: 32 en vez de "~35") y la inserción del paso de Parte 0 antes del
+paso 1 en "Orden de ejecución". AC9 re-verificado arriba con su triple
+completo. AC10 (`grep -ni "no queda cubierta" RUNBOOK.md`) re-corrido
+tras la reescritura del párrafo: `bash -c 'grep -ni "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md'` → exit 0, línea 514 en la versión final de esta ronda (desplazada por las secciones AC41/AC42 nuevas insertadas antes).
+
+## Impact set — ronda 4
+
+Dos archivos existentes cambiaron de contenido semántico (no sólo
+comentarios) por primera vez en R1: `plugins/bisalta-db/scripts/catalogo.js`
+(enum `GARANTIAS` suma `'deny-escritura'`) y `plugins/bisalta-db/catalogo.json`
+(entrada `dev-sql` suma esa garantía). Consumidores grepeados:
+
+```
+$ grep -rn "require(.\./catalogo\|require('./catalogo" plugins/bisalta-db/scripts/*.js
+plugins/bisalta-db/scripts/servidor-mcp.js:35:const catalogo = require('./catalogo.js');
+```
+
+`servidor-mcp.js` importa el módulo pero no referencia `GARANTIAS`
+directamente (grepeado: sin coincidencias de `GARANTIAS` fuera de
+`catalogo.js`) — el símbolo que cambió es sólo consumido por la propia
+función de validación del mismo archivo y por `SDD/tests/test_catalogo.sh`
+(AC11–AC14, AC36), corrido antes y después del cambio con resultado `PASS`
+las dos veces (ver brief, "Validation Executed (ronda 4)").
+
+Los siete archivos de `aprovisionamiento/` (seis modificados + uno nuevo)
+siguen sin ningún caller dentro del repo:
+
+```
+$ grep -rl "aprovisionamiento" --include="*.sh" --include="*.js" SDD/ plugins/ 2>/dev/null
+```
+
+Sin coincidencias (además de la prosa del propio brief/runbook/contract).
+
+## Rojos preexistentes
+
+Ninguno. La suite completa (17 archivos — creció de 14 a 17 entre rondas
+por trabajo de otros ciclos del propio plugin `sdd-flow`, no de este
+brief; `AC40`/`AC38` de este contract exigen derivar la cifra, no
+citarla) está verde en la base y sigue verde después de esta ronda.
