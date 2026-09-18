@@ -87,6 +87,14 @@ Los tests viven **sólo** en `SDD/tests/` e invocan los scripts por su path comp
 - [x] T6.1 Commitear (árbol limpio) y correr la escalera completa: `bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -o SDD/verification/feat-GEN-108-mcp-bisalta-db-R2.md`. **AC40.**
 - [x] T6.2 Pegar en el verification report, a mano, los **dieciséis triples** de mutación con comando literal y exit code de cada corrida.
 
+### Ronda 2 — un BLOCKER y tres `MINOR` del review
+
+- [x] T7.1 (BLOCKER, gate 9) Partir los dos literales del addendum que disparaban `secret-scan.sh` (`:187` el patch de la mutación de AC23, `:325` la lista de literales partidos). **Sin exclusión por path.**
+- [x] T7.2 (BLOCKER) Commitear con el árbol limpio, re-correr el runner, re-pegar el addendum (`D34`), y **declarar en el report la corrida de `secret-scan.sh` sobre el árbol final, post-addendum y ya commiteado**, con su exit code — que es lo que faltó en la ronda 1. §0.1 y §0.2 del report.
+- [x] T7.3 (MINOR) Test del `catalogo_invalido → exit 2` que el contract v3 agregó y la ronda 1 dejó sin cubrir. Seis afirmaciones + control positivo, sobre las dos rutas de carga del catálogo, probadas por mutación.
+- [x] T7.4 (MINOR) Corregir la transcripción del rojo de la mutación de AC11 (declaraba dos asserts caídos; cae uno). Re-medido.
+- [x] T7.5 (MINOR) Propagar las citas de `contract v2` a `v3` y grepear el valor viejo sobre el árbol entero (RT20) antes de cerrar.
+
 ## Acceptance criteria (IDs del contract v1 — no los renumeres)
 
 `AC11`–`AC40`, todos tuyos. Ninguno es de R1.
@@ -102,6 +110,7 @@ La mutación se aplica **sobre el sistema que el AC vigila, nunca sobre el test*
 | AC | Test (nombre literal del mensaje de assert) | Archivo | Estado |
 |---|---|---|---|
 | AC11 | `AC11 el validador sale distinto de 0 con un ambiente que no es dev ni qa` (+5) | `SDD/tests/test_catalogo.sh` | pass |
+| tabla de errores — `catalogo_invalido` (v3) | `con un catálogo ilegible, consultar devuelve el código 2` (+5, más el control `control: contra el catálogo vivo la misma invocación NO sale 2`) | `SDD/tests/test_servidor_mcp.sh` | pass — agregado en ronda 2 |
 | AC12 | `AC12 el validador rechaza una entrada cuyo host es el de Prod SQL` (+4) | `SDD/tests/test_catalogo.sh` | pass |
 | AC13 | `AC13 el validador rechaza una entrada con un campo no declarado` (+3) | `SDD/tests/test_catalogo.sh` | pass |
 | AC14 | `AC14 el validador rechaza una entrada con garantias vacío` (+2) | `SDD/tests/test_catalogo.sh` | pass |
@@ -185,8 +194,8 @@ deriva; escrito en el README del plugin. No hizo falta `BLOCKED`.
 
 ### Task Status
 
-Total: 20 pasos · completados: **19** · `[N/A]` con medición: **1** (T5.2 punto (a)) ·
-bloqueados: **0**.
+Total: **25** pasos (20 de ronda 1 + 5 de ronda 2) · completados: **24** · `[N/A]` con
+medición: **1** (T5.2 punto (a)) · bloqueados: **0**.
 
 T5.2(a) no se aplicó porque el plugin no tiene ningún `.sh`, y agregar
 `plugins/bisalta-db/scripts/*.sh` al glob del gate 2 lo pone en rojo permanente
@@ -195,25 +204,40 @@ T5.2(a) no se aplicó porque el plugin no tiene ningún `.sh`, y agregar
 
 ### Validation Executed
 
-Escalera completa por el runner, **sin editar su salida**:
+Escalera completa por el runner, **sin editar su salida** (ronda 2):
 `bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -o SDD/verification/feat-GEN-108-mcp-bisalta-db-R2.md`
-→ **exit 0**, `{"green":4,"red":0,"skipped":7}`, árbol **LIMPIO** sobre el commit `ee4a5ae`.
+→ **exit 0**, `{"green":4,"red":0,"skipped":7}`, árbol **LIMPIO** sobre el commit `24c366c`
+(tree `9eac66a`).
 
 | Gate | Comando | Exit |
 |---|---|---|
 | 2 lint | `shellcheck --severity=warning …` | 0 |
 | 4 unit tests | `bash SDD/tests/run.sh` | 0 (17 archivos, 0 fallos) |
-| 9 security | `bash SDD/tests/secret-scan.sh` | 0 (159 archivos versionados) |
+| 9 security | `bash SDD/tests/secret-scan.sh` | 0 (160 archivos versionados) |
 | — suite completa | `bash SDD/tests/run.sh` | 0 |
 | 1, 3, 5, 6, 7, 8, 10 | `[SKIPPED]` — sin comando en el doc (`N/A` declarado) | — |
 
-Los diecisiete triples, el impact set, los `manual-only` y los desvíos están en
-`SDD/verification/feat-GEN-108-mcp-bisalta-db-R2.md`, §2 a §6. **Rojos preexistentes de
+🔴 **El gate 9 también se midió fuera del runner, sobre el árbol final**: el runner
+trunca el archivo de `-o`, así que su sello es **anterior** al re-pegado del addendum
+(`D34`) — que es exactamente por qué el verde de la ronda 1 era cierto sobre un árbol que
+no contenía el archivo que rompía el gate. `bash SDD/tests/secret-scan.sh` sobre el árbol
+**post-addendum y ya commiteado** → **exit 0**, con la comprobación positiva de que el
+report está adentro del árbol medido. Detalle y hashes en §0.1 y §0.2 del report.
+
+Los diecisiete triples declarados por el contract, el triple 18 de ronda 2 (no declarado,
+corrido igual), el impact set, los `manual-only` y los desvíos están en
+`SDD/verification/feat-GEN-108-mcp-bisalta-db-R2.md`, §0 a §7. **Rojos preexistentes de
 la base: ninguno.**
 
 ### Blockers
 
-Ninguno.
+Ninguno **abierto**. El BLOCKER de la ronda 1 (gate 9 rojo en el árbol entregado) quedó
+cerrado por T7.1/T7.2.
+
+Un punto **fuera de mi ownership**, se reporta sin tocar: `plugins/bisalta-db/
+aprovisionamiento/*.sql` (4 citas) y `aprovisionamiento/RUNBOOK.md` (6) siguen citando
+`contract v2` del contract de GEN-108, que hoy es v3. Son archivos de `R1`, ya
+`APPROVED`. El planner decide si entran en el mismo cambio.
 
 Para ratificar (no bloquean, ningún AC depende de ellos) — detalle en
 `verification/…-R2.md` §6: los `nombre` del catálogo llevan guion y no guion bajo porque
@@ -232,9 +256,35 @@ triples donde el contract declara diecisiete.
 **Modificados (4)**: `.claude-plugin/marketplace.json` · `CHANGELOG.md` ·
 `SDD/docs/doc_quality_gates.md` · `SDD/docs/doc_architecture.md`
 
+**Tocados en ronda 2 (9)**: `SDD/verification/feat-GEN-108-mcp-bisalta-db-R2.md` ·
+`SDD/tests/test_servidor_mcp.sh` · `SDD/tests/test_catalogo.sh` ·
+`SDD/tests/test_lista_blanca.sh` · `SDD/docs/doc_quality_gates.md` ·
+`plugins/bisalta-db/scripts/servidor-mcp.js` · `scripts/catalogo.js` ·
+`scripts/lista-blanca.js` · `scripts/conexion.js` — más este brief.
+Los `.js` cambiaron **sólo en comentarios** (cita de versión del contract): el único
+cambio de comportamiento de la ronda es un bloque de test nuevo.
+
 **No se modificó ningún archivo de test preexistente** (AC40, derivado del árbol).
 
-### Final Statement
+### Final Statement — ronda 2
+
+El BLOCKER no fue un defecto del producto: fue **evidencia que medía un árbol distinto
+del entregado**. El runner selló `ee4a5ae`, donde el verification report todavía no
+existía; el report entró después con el addendum pegado, y el addendum era lo que rompía
+el gate 9. El verde era cierto y no servía. El cierre no es sólo partir los dos
+literales — es **medir el gate sobre el árbol final y declarar esa medición**, con la
+comprobación positiva de que el archivo está adentro del universo medido.
+
+Dos cosas que vale la pena que el planner mire, porque aparecieron **solas** mientras se
+escribía el arreglo y son la misma clase: (1) el primer borrador de la sección que
+explica el problema volvió a poner el gate en rojo, al citar el span entero; (2) el
+`grep -c` con el que verifico que el addendum está en el árbol dejó de contar
+encabezados y empezó a contar **su propia cita** dentro del report, sin dejar de
+"pasar". Las dos están en §0 y §0.2. También una precisión sobre el diagnóstico del
+review: el span que matcheaba en `:325` no era `USUARIO_SECRETO=` sino la clave
+`resolverSecreto` con su propio nombre de valor — el fix es el mismo, la forma no.
+
+### Final Statement — ronda 1
 
 R2 queda listo para review. Dos defectos aparecieron en el propio código y se
 arreglaron **por clase y no por instancia**: `process.exit()` cortando `stdout` hacia un

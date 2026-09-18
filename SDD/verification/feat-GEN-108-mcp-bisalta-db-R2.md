@@ -175,8 +175,31 @@ que el árbol integrable sale 0, no que haga falta una tercera.
 ### 0.2 Segunda medición — el árbol integrable
 
 ```
-__PLACEHOLDER__
+$ git rev-parse --short HEAD && git rev-parse HEAD^{tree}
+c93941e
+efe91d5c33c35c97653a35cd59a8dca9d3b0351a
+
+$ git status --porcelain
+                                        # vacío — árbol LIMPIO
+
+$ git show HEAD:SDD/verification/feat-GEN-108-mcp-bisalta-db-R2.md | grep -c '^# Addendum de'
+1                                       # el addendum SÍ está en el árbol medido
+
+$ bash SDD/tests/secret-scan.sh
+secret-scan: sin hallazgos sobre 160 archivos versionados (1 excluido: self)
+EXIT=0
 ```
+
+🔴 **La comprobación de §0.1 había dejado de medir lo que decía medir, y se
+arregló acá.** Sin el ancla `^#`, el `grep -c` de §0.1 devuelve **2** sobre este
+árbol, no 1: el segundo match es **el propio comando citado dentro del bloque de
+código de §0.1**. El número seguía siendo no-cero y el chequeo seguía "pasando",
+pero ya no contaba encabezados — contaba su propia cita. Con `^#` cuenta el
+encabezado y nada más. Es la misma clase que `SDD/retro.md` registra para
+v0.11.0 (*"un triple cuyas tres corridas no se distinguen no es un triple"*) y la
+que `sdd-check.sh` tuvo con su propia prosa: **la medición que se incluye a sí
+misma en el universo medido**. Vale registrarla porque apareció sola, en el
+mismo archivo, dos secciones después de documentarla.
 
 ### Lo demás que cambió en esta ronda
 
