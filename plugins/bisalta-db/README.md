@@ -132,10 +132,11 @@ la barrera es el texto.
 
 | | Postgres (`dev`/`qa`) | SQL Server (`dev-sql`) |
 |---|---|---|
-| Rol de solo lectura | sí | sí — **y es la única barrera** |
-| Sesión abierta en solo lectura | sí | **no existe equivalente** |
+| Rol de solo lectura | sí | sí |
+| Sesión abierta en solo lectura | sí, `default_transaction_read_only=on` | **no existe equivalente** |
+| `DENY` de escritura sobre el rol | no aplica | sí, `db_denydatawriter` — el `DENY` le gana a cualquier `GRANT` |
 | Motor que rechaza escrituras | sí (endpoint `cluster-ro-`) | **no hay réplica** |
-| Alcance del permiso | `pg_read_all_data`, de cluster | `db_datareader`, **por base**: una base nueva no queda cubierta sola |
+| Alcance del permiso | `pg_read_all_data`, de cluster — alcanza las 29 bases del cluster de dev/qa desde que el rol existe, no sólo las del catálogo | `db_datareader` + `db_denydatawriter`, **por base**: una base nueva no queda cubierta sola |
 
 Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que
 evita que alguien asuma que todas las conexiones son igual de seguras.
@@ -158,7 +159,7 @@ si algo no cierra.
 | `base` | cadena no vacía |
 | `secret_id` | identificador o ARN del secreto |
 | `region` | cadena no vacía |
-| `garantias` | al menos un elemento de `rol-solo-lectura`, `sesion-read-only`, `endpoint-replica-lectura` |
+| `garantias` | al menos un elemento de `rol-solo-lectura`, `sesion-read-only`, `endpoint-replica-lectura`, `deny-escritura` |
 
 **No existe campo de usuario ni de contraseña.** Los dos salen del secreto, en
 la forma estándar de RDS: un campo `username` y otro con la contraseña, en la
@@ -294,8 +295,16 @@ registrado como deuda.
 ejecuta una persona con privilegios de administración en cada motor; los
 scripts de esa carpeta no se corren desde acá.
 
+🔴 En Postgres, `pg_read_all_data` es una membresía **de cluster**, y
+Postgres concede `CONNECT` a PUBLIC por omisión en toda base: un rol
+creado por `postgres-parte-a.sql` alcanza las 29 bases del cluster de
+dev/qa desde que existe, no sólo las dos que declara `catalogo.json`. Por
+eso `aprovisionamiento/postgres-parte-0.sql` corre **antes** de crear
+ningún rol y aborta si el cluster contiene alguna base `_prod` — es la
+barrera real, no `postgres-parte-b.sql`.
+
 🔴 En SQL Server, **una base nueva no queda cubierta** hasta re-correr la
-parte B del runbook: `db_datareader` es por base.
+parte B del runbook: `db_datareader` y `db_denydatawriter` son por base.
 
 ## Tests
 

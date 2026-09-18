@@ -1,7 +1,7 @@
 # Task brief — R1 · infra: accesos de solo lectura en Postgres dev/qa y Dev SQL
 
 - **Agente**: `AGENT_r1` · **Modelo**: `sonnet`
-- **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v5**, ACs **AC1–AC10 + AC41 + AC42**
+- **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v6**, ACs **AC1–AC10 + AC41 + AC42**
 - **Arquetipo**: `infra`
 - **Repo**: `.` · **Branch**: `feat-GEN-108-mcp-bisalta-db` (ya creada; **NO crear otra, NO commitear a `prod`**)
 - **Proxima subtask**: `GEN-108.1`, id `cd0ed6b7-fde8-4381-9a69-e4e684498813` (informativo — **vos no tocás Proxima**)
@@ -495,3 +495,183 @@ path nueva. Único archivo tocado fuera del directorio
 `aprovisionamiento/` es `catalogo.js` — una línea, un enum, autorizado
 explícitamente por el contract v5 como excepción nombrada al scope de R1,
 no una decisión propia ni una invasión del scope de R2.
+
+---
+
+## Ronda 5 — un BLOCKER, cuatro MAJOR y decisiones nuevas de Patrick (contract v6)
+
+### Summary
+
+El review de ronda 5 encontró un BLOCKER (tercera instancia de la misma
+forma que J2/M5 de rondas anteriores: una comprobación corrida sobre un
+objeto cuyo estado no es el que el AC afirma) y cuatro MAJOR, más tres
+decisiones nuevas de Patrick Ocampo que el contract v6 ya ratificó
+(`SSISDB` fuera del loop, Postgres sigue siendo nuestro hasta que llegue
+el de Patrick, aprobación de Dev SQL pendiente de reemplazo íntegro — esta
+última no tiene acción para R1 todavía porque el texto corregido no
+llegó).
+
+- **BLOCKER — AC42, la segunda mitad corría sobre el objeto equivocado.**
+  `RUNBOOK.md` comprobaba "el `INSERT` sigue fallando pese al `GRANT`
+  explícito" contra `zz_scratch_ac6`, una base que el procedimiento de AC6
+  arma con `CREATE USER` + `ALTER ROLE db_datareader ADD MEMBER` **sin**
+  `db_denydatawriter` — nunca corre `sqlserver-parte-b.sql`. Un `GRANT
+  INSERT` ahí pasa con o sin el `DENY` real, así que la comprobación no
+  probaba lo que decía probar. Corregido: la segunda mitad ahora corre
+  sobre `zz_scratch_ac42`, aprovisionada por una corrida real de
+  `sqlserver-parte-b.sql` (que deja las dos membresías), y ahí `CREATE
+  TABLE t` + `GRANT INSERT` + `INSERT` sí falla con `The INSERT permission
+  was denied`. `zz_scratch_ac6` y `zz_scratch_ac42` quedan completamente
+  desacopladas.
+- **MAJOR 1 — el triple de AC42 no cerraba en verde.** El contract exige
+  "el `DENY` vuelve a ganar" tras restaurar el loop, no sólo limpiar.
+  Agregado un paso explícito: tras restaurar `sqlserver-parte-b.sql` real,
+  se vuelve a correr el mismo `INSERT` sobre la misma tabla y el mismo
+  `GRANT` que la mutación había dejado pasar, y se observa que vuelve a
+  fallar — recién ahí se revoca y se borra. `ALTER ROLE ... ADD MEMBER` es
+  aditivo (no quita nada al re-correr), así que el paso de mutación
+  recrea `zz_scratch_ac42` fresca (`DROP DATABASE` + `CREATE DATABASE`) en
+  vez de asumir que alcanza con re-correr el script sobre la existente.
+- **MAJOR 2 — la Parte 0 de Postgres medía algo que no discrimina.**
+  `has_database_privilege(...,'CONNECT')` ve el `CONNECT` heredado de
+  PUBLIC (eso sí lo prueba), pero sale `true` para cualquier rol en
+  cualquier base, con o sin `pg_read_all_data` — sola no confirma que el
+  rol "llegue de verdad". Agregada `pg_has_role(rolname,
+  'pg_read_all_data', 'MEMBER')` (membresía de cluster) como segunda
+  columna en `postgres-parte-0.sql`, con la prosa reescrita para afirmar
+  sólo lo que cada columna prueba por separado y lo que las dos juntas
+  permiten afirmar. Aplicado también a la prosa de `RUNBOOK.md` (AC41).
+  Contract v6 pide este mismo fix para el script que mande Patrick,
+  cuando llegue — vale para los dos.
+- **MAJOR 3/4 — el README contradecía el catálogo y el contract v6.** El
+  enum de `garantias` de la tabla del contrato de datos (línea 161, antes
+  de esta ronda) no listaba `deny-escritura`, que `catalogo.js` y
+  `catalogo.json` ya usan desde ronda 4 — agregado. La tabla "Garantías
+  por motor" seguía diciendo que en SQL Server el rol "es la única
+  barrera" y no tenía fila para el `DENY` — reescrita para que coincida
+  con la tabla homónima del contract (fila `DENY de escritura sobre el
+  rol`, alcance del permiso con las dos membresías).
+- **`SSISDB` deja de ser decisión pendiente (contract v6, punto 1).**
+  Patrick: *"guarda los proyectos desplegados con sus parámetros y
+  connection managers, o sea que es un lugar donde viven cadenas de
+  conexión, más los logs de ejecución. Cero dato de negocio y sí
+  credenciales."* `sqlserver-parte-b.sql` la excluye ahora **por nombre**
+  (`AND name <> 'SSISDB'` en el `WHERE` del cursor), además del
+  `database_id > 4` que no la agarra. Este script pasa de cubrir 32 bases
+  a cubrir **31**; la sección "Decisión pendiente: SSISDB" de
+  `RUNBOOK.md` se reescribió como "SSISDB queda fuera del loop", con la
+  decisión y su razón. `sqlserver-inverso.sql` suma la misma exclusión
+  por nombre, explícita (no dependía de ella: el `IF EXISTS` ya la
+  saltaba sola, pero la explicitud es el mismo criterio que ya rige el
+  filtro de la parte B). AC7 de `RUNBOOK.md` actualizado: `tiene_user = 1`
+  esperado en 31 bases, `tiene_user = 0` en las cuatro de sistema y en
+  `SSISDB`.
+- **Postgres sigue siendo nuestro (contract v6, punto 2).** Patrick avisó
+  que su Parte 0 ya existe, con condición equivalente, pero todavía no la
+  mandó — `postgres-parte-0.sql` de R1 queda como implementación de
+  referencia hasta que llegue, con el fix de MAJOR 2 ya aplicado.
+- **Hallazgo propio del barrido de cierre, no pedido por el review**:
+  `APROBACIONES.md:46` seguía afirmando que `db_datareader` alcanza "las
+  32" bases del servidor — cifra que la exclusión de `SSISDB` deja
+  desactualizada (ahora son 31). Corregido en el mismo commit, con la
+  razón y la cita al contract v6.
+
+### Minors
+
+- `RUNBOOK.md` (sección AC42) — aclarado explícitamente que
+  `sqlserver-parte-b.sql` no toma `-d` y recorre `sys.databases` completo
+  (32 bases hoy, 31 cubiertas + la nueva de scratch), idempotente sobre
+  las ya provistas — antes la prosa decía "correr esa copia contra una
+  base de scratch nueva" sin aclarar que en realidad procesa todo el
+  servidor.
+- `README.md` (sección "Aprovisionamiento") — agregado un párrafo sobre
+  `postgres-parte-0.sql` y que `pg_read_all_data` alcanza el cluster
+  entero, que antes no se mencionaba ahí (es el hallazgo central de R1 y
+  el README es lo que lee quien instala).
+- `sqlserver-inverso.sql` (cabecera) — la frase "con la misma
+  explicitud" sobreafirmaba: sólo `db_denydatawriter` se quita con un
+  `ALTER ROLE ... DROP MEMBER` explícito; `db_datareader` desaparece
+  implícitamente con `DROP USER`. Reescrita para no igualar las dos.
+
+### Task Status (ronda 5)
+
+Un BLOCKER, cuatro MAJOR, tres minors, dos decisiones nuevas del contract
+v6 (SSISDB, Postgres nuestro) y un hallazgo propio del barrido de cierre.
+Completed: 11. Blocked: 0. Skipped: 0.
+
+### Validation Executed (ronda 5)
+
+- Barrido de forma (comandos literales, salida completa en el
+  verification report, sección "Barrido de clase — ronda 5"):
+  - `grep -n "zz_scratch_" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md`
+    → AC2/AC6 siguen corriendo la mutación y la comprobación real sobre el
+    mismo objeto (ya corregido en rondas 2-3); AC42 ya no comparte objeto
+    con AC6 — las dos únicas apariciones de `zz_scratch_ac6` fuera de su
+    propia sección son la explicación de por qué AC42 dejó de usarla.
+  - `grep -rn "has_database_privilege\|pg_has_role" plugins/bisalta-db/aprovisionamiento/*.sql plugins/bisalta-db/aprovisionamiento/RUNBOOK.md`
+    → única medición de este tipo es la de la Parte 0, ya con las dos
+    columnas.
+  - `grep -rn "32 bases\|las 32\b" plugins/bisalta-db/` → cuatro
+    coincidencias, las cuatro miden el inventario crudo (`INVENTARIO.md`,
+    cabecera de `sqlserver-parte-b.sql`) o ya traen la salvedad de 31
+    cubiertas (`RUNBOOK.md`); la quinta que no la traía
+    (`APROBACIONES.md:46`) se corrigió en esta ronda.
+  - `grep -n "GARANTIAS = \[" plugins/bisalta-db/scripts/catalogo.js` vs.
+    `grep -n "garantias.*al menos un elemento" plugins/bisalta-db/README.md`
+    → los dos listan ahora los mismos cuatro valores, mismo orden.
+- `bash SDD/tests/secret-scan.sh` → `0` sobre el árbol con los seis
+  archivos tocados (163 archivos versionados). AC9 no re-corrido con su
+  triple completo esta ronda: `postgres-parte-a.sql`, el único archivo al
+  que la mutación declarada de AC9 aplica, no cambió de contenido —
+  mismo criterio que ronda 3 ("AC9 sin cambios... su triple ya está en el
+  addendum"). El triple completo más reciente (sobre `postgres-parte-a.sql`
+  sin cambios desde entonces) sigue en el addendum de ronda 4 del
+  verification report.
+- `bash SDD/tests/run.sh` → `17 passed, 0 failed (17 total)`, exit 0 (sin
+  `.sh` nuevo, mismo total que ronda 4).
+- `bash plugins/sdd-flow/scripts/sdd-lint-contract.sh SDD/contracts/2026-09-18-bisalta-db-mcp.md` → `0`.
+- `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` → `0` (sin `.sh` nuevo en `plugins/bisalta-db/`).
+- Escalera completa vía runner sobre el commit de esta ronda (hash y tree
+  en el encabezado del verification report, sellado por
+  `sdd-run-gates.sh`): `bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -o SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`.
+- `bash SDD/tests/secret-scan.sh` corrido una vez más **después** de
+  commitear el árbol final (post-runner, con el addendum de ronda 5 ya
+  pegado) — el único verde que cuenta según la trampa D34/D35. Comando y
+  exit code en el verification report.
+
+### AC41/AC42 — estado tras ronda 5
+
+Siguen `manual-only`, `pendiente-de-ejecucion`: ningún harness de este
+repo levanta un cluster Postgres real ni alcanza `10.24.40.137`. Los
+pasos corregidos de AC42 (BLOCKER + MAJOR 1) y AC41 (MAJOR 2) quedan
+escritos y listos para ejecutar en `RUNBOOK.md`.
+
+### Blockers (ronda 5)
+
+Ninguno — el BLOCKER de esta ronda es el hallazgo del reviewer, ya
+corregido; no quedó ningún bloqueo propio al cerrar.
+
+### Files Changed (ronda 5)
+
+- `plugins/bisalta-db/aprovisionamiento/postgres-parte-0.sql` (mod — MAJOR 2: columna `pg_has_role`; nota de referencia hasta que llegue el de Patrick)
+- `plugins/bisalta-db/aprovisionamiento/sqlserver-parte-b.sql` (mod — SSISDB fuera del loop por nombre; cifra 31)
+- `plugins/bisalta-db/aprovisionamiento/sqlserver-inverso.sql` (mod — SSISDB excluida por nombre, explícita; prosa "misma explicitud" corregida)
+- `plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` (mod — BLOCKER y MAJOR 1 de AC42, MAJOR 2 de AC41, SSISDB decidida, AC7 con cifra 31, contract v6)
+- `plugins/bisalta-db/aprovisionamiento/APROBACIONES.md` (mod — hallazgo propio: cifra de `db_datareader` corregida a 31)
+- `plugins/bisalta-db/README.md` (mod — MAJOR 3/4: enum `garantias` completo, tabla "Garantías por motor" sin la afirmación de "única barrera", sección Aprovisionamiento con la Parte 0)
+- `SDD/briefs/R1-infra-accesos-lectura.md` (mod, este archivo)
+- `SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md` (mod — addendum de ronda 5, generado por el runner + evidencia a mano)
+
+### Final Statement (ronda 5)
+
+El BLOCKER y los cuatro MAJOR de ronda 5 quedan corregidos, con las tres
+decisiones nuevas del contract v6 aplicadas (`SSISDB` fuera del loop,
+Postgres nuestro con el fix de la Parte 0 ya incorporado, aprobación de
+Dev SQL sigue pendiente de texto de Patrick — sin acción posible todavía).
+El barrido de cierre encontró y corrigió una quinta instancia del patrón
+"cifra vieja no propagada" (`APROBACIONES.md`) que ningún hallazgo del
+review nombraba. Sin mitigaciones prohibidas: no se tocó
+`secret-scan.sh`, no se bajó ningún threshold, no se usó `--no-verify`,
+ninguna exclusión por path nueva. AC1–AC8 y AC10 siguen
+`pendiente-de-ejecucion`; AC41 y AC42 con su procedimiento corregido y
+listo para ejecutar, sin declarar ningún AC en verde sin haberlo corrido.

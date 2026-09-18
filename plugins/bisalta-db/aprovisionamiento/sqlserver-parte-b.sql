@@ -21,24 +21,30 @@
 -- reproducible corriendo la misma consulta a mano contra sys.databases.
 --
 -- Filtro: database_id > 4 (excluye master=1, tempdb=2, model=3, msdb=4,
--- las cuatro bases de sistema) y state = 0 (ONLINE únicamente) — control
--- explícito del filtro, no un salto implícito del proveedor. 32 bases de
--- usuario medidas el 18-sep-2026, las 32 ONLINE
+-- las cuatro bases de sistema), name <> 'SSISDB' (ver más abajo) y
+-- state = 0 (ONLINE únicamente) — control explícito del filtro, no un
+-- salto implícito del proveedor. 32 bases de usuario medidas el
+-- 18-sep-2026, las 32 ONLINE
 -- (plugins/bisalta-db/aprovisionamiento/INVENTARIO.md; el contract citaba
--- "~35" antes de esta medición). Una base OFFLINE o RESTORING al momento
--- de esta corrida queda fuera de `state = 0` igual que quedaría fuera de
--- sp_MSforeachdb, y por el mismo motivo que una base nueva (AC10, "Acción
--- operativa" en RUNBOOK.md): re-correr este script cubre ambos huecos.
+-- "~35" antes de esta medición); de esas 32, este script cubre **31**
+-- (`SSISDB` queda afuera a propósito). Una base OFFLINE o RESTORING al
+-- momento de esta corrida queda fuera de `state = 0` igual que quedaría
+-- fuera de sp_MSforeachdb, y por el mismo motivo que una base nueva
+-- (AC10, "Acción operativa" en RUNBOOK.md): re-correr este script cubre
+-- ambos huecos.
 --
--- SSISDB (database_id = 36, 5.77 GB, INVENTARIO.md) NO la excluye este
--- filtro: database_id > 4 sólo saca las cuatro bases de sistema, y SSISDB
--- no es una de ellas aunque tampoco sea una base de negocio (es el
--- catálogo de SQL Server Integration Services). Queda DENTRO del loop a
--- propósito, no por un efecto colateral del filtro: si SSISDB entra o no
--- al catálogo de la aplicación es una decisión pendiente de Patrick
--- Ocampo (contract v5, tabla de responsabilidades, punto (d)), no algo
--- que este script deba resolver angostando el filtro sin que nadie lo
--- haya decidido.
+-- SSISDB (database_id = 36, 5.77 GB, INVENTARIO.md) queda FUERA del loop,
+-- por nombre (contract v6, "Cambios v5 → v6", punto 1 — decisión de
+-- Patrick Ocampo, Slack 2026-09-18 15:52 CST). database_id > 4 sólo saca
+-- las cuatro bases de sistema y no la agarra a ella, así que la exclusión
+-- va explícita en el WHERE de abajo, no implícita en ese filtro. Razón,
+-- textual: "guarda los proyectos desplegados con sus parámetros y
+-- connection managers, o sea que es un lugar donde viven cadenas de
+-- conexión, más los logs de ejecución. Cero dato de negocio y sí
+-- credenciales." Un servidor MCP cuyo propósito es que ninguna credencial
+-- pase por el contexto no puede alcanzar el lugar donde viven las cadenas
+-- de conexión. Ya no es una decisión pendiente (era el punto (d) de
+-- "Cambios v4 → v5"): quedó cerrada en v6.
 --
 -- Corre con un login con privilegio de sysadmin en la instancia — nunca
 -- con el propio bisalta_lectura que este script crea.
@@ -53,8 +59,9 @@ DECLARE @sql NVARCHAR(MAX);
 DECLARE db_cursor CURSOR LOCAL FAST_FORWARD FOR
   SELECT name
   FROM sys.databases
-  WHERE database_id > 4   -- excluye master, tempdb, model, msdb
-    AND state = 0;        -- ONLINE unicamente
+  WHERE database_id > 4     -- excluye master, tempdb, model, msdb
+    AND name <> 'SSISDB'    -- fuera del loop, decision cerrada (contract v6)
+    AND state = 0;          -- ONLINE unicamente
 
 OPEN db_cursor;
 FETCH NEXT FROM db_cursor INTO @db_name;

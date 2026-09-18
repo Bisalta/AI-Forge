@@ -43,10 +43,12 @@ que no está en el texto aprobado:
 | **`CONSTRUPLAZA_EFLOW`** | **266.92 GB — no nombrada en la aprobación; segunda más grande del servidor** |
 | otras 28 | el resto hasta 1383 GB |
 
-Esto **no invalida la aprobación**: `db_datareader` sobre el servidor alcanza las 32 con
-o sin esa enumeración, y el texto dice "las bases de Dev SQL", no una lista cerrada. Se
-deja escrito porque la diferencia entre lo enumerado y lo medido es exactamente el tipo
-de cosa que después nadie puede reconstruir. Comunicado a Patrick el mismo día.
+Esto **no invalida la aprobación**: `db_datareader` sobre el servidor alcanza 31 de las 32
+con o sin esa enumeración (`SSISDB` queda fuera del loop por decisión de Patrick, contract
+v6, "Cambios v5 → v6" punto 1 — no guarda dato de negocio y sí credenciales), y el texto
+dice "las bases de Dev SQL", no una lista cerrada. Se deja escrito porque la diferencia
+entre lo enumerado y lo medido es exactamente el tipo de cosa que después nadie puede
+reconstruir. Comunicado a Patrick el mismo día.
 
 ### Lo que esta aprobación NO cubre
 
