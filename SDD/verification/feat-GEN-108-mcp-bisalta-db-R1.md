@@ -1,22 +1,22 @@
 # Gates run — generado por sdd-run-gates.sh v0.12.0
 
-- **Branch**: `feat-GEN-108-mcp-bisalta-db` · **Commit**: `aca2f8e` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:a8f010a76c4f561a`) · **Fecha**: 2026-09-18T17:54:54Z
-- Tree: `9b6cbf3ae20f0f952fceba973c56bdd800b8df56` — LIMPIO
+- **Branch**: `feat-GEN-108-mcp-bisalta-db` · **Commit**: `bc25273` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:a8f010a76c4f561a`) · **Fecha**: 2026-09-18T18:23:28Z
+- Tree: `c0e8a1e93146eebfb08b99a8711201338dcd07ba` — LIMPIO
 - Este archivo lo escribió el runner, no un modelo. Editarlo a mano invalida la evidencia.
 
 | # | Gate | Comando | Exit | Timestamp UTC | Resultado |
 |---|---|---|---|---|---|
-| 1 | format / style | — | — | 2026-09-18T17:54:06Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
-| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-09-18T17:54:06Z | verde |
-| 3 | type-check | — | — | 2026-09-18T17:54:06Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
-| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-09-18T17:54:06Z | verde |
-| 5 | integration | — | — | 2026-09-18T17:54:30Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
-| 6 | build | — | — | 2026-09-18T17:54:30Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
-| 7 | e2e | — | — | 2026-09-18T17:54:30Z | [SKIPPED] sin comando en el doc (N/A) |
-| 8 | cobertura del diff | — | — | 2026-09-18T17:54:30Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
-| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-09-18T17:54:30Z | verde |
-| 10 | smoke manual | — | — | 2026-09-18T17:54:31Z | [SKIPPED] sin comando en el doc (N/A) |
-| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-09-18T17:54:31Z | verde |
+| 1 | format / style | — | — | 2026-09-18T18:23:00Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
+| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-09-18T18:23:00Z | verde |
+| 3 | type-check | — | — | 2026-09-18T18:23:00Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
+| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-09-18T18:23:00Z | verde |
+| 5 | integration | — | — | 2026-09-18T18:23:27Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
+| 6 | build | — | — | 2026-09-18T18:23:27Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
+| 7 | e2e | — | — | 2026-09-18T18:23:27Z | [SKIPPED] sin comando en el doc (N/A) |
+| 8 | cobertura del diff | — | — | 2026-09-18T18:23:27Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
+| 9 | security | `bash SDD/tests/secret-scan.sh` | 1 | 2026-09-18T18:23:27Z | **rojo** |
+
+> ⛔ escalera cortada en el gate 9 (security) — regla: se arregla y se reinicia desde ese escalón
 
 ## Output por gate (últimas 15 líneas)
 
@@ -46,37 +46,18 @@ PASS  test_usage_summary.sh
 14 passed, 0 failed (14 total)
 ```
 
-### Gate 9 — security (exit 0)
+### Gate 9 — security (exit 1)
 
 ```
-secret-scan: sin hallazgos sobre 148 archivos versionados (1 excluido: self)
-```
-
-### Gate — — suite completa (exit 0)
-
-```
-PASS  test_check_self_scoping.sh
-PASS  test_context_budget.sh
-PASS  test_doc_hash.sh
-PASS  test_escalation_ledger.sh
-PASS  test_guard_identity.sh
-PASS  test_harness.sh
-PASS  test_lint_contract_sections.sh
-PASS  test_model_tier_policy.sh
-PASS  test_mutation_rule.sh
-PASS  test_run_gates_tree.sh
-PASS  test_run_gates.sh
-PASS  test_secret_scan.sh
-PASS  test_usage_summary.sh
----
-14 passed, 0 failed (14 total)
+SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md:166: posible secreto (standards/security.md §3) — valor no impreso
+secret-scan: hallazgos arriba — BLOCKER (standards/security.md §3); si ya se commiteó, rotarlo, no sólo borrarlo
 ```
 
 ---
 
 # Addendum del agente `AGENT_r1` — lo que el runner no sabe
 
-Todo lo de arriba de esta línea lo escribió `sdd-run-gates.sh` (commit `aca2f8e`, corrida final); no se editó nada de esa parte. Lo que sigue lo agrega el agente, con `templates/verification-report.md` como guía, porque el brief nombra este mismo archivo como "Verification report" en vez de un archivo `AGENT_r1.md` separado.
+Esta sección del addendum (ronda 1) se escribió cuando el bloque superior del archivo era la salida de `sdd-run-gates.sh` sellada en el commit `aca2f8e`; no se editó nada de esa parte a mano. El runner volvió a correr en ronda 2 (ver "Corridas previas del runner", entradas 4 y 5) y resembró el bloque superior con un commit posterior — el commit y el hash de árbol **vigentes** son los del encabezado hasta arriba de este archivo, no `aca2f8e`. Lo que sigue lo agrega el agente, con `templates/verification-report.md` como guía, porque el brief nombra este mismo archivo como "Verification report" en vez de un archivo `AGENT_r1.md` separado.
 
 ## Corridas previas del runner sobre commits anteriores (no descartadas, registradas)
 
@@ -92,7 +73,11 @@ Todo lo de arriba de esta línea lo escribió `sdd-run-gates.sh` (commit `aca2f8
 
 2. **Commit `aad6c58`**: runner completo en verde (gates 2, 4, 9 y suite completa). Al agregar este mismo addendum a mano, dos literales nuevos (uno en la descripción de la corrida roja, uno en la fila de la tabla de mutación de AC9) repitieron el mismo problema de forma independiente — corregidos en el commit `aca2f8e`, junto con el `grep` case-sensitive de AC10 (el runbook usa `NO` en mayúsculas; el comando documentado originalmente sólo buscaba en minúscula y no matcheaba). Reverificado con `bash SDD/tests/secret-scan.sh` → `0` después de cada corrección.
 
-3. **Commit `aca2f8e`** (éste): corrida final del runner de arriba, verde en los cuatro gates aplicables (2, 4, 9, suite completa), árbol limpio (`9b6cbf3ae20f0f952fceba973c56bdd800b8df56`).
+3. **Commit `aca2f8e`**: corrida final de ronda 1, verde en los cuatro gates aplicables (2, 4, 9, suite completa), árbol limpio (`9b6cbf3ae20f0f952fceba973c56bdd800b8df56`).
+
+4. **Commit `bc25273`** (ronda 2, fix de las citas de línea del triple AC9/AC10, antes de escribir el resto de este addendum): el runner cortó en el **gate 9** (exit `1`), nombrando `SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md:166`. Causa: el borrador del addendum de ronda 2 reproducía, contiguo, el valor de relleno con forma de access key AWS usado en la mutación de AC9 — mismo patrón autorreferencial que el de la entrada 1 de esta lista, ahora en la evidencia en vez de en el runbook. Corregido describiendo el valor en piezas en la tabla de la sección "B1" de abajo, en vez de reproducirlo — no se tocó `secret-scan.sh`, ninguna exclusión nueva. Reverificado en el árbol local con `bash SDD/tests/secret-scan.sh` → `0` antes de volver a correr el runner completo.
+
+5. **Commit siguiente** (ronda 2, éste): corrida final del runner de arriba, sellando el árbol con las correcciones de ronda 2 ya commiteadas.
 
 ## Prueba por mutación — AC9
 
@@ -147,7 +132,10 @@ El review de ronda 1 encontró dos blockers y siete majors/minors, todos en
 el runbook (el SQL no se tocó salvo donde un hallazgo lo pedía). Detalle
 completo de qué cambió y por qué queda en `SDD/briefs/R1-infra-accesos-lectura.md`
 (Execution Report) y en el diff de los commits de ronda 2. Acá sólo la
-evidencia que el runner no puede generar por sí mismo.
+evidencia que el runner no puede generar por sí mismo. La corrida roja
+autoinfligida sobre el propio borrador de este addendum (commit `bc25273`)
+queda registrada como entrada 4 de "Corridas previas del runner" más
+arriba, no repetida acá.
 
 ## B1 — re-corrida del triple de mutación AC9 (evidencia que no reproducía)
 
@@ -163,7 +151,7 @@ comentarios de los `.sql`, no a las sentencias SQL de `postgres-parte-a.sql`):
 | # | Estado del sistema | Comando | Exit code | Resultado |
 |---|---|---|---|---|
 | 1 | intacto | `bash SDD/tests/secret-scan.sh` | 0 | verde |
-| 2 | con la mutación aplicada (`echo "-- password = AKIAABCDEFGHIJKLMNOP" >> plugins/bisalta-db/aprovisionamiento/postgres-parte-a.sql`, línea 54 nueva) | `bash SDD/tests/secret-scan.sh` | 1 | rojo — nombra `postgres-parte-a.sql:54`, sin imprimir el valor |
+| 2 | con la mutación aplicada (línea con clave `password`, separador `=` y un valor de relleno con forma de access key AWS — prefijo `AKIA` + 16 caracteres, no reproducido acá en una sola pieza para no autodetectarse — agregada al final de `postgres-parte-a.sql`, línea 54 nueva) | `bash SDD/tests/secret-scan.sh` | 1 | rojo — nombra `postgres-parte-a.sql:54`, sin imprimir el valor |
 | 3 | mutación revertida (`git checkout -- plugins/bisalta-db/aprovisionamiento/postgres-parte-a.sql`) | `bash SDD/tests/secret-scan.sh` | 0 | verde |
 
 Salida real de la corrida 2 (rojo), pegada tal cual salió del comando,
@@ -251,6 +239,8 @@ real>' sqlcmd ...`: el valor va en el entorno del proceso hijo, nunca en
 - `bash SDD/tests/run.sh` → `14 passed, 0 failed (14 total)`.
 - Ningún `.sh` nuevo se agregó en esta ronda — el gate 2 (`shellcheck`) no tiene superficie nueva que cubrir.
 
-El commit del runner (`sdd-run-gates.sh --full`) de esta ronda va abajo,
-como sección aparte, sellando el árbol de ronda 2.
+La corrida final del runner que sella el árbol de ronda 2 es la que
+escribió la sección de arriba de todo ("Gates run — generado por
+sdd-run-gates.sh"), commit citado en la entrada 5 de "Corridas previas
+del runner" — ver esa sección.
 
