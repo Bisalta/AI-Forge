@@ -6,8 +6,9 @@
 -- queda cubierta hasta que este script se corra otra vez (AC10, declarado
 -- también en RUNBOOK.md).
 --
--- Recorre sys.databases con un CURSOR EXPLÍCITO (Decisión de diseño punto
--- 5, cerrada, no reabrir). NO usar sp_MSforeachdb: no está soportado desde
+-- Recorre sys.databases con un CURSOR EXPLÍCITO (contract v2, AC7 y
+-- sección "Garantías por motor (asimetría declarada, no disimulada)",
+-- cerrada, no reabrir). NO usar sp_MSforeachdb: no está soportado desde
 -- SQL Server 2016+ y salta bases en algunos estados (ej. RESTORING,
 -- OFFLINE) sin avisar.
 --
