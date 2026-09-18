@@ -201,6 +201,27 @@ que `sdd-check.sh` tuvo con su propia prosa: **la medición que se incluye a sí
 misma en el universo medido**. Vale registrarla porque apareció sola, en el
 mismo archivo, dos secciones después de documentarla.
 
+### 0.3 Los commits posteriores de esta ronda — cómo se cierra el bucle
+
+Un report que declara el hash de su propio árbol no puede estar completo: escribir
+la declaración cambia el árbol declarado. Lo que **sí** se puede cerrar es el
+procedimiento, y es lo que esta ronda hizo en cada paso:
+
+1. Todo commit de esta ronda se midió con `bash SDD/tests/secret-scan.sh` **antes**
+   de commitear — exit 0 en los cuatro.
+2. El árbol final se re-mide **después** del último commit, y ese exit code va en
+   el bloque `sdd.result` del agente, que es el artefacto que sí puede nombrar un
+   árbol posterior a sí mismo.
+3. Los commits que siguen a §0.2 **sólo agregan prosa de este addendum** — ni una
+   línea de producto ni de test. `git diff c93941e..HEAD -- plugins/ SDD/tests/`
+   lo confirma vacío.
+
+**El reviewer no necesita creer nada de esto**: con el árbol limpio, un solo
+comando lo reproduce — `bash SDD/tests/secret-scan.sh` → debe salir **0**, y
+`git status --porcelain` debe salir vacío. Si sale 1, la entrega está rota,
+independientemente de lo que diga cualquier tabla de más arriba. Esa es la lección
+de la ronda 1: **el árbol que se integra manda sobre la evidencia que lo describe.**
+
 ### Lo demás que cambió en esta ronda
 
 1. **`catalogo_invalido` tenía implementación y no tenía test** (`MINOR`).
