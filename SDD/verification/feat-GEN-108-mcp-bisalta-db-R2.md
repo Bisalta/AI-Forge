@@ -133,6 +133,51 @@ misma clase que `sdd-check.sh` tuvo en v0.11.0. Se corrigió antes de commitear;
 queda anotada porque la frecuencia con la que reaparece es el dato, no la
 instancia.
 
+### 0.1 Gate 9 sobre el árbol **final**, post-addendum y ya commiteado
+
+Esto es lo que faltó en la ronda 1, y es el único árbol que cuenta porque es el
+que se integra. **Medido a mano**, no por el runner, precisamente porque el
+runner no puede verlo: su sello es anterior al re-pegado del addendum (`D34`).
+
+```
+$ git rev-parse --short HEAD && git rev-parse HEAD^{tree}
+29098f0
+bfe376f26248306ced0bf71e913afe3ad038b415
+
+$ git status --porcelain
+                                        # vacío — árbol LIMPIO
+
+$ git show HEAD:SDD/verification/feat-GEN-108-mcp-bisalta-db-R2.md | grep -c 'Addendum de'
+1                                       # el addendum SÍ está en el árbol medido
+
+$ bash SDD/tests/secret-scan.sh
+secret-scan: sin hallazgos sobre 160 archivos versionados (1 excluido: self)
+EXIT=0
+```
+
+La tercera línea es la que distingue esta corrida de la de la ronda 1: se
+verifica **positivamente** que el archivo que rompió el gate está dentro del
+árbol que se está midiendo, en vez de asumirlo. Un verde sin esa comprobación
+es indistinguible del verde que la ronda 1 declaró de buena fe.
+
+**Sobre la regresión infinita** — escribir esta sección cambia el árbol que la
+sección describe. Se resuelve midiendo dos veces y declarando las dos:
+
+| Árbol | Commit | Contiene el addendum | `secret-scan.sh` |
+|---|---|---|---|
+| `bfe376f26248306ced0bf71e913afe3ad038b415` | `29098f0` | sí | **exit 0** |
+| árbol final, con esta §0.1 adentro | ver §0.2 | sí | **exit 0** — §0.2 |
+
+Termina porque el texto agregado se escribió respetando la convención de partir
+literales, así que no introduce hallazgos nuevos: la segunda medición confirma
+que el árbol integrable sale 0, no que haga falta una tercera.
+
+### 0.2 Segunda medición — el árbol integrable
+
+```
+__PLACEHOLDER__
+```
+
 ### Lo demás que cambió en esta ronda
 
 1. **`catalogo_invalido` tenía implementación y no tenía test** (`MINOR`).
