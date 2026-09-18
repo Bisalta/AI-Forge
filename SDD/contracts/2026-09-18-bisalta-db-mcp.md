@@ -1,6 +1,21 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v5
+- **Versión**: v6
+
+### Cambios v5 → v6 (respuestas de Patrick Ocampo, Slack 2026-09-18 15:52 CST)
+
+1. **`SSISDB` queda FUERA del loop de SQL Server.** Decisión de Patrick, con una razón más fuerte que la que este contract tenía: *"guarda los proyectos desplegados con sus parámetros y connection managers, o sea que es un lugar donde viven cadenas de conexión, más los logs de ejecución. Cero dato de negocio y sí credenciales."* Un servidor MCP cuyo propósito es que ninguna credencial pase por el contexto no puede alcanzar el lugar donde viven las cadenas de conexión. El loop la excluye por nombre, además del filtro `database_id > 4` que no la agarra (su id es 36).
+2. **El aprovisionamiento de Postgres lo provee Patrick** — vuelve la decisión de v4, revertida en v5. Su Parte 0 **ya existe** y su condición es `datname ILIKE '%prod%'`, equivalente a la que este contract cerró en v4. Textual: *"No escribas el de Postgres de nuevo. El de SQL Server sí, ese no existe."* **Su `.sql` todavía no llegó**, así que `postgres-parte-0.sql` de R1 se mantiene en el árbol como implementación de referencia hasta que llegue el suyo, y entonces se compara y se reemplaza. El hallazgo `MAJOR 2` de la ronda 4 (la medición del PASO 1 no discrimina) se corrige igual sobre el nuestro: vale para los dos scripts.
+3. **La aprobación de Dev SQL se reemplaza entera cuando Patrick mande el texto corregido**, no se parchea. Textual: *"Hoy hay en el expediente una aprobación con fecha que declara menos de lo que autoriza, y eso es peor que no tenerla… lo reemplazás entero, no le agregues una línea al pie."* Pendiente de que lo envíe.
+4. **La política IAM lleva regla propia**: *"Una conexión, un secreto, un consumidor — nada de un secreto compartido."* Entra al contract como propiedad del diseño de secretos, no sólo como tarea de Patrick.
+5. **Dev/qa no es homogéneo, y son seis bases sensibles, no dos.** A `rrhh` y `bisalta` se suman `construplaza`, `qa` y —lo que ninguna de las dos partes había visto— **`portalrh_dev` y `portalrh_qa`, el portal de RRHH**.
+6. **No hay forma de dar un subconjunto con `pg_read_all_data`.** Conectarse es leer todo y `CONNECT` lo concede PUBLIC por omisión, así que el rol llega a las 29 aunque los `GRANT` por base se corran sólo en algunas. Los dos caminos, y Patrick no ve un tercero: (a) las 29, `rrhh` incluida, asumido explícito como se hizo con Dev SQL; (b) un subconjunto, que obliga a `REVOKE CONNECT ON DATABASE <cada excluida> FROM PUBLIC`, afecta a todos los roles del cluster y exige verificar antes que ninguna app dependa de ese `CONNECT`. **Decisión abierta de Patrick.**
+
+### FRENO VIGENTE
+
+**El loop de SQL Server no se ejecuta hasta que Patrick defina el alcance** (*"no corras el loop de SQL Server todavía"*). El freno es sobre **ejecutar**, no sobre escribir: los doce ACs de R1 son `manual-only` y su ejecución es posterior a Feature Ready, así que corregir los procedimientos sigue siendo trabajo válido.
+
+El motivo del freno es que la respuesta sobre qué se va a consultar describía **alcance y no uso**. Patrick pide: *"Decime qué vas a consultar esta semana, en concreto — qué base y para qué."* **Es la única pregunta que bloquea el cierre de este ciclo, y sólo la puede contestar Ian Vargas.**
 
 ### Cambios v4 → v5 (decisión de Ian Vargas, 18-sep-2026)
 
@@ -17,7 +32,7 @@ Con eso, **la frontera de responsabilidad queda cerrada así**:
 
 **ACs nuevos** (los cambios de v4 eran de diseño y no traían cómo verificarse — sin AC no se prueban): `AC41` y `AC42`, abajo.
 
-**El punto (b) es el único que no admite atajo**",: si la contraseña viaja de Patrick a Ian para que Ian la cargue, se rompe exactamente la propiedad que este plugin existe para dar. Va de quien la genera al secreto, y de ahí sólo la lee el proceso.
+**El punto (b) es el único que no admite atajo**: si la contraseña viaja de Patrick a Ian para que Ian la cargue, se rompe exactamente la propiedad que este plugin existe para dar. Va de quien la genera al secreto, y de ahí sólo la lee el proceso.
 
 ### Cambios v3 → v4 (contract-change-request externo, 18-sep-2026)
 
