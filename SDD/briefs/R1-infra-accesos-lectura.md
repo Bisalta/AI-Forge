@@ -1,7 +1,7 @@
 # Task brief — R1 · infra: accesos de solo lectura en Postgres dev/qa y Dev SQL
 
 - **Agente**: `AGENT_r1` · **Modelo**: `sonnet`
-- **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v1**, ACs **AC1–AC10**
+- **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v2**, ACs **AC1–AC10** (el bump v1 → v2 no tocó ninguno de ellos)
 - **Arquetipo**: `infra`
 - **Repo**: `.` · **Branch**: `feat-GEN-108-mcp-bisalta-db` (ya creada; **NO crear otra, NO commitear a `prod`**)
 - **Proxima subtask**: `GEN-108.1`, id `cd0ed6b7-fde8-4381-9a69-e4e684498813` (informativo — **vos no tocás Proxima**)
@@ -14,7 +14,9 @@ Las dos identidades que el plugin `bisalta-db` va a usar **no existen todavía**
 
 El aprovisionamiento no es un detalle de operación: es donde vive la garantía. El servidor puede tener la lista blanca perfecta y seguir siendo capaz de escribir si el rol de base está mal dado de alta. Por eso R1 va antes que R2 y no al revés.
 
-## Decisión de diseño (cerrada en el contract — no la re-abras)
+## Decisiones de diseño (cerradas — no las re-abras)
+
+> **Cómo citar esta lista**: los puntos numerados de abajo son de **este brief**, no del contract. Los archivos de `plugins/bisalta-db/` son distribuibles y los va a leer alguien que no tiene el brief a mano: citá la sección del contract por su **nombre** (ej. "Entrega de la credencial al cliente"), nunca "punto N del contract".
 
 1. **Dos roles de Postgres, no uno**: `claude_lectura` y `neo_lectura`. `pg_stat_activity` distingue quién corrió qué, y se puede revocar a uno sin el otro.
 2. **`GRANT pg_read_all_data`, y SIN `NOINHERIT`.** Con `NOINHERIT` el rol **no vería una sola tabla**: `pg_read_all_data` es una membresía, y las membresías no aplican sin `SET ROLE`. Esto ya está decidido; si lo escribís con `NOINHERIT` el rol queda inútil y el AC1 falla.
