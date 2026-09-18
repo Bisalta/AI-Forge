@@ -34,8 +34,8 @@ El aprovisionamiento no es un detalle de operación: es donde vive la garantía.
 2. **`GRANT pg_read_all_data`, y SIN `NOINHERIT`.** Con `NOINHERIT` el rol **no vería una sola tabla**: `pg_read_all_data` es una membresía, y las membresías no aplican sin `SET ROLE`. Esto ya está decidido; si lo escribís con `NOINHERIT` el rol queda inútil y el AC1 falla.
 3. **Script en dos partes.** Parte A una vez **por cluster** (los roles son objetos de cluster). Parte B una vez **por base** (los `GRANT` son por base).
 4. **Sólo en el cluster de dev/qa** (`sistemas-costruplaza-db.cluster-cfrl3owqzwof`). Nada toca `cluster-cr4rbgr7qlr6`: ahí viven los cinco pares `_prod`/`_stg` de la empresa, y un rol de login creado en cualquier `_stg` queda al lado de producción.
-5. **SQL Server recorre `sys.databases` con un cursor explícito**, excluyendo `master`, `model`, `msdb` y `tempdb`. `db_datareader` es por base y son ~35. **No uses `sp_MSforeachdb`**: no está soportado y salta bases en algunos estados.
-6. **La asimetría se documenta, no se compensa.** SQL Server no tiene equivalente de `default_transaction_read_only` ni réplica de lectura: el rol del login es la única barrera. No inventes un sustituto.
+5. **SQL Server recorre `sys.databases` con un cursor explícito**, excluyendo `master`, `model`, `msdb` y `tempdb`. `db_datareader` es por base y son **32** (medido, `INVENTARIO.md` — no "~35"). **No uses `sp_MSforeachdb`**: no está soportado y salta bases en algunos estados.
+6. **La asimetría se documenta, no se compensa.** SQL Server no tiene equivalente de `default_transaction_read_only` ni réplica de lectura: el rol del login, con `db_datareader` y (v4/v5) `db_denydatawriter`, es la única barrera. No inventes un sustituto.
 
 ## Out of scope
 
@@ -104,10 +104,26 @@ Ocho de los diez son `manual-only` porque **ningún harness de este repo puede c
 | AC8 | manual-only: sección "AC8 — cada secreto existe..." | `RUNBOOK.md` | pendiente-de-ejecucion |
 | AC9 | automatizable + triple de mutación: `bash SDD/tests/secret-scan.sh` (verde→rojo→verde, ver verification report) | `SDD/tests/secret-scan.sh` | pass |
 | AC10 | automatizable (grep): `grep -ni "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` | `plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` | pass |
+| AC41 | manual-only + mutación declarada: sección "AC41 — la Parte 0 aborta por lo que el cluster CONTIENE, no por el nombre de la base" | `RUNBOOK.md` / `plugins/bisalta-db/aprovisionamiento/postgres-parte-0.sql` | pendiente-de-ejecucion |
+| AC42 | manual-only + mutación declarada: sección "AC42 — el user tiene las dos membresías, y el `DENY` gana" | `RUNBOOK.md` / `plugins/bisalta-db/aprovisionamiento/sqlserver-parte-b.sql` | pendiente-de-ejecucion |
 
 ## Cobertura del impact set
 
-R1 **no modifica ningún archivo existente**: los siete archivos son nuevos y nadie los importa todavía. Sin filas de regresión que justificar.
+R1 original (rondas 1-3) no modificaba ningún archivo existente: los siete
+archivos eran nuevos y nadie los importaba todavía. **La reapertura v4→v5
+(ronda 4) sí toca dos archivos existentes fuera de
+`aprovisionamiento/`**, los dos con consumidores grepeados:
+
+| Archivo | Cambio | Consumidores existentes | Cobertura |
+|---|---|---|---|
+| `plugins/bisalta-db/scripts/catalogo.js` | `GARANTIAS` suma `'deny-escritura'` | `plugins/bisalta-db/scripts/servidor-mcp.js` (importa `catalogo.js`, no usa `GARANTIAS` directamente — sólo `validarCatalogo`); `SDD/tests/test_catalogo.sh` (AC11-AC14, AC36) | `test_catalogo.sh`, corrido antes y después del cambio: `PASS` las dos veces (ver "Validation Executed", ronda 4) |
+| `plugins/bisalta-db/catalogo.json` | entrada `dev-sql` suma `deny-escritura` a `garantias` | `catalogo.js` (lo valida), `servidor-mcp.js` (lo lee en runtime — sin tests que lo ejerciten contra una base real, fuera de scope de R1) | `test_catalogo.sh` (valida que el catálogo real sigue siendo válido) |
+
+Los siete archivos de `aprovisionamiento/` (seis modificados + uno nuevo,
+`postgres-parte-0.sql`) siguen sin ningún consumidor dentro de este repo —
+R2 (el servidor que los va a usar como referencia operativa, no como
+import) ya existe pero no importa nada de `aprovisionamiento/`: son
+prosa/SQL para un operador humano, no código que otro módulo requiera.
 
 ## Docs delta
 
@@ -334,3 +350,148 @@ contra una base real. AC9 sin cambios (ningún fix tocó `secret-scan.sh` ni
 agregó un literal con forma de credencial); su triple ya está en el
 addendum de rondas 1-2, restaurado íntegro en este mismo verification
 report.
+
+---
+
+## Ronda 4 — reapertura v4→v5: hallazgo de Patrick Ocampo (CCR externo, no rechazo de review)
+
+### Summary
+
+`APPROVED` no se tira: Patrick Ocampo midió el cluster real y encontró un
+hueco de diseño invisible en el código — `pg_read_all_data` es membresía
+de cluster y Postgres concede `CONNECT` a PUBLIC por omisión, así que un
+rol creado por `postgres-parte-a.sql` alcanza las 29 bases del cluster de
+dev/qa desde que existe, no las 2 del catálogo. `postgres-parte-b.sql`
+nunca fue la barrera de acceso. Contract v4→v5 (ratificado) pide seis
+cosas; las seis, hechas:
+
+1. **`postgres-parte-0.sql` (nuevo)**: dos pasos, los dos read-only.
+   Informativo (`has_database_privilege` por rol×base — la única forma de
+   ver el `CONNECT` heredado de PUBLIC, invisible en `pg_database.datacl`
+   cuando nunca se revocó explícitamente) y de control (`RAISE EXCEPTION`
+   si el cluster contiene alguna base `_prod`, para que `psql -v
+   ON_ERROR_STOP=1` salga distinto de 0 y no siga a la parte A). AC41.
+2. **Prosa de `postgres-parte-b.sql` corregida**: ya no dice que el
+   `GRANT CONNECT` es la barrera. Ahora explica qué es en realidad — un
+   refuerzo redundante hoy — y remite a la parte 0 como la barrera real.
+   Mismo ajuste en el encabezado de `postgres-parte-a.sql` (agregada la
+   referencia a correr la parte 0 antes).
+3. **`db_denydatawriter` junto a `db_datareader`** en el mismo loop de
+   `sqlserver-parte-b.sql` (AC42), y su reverso explícito (`ALTER ROLE
+   db_denydatawriter DROP MEMBER` antes de `DROP USER`) en
+   `sqlserver-inverso.sql`. Corregida la tabla implícita de "única
+   barrera" en el comentario de `sqlserver-parte-a.sql`: ahora nombra las
+   dos membresías del rol de base, no una.
+4. **Cifras contra `INVENTARIO.md`**: `sqlserver-parte-b.sql`,
+   `RUNBOOK.md` (AC7 y AC10) y la propia sección "Decisiones de diseño"
+   de este brief pasan de "~35"/"35 bases" a **32**, medido. Grep sobre
+   todo el árbol confirma que las únicas apariciones restantes de "~35"
+   citan el valor viejo entre comillas para contrastarlo con el correcto
+   (`sqlserver-parte-b.sql` línea 28, `RUNBOOK.md` AC7, contract v5 punto
+   7 de "Cambios v3 → v4"), nunca lo afirman como cifra vigente.
+5. **`SSISDB` dentro del loop**, documentado como decisión pendiente de
+   Patrick (nueva sección "Decisión pendiente: `SSISDB`" en
+   `RUNBOOK.md`), no como efecto colateral del filtro — el comentario de
+   `sqlserver-parte-b.sql` lo explicita también.
+6. **`catalogo.js`**: `GARANTIAS` suma `'deny-escritura'` (una línea; el
+   contract v5 asigna este ítem puntual a R1, por excepción explícita a
+   "`AGENT_r2` no se reabre" en la sección "Cambios v3 → v4"). `dev-sql`
+   en `catalogo.json` la suma a su arreglo. `test_catalogo.sh` (AC14) y
+   la suite completa siguen en verde — verificado antes y después del
+   cambio.
+
+### Task Status (ronda 4)
+
+Seis puntos del CCR v4→v5, más AC41/AC42 con su verificación escrita en
+`RUNBOOK.md`. Completed: 6. Blocked: 0. Skipped: 0.
+
+### Validation Executed (ronda 4)
+
+- `command -v shellcheck` → `0` (`/opt/homebrew/bin/shellcheck`, sigue
+  presente de rondas previas).
+- `node --check plugins/bisalta-db/scripts/catalogo.js` → `0`.
+- `node plugins/bisalta-db/scripts/catalogo.js` → `0`, `catálogo válido: 3
+  conexión(es)` — corrido después de sumar `deny-escritura` al enum y a la
+  entrada `dev-sql`.
+- `bash SDD/tests/test_catalogo.sh` → `PASS` (todas las líneas `ok`,
+  incluidas las cuatro de AC11-AC14), exit 0 — confirma que sumar
+  `deny-escritura` al enum no rompe ninguna fixture existente (ninguna
+  fija la lista completa de garantías válidas, sólo prueba
+  conocida-vs-desconocida).
+- `bash SDD/tests/run.sh` → `17 passed, 0 failed (17 total)`, exit 0.
+- `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh
+  plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh
+  SDD/tests/*.sh SDD/scripts/*.sh` → `0` (sin `.sh` nuevo en
+  `plugins/bisalta-db/`, glob del gate 2 sin cambios — `postgres-parte-0.sql`
+  es `.sql`, no `.sh`).
+- `grep -rn "~35\|35 bases" --include="*.md" --include="*.sql"
+  --include="*.json" --include="*.js" .` → único hallazgo nuevo fuera de
+  las citas históricas ya conocidas (`INVENTARIO.md`, `retro.md`,
+  verification report de ronda 3, contract v5 "Cambios v3→v4"): ninguno —
+  las tres apariciones nuevas (`RUNBOOK.md`, `sqlserver-parte-b.sql`, este
+  brief) citan "~35" entre comillas para contrastarlo con 32, no lo
+  afirman.
+- `grep -ni "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md`
+  → exit 0 (verificado explícitamente después de reescribir el párrafo de
+  AC10, que en un borrador intermedio partió la frase en dos líneas y
+  rompió el grep — corregido antes de cerrar, no después).
+- **Triple AC9 re-corrido contra el árbol de ronda 4** (`postgres-parte-a.sql`
+  cambió de contenido — nueva cita a la parte 0 en su encabezado — así
+  que se re-corre, no se asume): `bash SDD/tests/secret-scan.sh` → `0`
+  sobre 163 archivos versionados (verde) → agregada al final de
+  `postgres-parte-a.sql` una línea con clave `password`, separador `=` y
+  un valor de relleno con forma de access key de AWS (prefijo `AKIA` +
+  16 caracteres, construido en dos variables de shell para no aparecer
+  contiguo ni en el archivo temporal de esta sesión ni en esta
+  transcripción) → `bash SDD/tests/secret-scan.sh` → `1`, nombrando
+  `plugins/bisalta-db/aprovisionamiento/postgres-parte-a.sql:62`, sin
+  imprimir el valor (rojo) → revertida la línea (`sed -i '' '$ d'`) →
+  `git diff` contra el índice (que ya tenía el archivo mutado-sin-mutar
+  vía `git add -A` previo) sale vacío, reversión exacta → `bash
+  SDD/tests/secret-scan.sh` → `0` (verde). Detalle completo con comando y
+  exit code en `SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`.
+- Escalera completa vía runner sobre el commit de esta ronda (ver hash en
+  el reporte sellado): `bash plugins/sdd-flow/scripts/sdd-run-gates.sh
+  --full -o SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`.
+- `bash SDD/tests/secret-scan.sh` corrido una vez más **después** de
+  commitear el árbol final (post-runner), sobre el árbol ya commiteado —
+  es el único verde que cuenta según la trampa conocida D34/D35 (el
+  runner trunca `-o` y no ve el addendum pegado después). Resultado y
+  exit code en el verification report.
+
+### Blockers (ronda 4)
+
+Ninguno. El único punto que hubiera requerido preguntar —si `catalogo.js`
+entraba en el "out of scope: no tocar `plugins/bisalta-db/scripts/`" del
+brief— lo resuelve el propio contract v5 con una excepción explícita y
+nombrada ("Cambios v3 → v4": *"`AGENT_r2` no se reabre... salvo el enum de
+garantías del catálogo, que se trata como parte del scope reabierto de
+R1"*), así que no fue necesario escalar.
+
+### Files Changed (ronda 4)
+
+- `plugins/bisalta-db/aprovisionamiento/postgres-parte-0.sql` (new — AC41)
+- `plugins/bisalta-db/aprovisionamiento/postgres-parte-a.sql` (mod — cabecera: referencia a la parte 0)
+- `plugins/bisalta-db/aprovisionamiento/postgres-parte-b.sql` (mod — prosa: ya no se presenta como barrera)
+- `plugins/bisalta-db/aprovisionamiento/sqlserver-parte-a.sql` (mod — cabecera: dos membresías, no una)
+- `plugins/bisalta-db/aprovisionamiento/sqlserver-parte-b.sql` (mod — AC42: `db_denydatawriter` en el loop; cifra 32; nota SSISDB)
+- `plugins/bisalta-db/aprovisionamiento/sqlserver-inverso.sql` (mod — quita `db_denydatawriter` explícitamente)
+- `plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` (mod — orden de ejecución, AC41, AC42, AC7/AC10 con cifra corregida, decisión pendiente SSISDB, inverso)
+- `plugins/bisalta-db/catalogo.json` (mod — `dev-sql` suma `deny-escritura`)
+- `plugins/bisalta-db/scripts/catalogo.js` (mod — enum `GARANTIAS` suma `deny-escritura`, autorizado por el contract v5)
+- `SDD/briefs/R1-infra-accesos-lectura.md` (mod, este archivo)
+- `SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md` (mod — addendum de ronda 4, generado por el runner + evidencia a mano del triple AC9)
+
+### Final Statement (ronda 4)
+
+Los seis puntos del CCR de Patrick Ocampo quedan implementados con su
+verificación escrita: AC41 y AC42 son nuevos y `manual-only` como el
+resto de R1, con su mutación declarada en `RUNBOOK.md`; AC1–AC8 y AC10
+siguen `pendiente-de-ejecucion`, sin declarar ningún AC en verde sin
+haberlo corrido; AC9 re-verificado con su triple completo sobre el árbol
+final. Sin mitigaciones prohibidas: no se tocó `secret-scan.sh`, no se
+bajó ningún threshold, no se usó `--no-verify`, ninguna exclusión por
+path nueva. Único archivo tocado fuera del directorio
+`aprovisionamiento/` es `catalogo.js` — una línea, un enum, autorizado
+explícitamente por el contract v5 como excepción nombrada al scope de R1,
+no una decisión propia ni una invasión del scope de R2.

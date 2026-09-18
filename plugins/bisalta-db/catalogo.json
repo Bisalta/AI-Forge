@@ -30,6 +30,6 @@
     "base": "EXACTUS",
     "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
     "region": "us-east-1",
-    "garantias": ["rol-solo-lectura"]
+    "garantias": ["rol-solo-lectura", "deny-escritura"]
   }
 ]

@@ -1,9 +1,12 @@
 -- postgres-parte-a.sql
 --
 -- Aprovisionamiento de solo lectura para el plugin `bisalta-db` — PARTE A.
--- Corre UNA VEZ POR CLUSTER: los roles son objetos de cluster en Postgres,
--- no de base (contract SDD/contracts/2026-09-18-bisalta-db-mcp.md v3,
--- sección "Garantías por motor (asimetría declarada, no disimulada)").
+-- Corre UNA VEZ POR CLUSTER, DESPUÉS de postgres-parte-0.sql (control: el
+-- cluster no puede contener ninguna base `_prod`; ver ese archivo y AC41,
+-- contract SDD/contracts/2026-09-18-bisalta-db-mcp.md v5) y ANTES de
+-- postgres-parte-b.sql: los roles son objetos de cluster en Postgres, no
+-- de base (contract v5, sección "Garantías por motor (asimetría
+-- declarada, no disimulada)").
 --
 -- Cluster objetivo: identificador de cluster sistemas-costruplaza-db.cluster-cfrl3owqzwof
 -- (dev/qa) — esto es el identificador de cluster, no el endpoint completo;
