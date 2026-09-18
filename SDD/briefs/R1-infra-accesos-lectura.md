@@ -89,7 +89,7 @@ Ocho de los diez son `manual-only` porque **ningún harness de este repo puede c
 | AC7 | manual-only + mutación declarada: sección "AC7 — el user existe en todas las bases de usuario y en ninguna de sistema" | `RUNBOOK.md` | pendiente-de-ejecucion |
 | AC8 | manual-only: sección "AC8 — cada secreto existe..." | `RUNBOOK.md` | pendiente-de-ejecucion |
 | AC9 | automatizable + triple de mutación: `bash SDD/tests/secret-scan.sh` (verde→rojo→verde, ver verification report) | `SDD/tests/secret-scan.sh` | pass |
-| AC10 | automatizable (grep): `grep -n "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` | `plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` | pass |
+| AC10 | automatizable (grep): `grep -ni "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` | `plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` | pass |
 
 ## Cobertura del impact set
 
@@ -127,7 +127,7 @@ Total tasks: 11 (T1.1–T1.11). Completed: 11. Blocked: 0. Skipped: 0.
 - `bash SDD/tests/secret-scan.sh` (baseline, tras `git add plugins/bisalta-db/` para que `git ls-files` viera los archivos nuevos) → `0`.
 - **Triple AC9**: `bash SDD/tests/secret-scan.sh` → `0` (verde) → insertada línea con clave `password`, separador `=` y un valor de relleno con forma de access key AWS (prefijo `AKIA` + 16 caracteres — no reproducido acá en una sola pieza para no autodetectarse; el literal completo queda en la corrida pegada de `SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`) al final de `postgres-parte-a.sql` → `bash SDD/tests/secret-scan.sh` → `1`, nombrando `postgres-parte-a.sql:55`, sin imprimir el valor (rojo) → revertida la línea (`git diff` contra el índice sale vacío, reversión exacta) → `bash SDD/tests/secret-scan.sh` → `0` (verde). Detalle completo en `SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`.
 - Hallazgo adicional durante el mismo paso: el `RUNBOOK.md` original se autodetectaba en dos líneas (la acción de IAM `secretsmanager`:`GetSecretValue`, cuyo `:` interno matchea el patrón `secret...[:=]...4+ chars`, no una credencial). Corregido partiendo el literal con un backtick (`` `secretsmanager`:`GetSecretValue` ``) en las dos ocurrencias — mismo criterio que los placeholders de contraseña. Re-corrida tras el fix → `0`.
-- AC10: `grep -n "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` → coincidencia en línea 261 (declaración explícita del hueco de SQL Server).
+- AC10: `grep -ni "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` → coincidencia en línea 261 (declaración explícita del hueco de SQL Server).
 - `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` → `0` (sin `.sh` nuevos en R1, gate corrido igual como parte de la escalera completa).
 - `bash SDD/tests/run.sh` (suite completa, 14 archivos) → `0`.
 - Escalera completa vía runner: `bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -o SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md` — ver ese archivo para exit codes gate por gate.
