@@ -101,13 +101,13 @@ Todo lo de arriba de esta línea lo escribió `sdd-run-gates.sh` (commit `aca2f8
 | # | Estado del sistema | Comando | Exit code | Resultado |
 |---|---|---|---|---|
 | 1 | intacto | `bash SDD/tests/secret-scan.sh` | 0 | verde |
-| 2 | con la mutación aplicada (línea con clave `password`, separador `=` y un valor de relleno con forma de access key AWS agregada al final de `postgres-parte-a.sql`) | `bash SDD/tests/secret-scan.sh` | 1 | rojo — nombra `postgres-parte-a.sql:55`, sin imprimir el valor |
+| 2 | con la mutación aplicada (línea con clave `password`, separador `=` y un valor de relleno con forma de access key AWS agregada al final de `postgres-parte-a.sql`) | `bash SDD/tests/secret-scan.sh` | 1 | rojo — nombra `postgres-parte-a.sql:54`, sin imprimir el valor |
 | 3 | mutación revertida | `bash SDD/tests/secret-scan.sh` | 0 | verde |
 
 Salida de la corrida 2 (rojo):
 
 ```
-plugins/bisalta-db/aprovisionamiento/postgres-parte-a.sql:55: posible secreto (standards/security.md §3) — valor no impreso
+plugins/bisalta-db/aprovisionamiento/postgres-parte-a.sql:54: posible secreto (standards/security.md §3) — valor no impreso
 secret-scan: hallazgos arriba — BLOCKER (standards/security.md §3); si ya se commiteó, rotarlo, no sólo borrarlo
 ```
 
@@ -119,11 +119,11 @@ Reversión verificada byte a byte: `git diff plugins/bisalta-db/aprovisionamient
 grep -ni "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md
 ```
 
-Resultado: línea 261 (`... NO queda cubierta automáticamente**:`) — coincidencia, exit 0. (El runbook usa `NO` en mayúsculas; el grep necesita `-i` para matchear — corregido tras un primer intento en minúscula estricta que no encontraba nada, ver punto 2 arriba.)
+Resultado: línea 352 (`... NO queda cubierta automáticamente**:`) — coincidencia, exit 0. (El runbook usa `NO` en mayúsculas; el grep necesita `-i` para matchear — corregido tras un primer intento en minúscula estricta que no encontraba nada, ver punto 2 arriba. Número de línea actualizado en R2 tras la reescritura de las secciones AC1/AC2/AC5–AC7 del runbook — ver addendum de ronda 2 abajo.)
 
 ## Smoke manual (ACs `manual-only` — AC1–AC8)
 
-Ninguno de estos ocho se ejecutó: ningún harness de este repo puede crear un rol de Postgres, alcanzar la VPC de dev/qa, ni alcanzar `10.24.40.137` (misma razón declarada AC por AC en el contract v1). Estado de los ocho: **pendiente-de-ejecucion**. Los pasos exactos — incluidas las tres mutaciones declaradas del contract para AC2, AC6 y AC7 — están escritos en `plugins/bisalta-db/aprovisionamiento/RUNBOOK.md`, sección "Verificación de AC1–AC8". No se declara ningún resultado observado porque no se corrió nada: declarar un "Observado" acá sin haber corrido el comando sería exactamente la validación no corrida que las reglas del ciclo prohíben.
+Ninguno de estos ocho se ejecutó: ningún harness de este repo puede crear un rol de Postgres, alcanzar la VPC de dev/qa, ni alcanzar `10.24.40.137` (misma razón declarada AC por AC en el contract v2). Estado de los ocho: **pendiente-de-ejecucion**. Los pasos exactos — incluidas las tres mutaciones declaradas del contract para AC2, AC6 y AC7 — están escritos en `plugins/bisalta-db/aprovisionamiento/RUNBOOK.md`, sección "Verificación de AC1–AC8". No se declara ningún resultado observado porque no se corrió nada: declarar un "Observado" acá sin haber corrido el comando sería exactamente la validación no corrida que las reglas del ciclo prohíben.
 
 ## Impact set
 
@@ -138,4 +138,119 @@ Sin coincidencias (además de la prosa de este mismo brief/runbook).
 ## Rojos preexistentes
 
 Ninguno. La suite completa (14 archivos, incluidos los heredados de ciclos anteriores) está verde en la base y sigue verde después de este trabajo — R1 no tocó ningún archivo que esos tests ejerciten.
+
+---
+
+# Addendum de ronda 2 — correcciones del review
+
+El review de ronda 1 encontró dos blockers y siete majors/minors, todos en
+el runbook (el SQL no se tocó salvo donde un hallazgo lo pedía). Detalle
+completo de qué cambió y por qué queda en `SDD/briefs/R1-infra-accesos-lectura.md`
+(Execution Report) y en el diff de los commits de ronda 2. Acá sólo la
+evidencia que el runner no puede generar por sí mismo.
+
+## B1 — re-corrida del triple de mutación AC9 (evidencia que no reproducía)
+
+El reviewer reprodujo que `postgres-parte-a.sql` tiene 53 líneas y termina
+con newline: la línea agregada al final es la **54**, no la 55 que la
+tabla y el bloque "Salida de la corrida 2" de este archivo citaban antes
+de esta ronda. Corregido en las dos citas (esta tabla más abajo y
+`SDD/briefs/R1-infra-accesos-lectura.md:130`) y **re-corrido el triple
+entero** contra el árbol real de ronda 2 (el archivo no cambió de tamaño
+entre rondas: las correcciones de esta ronda fueron a `RUNBOOK.md` y a los
+comentarios de los `.sql`, no a las sentencias SQL de `postgres-parte-a.sql`):
+
+| # | Estado del sistema | Comando | Exit code | Resultado |
+|---|---|---|---|---|
+| 1 | intacto | `bash SDD/tests/secret-scan.sh` | 0 | verde |
+| 2 | con la mutación aplicada (`echo "-- password = AKIAABCDEFGHIJKLMNOP" >> plugins/bisalta-db/aprovisionamiento/postgres-parte-a.sql`, línea 54 nueva) | `bash SDD/tests/secret-scan.sh` | 1 | rojo — nombra `postgres-parte-a.sql:54`, sin imprimir el valor |
+| 3 | mutación revertida (`git checkout -- plugins/bisalta-db/aprovisionamiento/postgres-parte-a.sql`) | `bash SDD/tests/secret-scan.sh` | 0 | verde |
+
+Salida real de la corrida 2 (rojo), pegada tal cual salió del comando,
+contra un archivo verificado con `wc -l` inmediatamente antes y después de
+la mutación (53 → 54 → 53 líneas):
+
+```
+plugins/bisalta-db/aprovisionamiento/postgres-parte-a.sql:54: posible secreto (standards/security.md §3) — valor no impreso
+secret-scan: hallazgos arriba — BLOCKER (standards/security.md §3); si ya se commiteó, rotarlo, no sólo borrarlo
+```
+
+Reversión verificada byte a byte: `git diff plugins/bisalta-db/aprovisionamiento/postgres-parte-a.sql` contra el índice salió vacío después de `git checkout --`.
+
+## B2/M4 — AC7: cursor real en vez de `LEFT JOIN ... ON 1=0`
+
+El `LEFT JOIN ... ON 1=0` nunca podía matchear (`dp.name` sale `NULL` para
+las ~35 bases con o sin aprovisionamiento) y `sqlserver-parte-b-sin-filtro.sql`
+no existe. `RUNBOOK.md`, sección AC7, ahora instruye editar
+`sqlserver-parte-b.sql` directamente para la mutación, y la comprobación
+real es un cursor T-SQL (`##ac7_check`, ver el bloque en el runbook) que
+recorre `sys.databases` completo y consulta `sys.database_principals`
+dentro de cada base vía `USE` + SQL dinámico — mismo patrón que
+`sqlserver-parte-b.sql` ya usa para aprovisionar, ahora reusado para leer.
+No se pudo correr contra `Dev SQL` real (mismo motivo `manual-only` de
+siempre); el bloque queda escrito y listo para ejecutar.
+
+## M1/M2/M3 — AC2 y AC6: mutación y comprobación real sobre el mismo objeto
+
+- AC2: la comprobación real dejó de apuntar a `INSERT INTO
+  information_schema.tables` (una vista; falla con `cannot insert into
+  view`, nunca con el error de permiso). Ahora corre sobre `zz_scratch_ac2`,
+  la misma tabla que la mutación usó, y el `DROP TABLE` pasó a ser el
+  último paso, después de la comprobación real, no antes.
+- AC6: mismo defecto en SQL Server: la comprobación real dejó de apuntar a
+  `INSERT INTO sys.tables` (catálogo del sistema; falla con `Msg 259, Ad
+  hoc updates to system catalogs are not allowed`). Ahora corre sobre la
+  tabla `t` de `zz_scratch_ac6`, y `DROP DATABASE zz_scratch_ac6` pasó a
+  ser el último paso.
+
+Los dos siguen `manual-only` — no se corrieron contra una base real; el
+texto corregido queda en `RUNBOOK.md`.
+
+## M6 — exit codes que antes no podían ser otra cosa que 0
+
+`psql -f` sin `-v ON_ERROR_STOP=1` sale 0 aunque cada sentencia adentro
+falle. Agregado a las cuatro invocaciones `-f` de `RUNBOOK.md` (AC3 ×2,
+AC4 ×2). `sqlcmd -i` sin `-b` tiene el mismo problema; agregado (junto con
+`-v ON_ERROR_STOP=1`) a la invocación de AC7.
+
+## M7 — la contraseña dejó de viajar por `-P`
+
+Las tres invocaciones de `sqlcmd` que autenticaban como `bisalta_lectura`
+(`AC5`, dos en `AC6`) usaban `-P <contraseña real>`, visible en la tabla de
+procesos — invariante cerrada del contract, sección "Entrega de la
+credencial al cliente". Reemplazado por `SQLCMDPASSWORD='<contraseña
+real>' sqlcmd ...`: el valor va en el entorno del proceso hijo, nunca en
+`argv`.
+
+## Minor — v1 → v2, citado por nombre, host completo, AC4
+
+- Seis citas de contract `v1` corregidas a `v2` en `RUNBOOK.md` (líneas 3,
+  100 y las tres cabeceras de mutación AC2/AC6/AC7, más la de AC10) y en
+  los `.sql` (`postgres-parte-a.sql`, `postgres-parte-b.sql`,
+  `sqlserver-parte-a.sql`).
+- Los `.sql` y el runbook dejaron de citar "Decisión de diseño punto N del
+  contract" (esa lista vive en el brief, no en el contract): ahora citan
+  la sección o el AC del contract por nombre (`AC1`, `AC7`, "Out of
+  scope", "Garantías por motor (asimetría declarada, no disimulada)",
+  "Entrega de la credencial al cliente").
+- El host de Aurora quedó completo en las cuatro ubicaciones truncadas con
+  `...`: `sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com`
+  (identificador del contract + región `us-east-1`, ya declarada en la fila
+  `Integration` del `Architectural Delta`).
+- AC4: la comprobación real pasó a ser `SELECT 1 FROM pg_roles WHERE
+  rolname = 'claude_lectura'` (cero filas esperadas) en vez de depender
+  únicamente del mensaje de error de un intento de conexión —
+  `password authentication failed` no distingue "el rol no existe" de
+  "el rol existe pero la contraseña está mal tipeada". El intento de
+  conexión queda como confirmación adicional, no como la prueba.
+
+## Re-verificación tras los fixes
+
+- `bash SDD/tests/secret-scan.sh` → `0` (ver triple de arriba).
+- `grep -ni "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` → línea 352, exit 0 (desplazada desde 261 por la reescritura de las secciones AC1/AC2/AC5–AC7; ver `SDD/briefs/R1-infra-accesos-lectura.md:132`).
+- `bash SDD/tests/run.sh` → `14 passed, 0 failed (14 total)`.
+- Ningún `.sh` nuevo se agregó en esta ronda — el gate 2 (`shellcheck`) no tiene superficie nueva que cubrir.
+
+El commit del runner (`sdd-run-gates.sh --full`) de esta ronda va abajo,
+como sección aparte, sellando el árbol de ronda 2.
 
