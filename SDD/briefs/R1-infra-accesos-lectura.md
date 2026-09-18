@@ -61,7 +61,7 @@ El aprovisionamiento no es un detalle de operación: es donde vive la garantía.
 - [x] T1.10 Commitear (árbol limpio) y correr la escalera de gates: `bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -o SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`
 - [x] T1.11 **AC9 con su triple**: correr `bash SDD/tests/secret-scan.sh` (verde) → insertar el literal con forma de credencial en `postgres-parte-a.sql` y volver a correrlo (rojo) → revertir y correrlo otra vez (verde). Las tres corridas, con comando literal y exit code, van al verification report a mano. → adicionalmente encontrado y corregido en el mismo paso: el propio `RUNBOOK.md` (no un `.sql`) se autodetectaba por la acción de IAM `secretsmanager`:`GetSecretValue` (namespace y acción con `:` en el medio, no una credencial) — corregido partiendo el literal con un backtick, ver verification report.
 
-## Acceptance criteria (IDs del contract v1 — no los renumeres)
+## Acceptance criteria (IDs del contract v2 — no los renumeres)
 
 | AC | Qué afirma | Cómo se verifica |
 |---|---|---|
