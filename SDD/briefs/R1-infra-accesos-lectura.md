@@ -83,7 +83,7 @@ El aprovisionamiento no es un detalle de operación: es donde vive la garantía.
 | AC4 | Tras el inverso, `claude_lectura` no conecta | `manual-only` |
 | AC5 | El login de Dev SQL lee de `EXACTUS` | `manual-only` |
 | AC6 | Un `INSERT` con ese login falla | `manual-only` + mutación declarada |
-| AC7 | El user existe en todas las bases de usuario y en ninguna de sistema | `manual-only` + mutación declarada |
+| AC7 | El user existe en todas las bases de usuario salvo `SSISDB`, y en ninguna de sistema | `manual-only` + mutación declarada |
 | AC8 | Cada secreto existe con los dos campos y es legible con la política IAM | `manual-only` |
 | AC9 | `secret-scan.sh` sale 0 sobre el árbol con los scripts de R1 | **automatizable** + triple de mutación |
 | AC10 | El runbook declara el hueco de la base nueva en SQL Server | **automatizable** (grep sobre el runbook) |

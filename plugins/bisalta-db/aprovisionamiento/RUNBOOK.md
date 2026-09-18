@@ -369,7 +369,7 @@ comprobación real ya corrida, borrar la base de scratch:
 sqlcmd -S 10.24.40.137 -E -Q "DROP DATABASE zz_scratch_ac6;"
 ```
 
-### AC7 — el user existe en todas las bases de usuario y en ninguna de sistema
+### AC7 — el user existe en todas las bases de usuario salvo `SSISDB` y en ninguna de sistema
 
 **Mutación declarada** (contract v3, AC7): sobre una instancia de prueba
 (no `Dev SQL`), editar `sqlserver-parte-b.sql` quitando el filtro

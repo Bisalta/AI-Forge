@@ -1,6 +1,14 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v6
+- **Versión**: v7
+
+### Cambios v6 → v7 (resolución de `ESCALATE`, 18-sep-2026)
+
+`AGENT_r1` agotó el cap de tres rondas sobre el alcance reabierto y el reviewer emitió `ESCALATE` — **no por un defecto del implementador, sino del contract**. El v6 decidió sacar `SSISDB` del loop y **no reconcilió los dos ACs que ese loop verifica**: `AC7` seguía diciendo "todas las bases de usuario en línea" y `AC42` "cada base de usuario en línea". `SSISDB` **es** una base de usuario en línea (`database_id = 36`, `state = 0`), así que el procedimiento entregado assertaba la negación de la letra de su propio AC: quien lo ejecutara leyendo el contract lo marcaba rojo, leyendo el runbook lo marcaba verde.
+
+Es la disciplina que este mismo contract fija dos veces —en "Cambios v3 → v4" punto 1 ("sin AC no se prueban") y en v4 punto 9, donde se nombró explícitamente qué AC tocaba el cambio— y que v6 no aplicó a su propia decisión.
+
+**Resolución**: enmienda del planner, sin ronda nueva de implementación. `AC7` y `AC42` acotan su universo a "todas las bases de usuario en línea **salvo `SSISDB`**", y la redacción se propaga al runbook y al brief. El BLOCKER y los cuatro MAJOR de la ronda 4 quedaron cerrados y verificados uno por uno por el reviewer en la ronda 5.
 
 ### Cambios v5 → v6 (respuestas de Patrick Ocampo, Slack 2026-09-18 15:52 CST)
 
@@ -275,7 +283,7 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 `manual-only: misma razón que AC5.`
 **Mutación declarada**: agregar el user a `db_datawriter` en una base de scratch; la comprobación tiene que ponerse roja; quitarlo del rol y borrar la base de scratch.
 
-**AC7** — Tras correr la parte B, el user existe en todas las bases de usuario en línea y en **ninguna** de las cuatro bases de sistema (`master`, `model`, `msdb`, `tempdb`).
+**AC7** — Tras correr la parte B, el user existe en todas las bases de usuario en línea **salvo `SSISDB`** (excluida por decisión de v6), y en **ninguna** de las cuatro bases de sistema (`master`, `model`, `msdb`, `tempdb`) ni en `SSISDB`.
 `manual-only: misma razón que AC5.`
 **Mutación declarada**: quitar del cursor el filtro que excluye las bases de sistema y volver a correr la parte B contra una instancia de prueba; la comprobación tiene que ponerse roja; restaurar el filtro.
 
@@ -380,7 +388,7 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 `manual-only: requiere un cluster Postgres real; ningún harness de este repo levanta uno.`
 **Mutación declarada**: cambiar la condición de aborto de `_prod` a `_stg`; corrida contra el cluster de dev/qa (que contiene `controlactivos_stg` y ninguna `_prod`), la Parte 0 tiene que abortar — o sea, la comprobación de que continúa se pone roja; restaurar la condición.
 
-**AC42** — Tras correr la parte B de SQL Server, el user tiene en cada base de usuario en línea **las dos** membresías: `db_datareader` y `db_denydatawriter`. Un `INSERT` falla con `DENY` aunque alguien le conceda `INSERT` explícitamente después.
+**AC42** — Tras correr la parte B de SQL Server, el user tiene en cada base de usuario en línea **salvo `SSISDB`** **las dos** membresías: `db_datareader` y `db_denydatawriter`. Un `INSERT` falla con `DENY` aunque alguien le conceda `INSERT` explícitamente después.
 `manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
 **Mutación declarada**: quitar `db_denydatawriter` del loop y conceder `INSERT` directo al user sobre una tabla de scratch; el `INSERT` tiene que pasar — o sea, la comprobación de que falla se pone roja. Restaurar el loop y revocar el `INSERT`: el `DENY` vuelve a ganar.
 
