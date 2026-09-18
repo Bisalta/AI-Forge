@@ -2,7 +2,7 @@
 'use strict';
 //
 // plugins/bisalta-db/scripts/catalogo.js — lectura y validación de
-// plugins/bisalta-db/catalogo.json (contract v2, "Contrato de datos").
+// plugins/bisalta-db/catalogo.json (contract v3, "Contrato de datos").
 //
 // 🔴 PRODUCCIÓN ES IRREPRESENTABLE, NO RECHAZADA POR NOMBRE. `ambiente`
 // admite `dev` y `qa` y nada más: no hay valor que nombre producción. Una
@@ -31,7 +31,7 @@ const DIALECTOS = ['postgres', 'sqlserver'];
 const AMBIENTES = ['dev', 'qa'];
 const GARANTIAS = ['rol-solo-lectura', 'sesion-read-only', 'endpoint-replica-lectura'];
 
-// Cluster y host de la cuenta AWS de PRODUCCIÓN (contract v2, "Out of
+// Cluster y host de la cuenta AWS de PRODUCCIÓN (contract v3, "Out of
 // scope"). Ninguna entrada puede apuntar ahí.
 const HOSTS_PROHIBIDOS = ['cluster-cr4rbgr7qlr6', '192.168.252.22'];
 

@@ -84,9 +84,79 @@ PASS  test_usage_summary.sh
 > arregla acá. Si hay que re-correr la escalera, este addendum se vuelve a
 > pegar después.
 
-- **Agente**: `AGENT_r2` · **Ronda**: 1 · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v2**
-- **Rama**: `feat-GEN-108-mcp-bisalta-db` (base `prod`) · **Commit de la evidencia**: `ee4a5ae`
+- **Agente**: `AGENT_r2` · **Ronda**: 2 · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v3**
+- **Rama**: `feat-GEN-108-mcp-bisalta-db` (base `prod`) · **Commit de la evidencia**: ver §0
 - **ACs**: AC11–AC40 (AC1–AC10 son de R1, ya `APPROVED`)
+
+## 0. Ronda 2 — el BLOCKER del gate 9, y por qué la evidencia de la ronda 1 no lo vio
+
+La ronda 1 entregó un gate 9 **verde sobre un árbol que no era el entregado**.
+El runner selló el árbol de `ee4a5ae`, y **este archivo no existía en ese árbol**
+— entró después, en `9bec3ed`, con el addendum ya pegado:
+
+```
+$ git show ee4a5ae:SDD/verification/feat-GEN-108-mcp-bisalta-db-R2.md
+fatal: path '...' exists on disk, but not in 'ee4a5ae'
+```
+
+O sea: el sello del runner es correcto y la afirmación "gate 9 verde" era
+cierta — sobre un árbol que **por construcción excluía el archivo que lo
+rompía**. No es una medición falseada; es una medición de otra cosa. Es la
+deuda `D34` (el runner trunca el archivo de `-o`, así que el addendum se pega
+*después* de la última corrida sellada) mordiendo por primera vez de verdad, y
+es exactamente la clase que `SDD/retro.md` RT20 no cubre: no había un valor
+viejo que grepear, había un **árbol** que no contenía el archivo.
+
+**Lo que rompía** eran dos renglones de prosa de este mismo addendum, no del
+producto: el patch literal de la mutación de AC23 (`:187`) y la lista de
+literales partidos (`:325`). Los dos se **partieron**, que es la convención que
+el repo ya usa en `conexion.js` y en `test_servidor_mcp.sh:255`. **Ninguna
+exclusión por path** — prohibida por el brief y por `doc_quality_gates.md`
+gate 9.
+
+Precisión sobre el diagnóstico del review: el span que matcheaba en `:325`
+**no** era `USUARIO_SECRETO=` (su valor era `…`, fuera del charset del patrón),
+sino la clave `resolverSecreto` llevando su propio nombre como valor, con `:`
+de separador — la palabra disparadora en el medio del identificador. Es la
+forma que AC6bis agregó. Verificado con el patrón del script en la mano; el
+fix es el mismo.
+
+🔴 **Y esta sección volvió a caer en lo mismo mientras se escribía**: el
+primer borrador citaba ese span entero para explicarlo, y puso el gate en rojo
+otra vez (`:119`). Es la tercera instancia registrada del mismo patrón en este
+ciclo — **la prosa que describe lo que el gate prohíbe dispara el gate**, la
+misma clase que `sdd-check.sh` tuvo en v0.11.0. Se corrigió antes de commitear;
+queda anotada porque la frecuencia con la que reaparece es el dato, no la
+instancia.
+
+### Lo demás que cambió en esta ronda
+
+1. **`catalogo_invalido` tenía implementación y no tenía test** (`MINOR`).
+   Bloque nuevo en `test_servidor_mcp.sh`: seis afirmaciones sobre las dos
+   rutas de carga del catálogo (`consultar` y `listar_conexiones`), catálogo
+   ilegible y catálogo ausente, exit del proceso incluido, más un control
+   positivo. Probado por mutación — §2, "Triple 18".
+2. **Transcripción del rojo de AC11** (`MINOR`): declaraba dos asserts caídos,
+   cae uno. Corregido y re-medido — §2.
+3. **Citas a `contract v2` → `v3`** (`MINOR`): `catalogo.js` (2), `lista-blanca.js`,
+   `conexion.js`, `servidor-mcp.js` (2), las cabeceras de los tres `test_*.sh`
+   de R2, y la nota del gate 2 de `doc_quality_gates.md`. El contract v3 se
+   ratificó en `83b339d`, después de la entrega de la ronda 1.
+
+   🔴 **Dos "contract v2" que quedan en el árbol NO son errores y no se
+   tocaron** (grep del valor viejo sobre el árbol entero, RT20): los de
+   `doc_quality_gates.md` gate 2 (`ratificada en el contract v2 (AC3)`) y
+   gate 9 (`threat model contract v2`) citan **otro contract**,
+   `SDD/contracts/2026-08-13-sicop-hardening.md`, **cuya versión corriente sí
+   es v2** — ahí viven `AC3` (piso de `shellcheck`) y `AC6bis`. Propagarlos a
+   v3 habría creado una cita a una versión que no existe. Misma razón para
+   `SDD/tests/secret-scan.sh` (que además el brief prohíbe tocar) y para
+   `test_secret_scan.sh`, que ya dice `v2/v3` correctamente.
+
+   **Fuera de mi ownership, se reporta sin tocar**: `plugins/bisalta-db/
+   aprovisionamiento/*.sql` (4 citas) y `aprovisionamiento/RUNBOOK.md` (6) citan
+   `contract v2` del contract de GEN-108, que hoy es v3. Son archivos de `R1`,
+   ya `APPROVED`. Queda para el planner decidir si entran en el mismo cambio.
 
 ## 1. AC ↔ test binding
 
@@ -125,6 +195,7 @@ grepeable en el archivo que lo acompaña.
 | AC38 | verificación por grep + triple de mutación — ver §3 y §5(a) | `SDD/docs/doc_quality_gates.md` | pass |
 | AC39 | verificación por grep — ver §3 | `SDD/docs/doc_architecture.md` | pass |
 | AC40 | `bash SDD/tests/run.sh` (gate 4 y suite completa del runner, exit 0) + derivación del árbol — ver §3 | `SDD/tests/run.sh` | pass |
+| tabla de errores — `catalogo_invalido` (v3) | `con un catálogo ilegible, consultar devuelve el código 2` · `con un catálogo ilegible, el error es catalogo_invalido` · `con un catálogo ilegible, el proceso sale 2` · `con un catálogo que no existe, el proceso sale 2` · `con un catálogo ilegible, listar_conexiones devuelve el código 2` · `con un catálogo ilegible, listar_conexiones da catalogo_invalido` (+ control `control: contra el catálogo vivo la misma invocación NO sale 2`) | `SDD/tests/test_servidor_mcp.sh` | pass — **agregado en ronda 2** |
 
 **Ningún AC quedó `missing`.** El único parcialmente manual es AC34 (§4).
 
@@ -164,7 +235,14 @@ exit codes reales y, en el rojo, los asserts que cayeron.
 Reproducible a mano: el texto de la izquierda es lo único que se cambió.
 
 1. **AC11** — `"ambiente": "dev"` → `"ambiente": "stg"` en la entrada `proveedores-dev`.
-   Rojo: `FAIL el catálogo real que se distribuye con el plugin es válido — esperado [0], obtenido [1]`, `FAIL AC11 el rechazo nombra la entrada`.
+   Rojo: **un solo assert**, `FAIL el catálogo real que se distribuye con el plugin es válido (exit 0) — esperado [0], obtenido [1]`.
+   🔴 **Corregido en ronda 2 — la transcripción de la ronda 1 era imprecisa**: declaraba un segundo
+   assert caído (`AC11 el rechazo nombra la entrada`) que **no cae**, y el reviewer lo verificó
+   reproduciendo. La razón vale anotarla porque no es un descuido de tipeo: los asserts propios de
+   AC11 corren sobre una **fixture aparte** que hace `c[0].ambiente='stg'` sobre una copia, así que
+   mutar el catálogo distribuido a ese mismo valor los deja igual de verdes. El triple se sostiene;
+   lo que el rojo prueba es exactamente lo que AC11 pide: que el catálogo **que se empaqueta** pasa
+   por el validador. Re-medido en ronda 2: verde 0 → rojo 1 (1 assert) → verde 0.
 2. **AC12** — se inserta al principio del arreglo una entrada `prod-sql` con `"host": "192.168.252.22"`.
    Rojo: `FAIL el catálogo real …`, `FAIL AC12 ninguna entrada del catálogo real nombra el cluster ni el host de producción — esperado [no], obtenido [si]`.
 3. **AC13** — se agrega `"usuario": "claude_lectura",` a `proveedores-dev`.
@@ -184,7 +262,12 @@ Reproducible a mano: el texto de la izquierda es lo único que se cambió.
    🔴 **Los cuatro casos "detrás de una lectura" existen por esta mutación**: un input `EXEC algo` a secas cae igual por el ancla común, así que con las reglas del dialecto borradas seguiría dando 4 y el triple no podría ponerse rojo. Los casos discriminantes empiezan con `SELECT` (y un assert de control verifica que `postgres` los acepta), así que su rechazo sólo puede venir de la regla del dialecto.
 10. **AC22** — se inserta `dialecto = 'comun';` antes de normalizar, de modo que ninguna rama de dialecto se evalúa.
     Rojo, **verificado que cae el assert propio de AC22** y no sólo los vecinos: `FAIL AC22 la misma entrada se rechaza en sqlserver — esperado [4], obtenido [0]` (8 asserts en rojo en total).
-11. **AC23** — se agrega `process.env.PGPASSWORD = credencial.contrasena;` tras resolver la credencial.
+11. **AC23** — se agrega, tras resolver la credencial, una asignación a la variable de entorno de
+    libpq que lleva la contraseña como valor — `process.env.PGPASSWORD` — con `credencial.contrasena`
+    del lado derecho. **El patch no se transcribe entero a propósito**: escrito contiguo con su
+    separador, este renglón dispara el gate 9 contra este mismo archivo (es lo que pasó en la
+    ronda 1). Partirlo es la convención del repo, la misma que ya usan `conexion.js` y
+    `test_servidor_mcp.sh:255`; la exclusión por path está prohibida.
     Rojo: `FAIL AC23 el código fuente de scripts/ no contiene [PGPASSWORD] — esperado [no], obtenido [si]`.
 12. **AC24** — el cuerpo del `finally` se reemplaza por un comentario (deja de borrar el directorio).
     Rojo: `FAIL AC24 tras una consulta que falla al conectar no queda ningún directorio temporal — esperado [0], obtenido [4]` y `… tras una consulta exitosa — esperado [0], obtenido [5]`.
@@ -204,6 +287,42 @@ AC38 en su lista; el contract v2 **sí** declara una mutación bajo AC38. Se
 corrió igual: ejecutar una mutación declarada nunca puede sobrar, y omitirla
 por una discrepancia entre brief y contract sería elegir cuál de los dos
 ignorar. Queda señalado para el planner en §6.
+
+### Triple 18 (ronda 2) — `catalogo_invalido`, **no declarado en el contract**
+
+El contract v3 agregó la fila `Catálogo ilegible o inválido → exit 2
+(catalogo_invalido)` a la tabla de errores, y la ronda 1 la implementó
+(`servidor-mcp.js:141` y `:215`) **sin ningún test**: `grep -rn catalogo_invalido
+SDD/tests/` daba vacío. Lo levantó el reviewer como `MINOR` y se cerró en esta
+ronda con el bloque nuevo de `test_servidor_mcp.sh` (seis afirmaciones + un
+control positivo).
+
+El triple **no está declarado en el contract** — no es una mutación que el
+planner haya pedido, y no se cuenta entre los diecisiete de arriba. Se corrió
+igual, y se declara por separado, porque un assert nuevo que nadie vio fallar no
+prueba nada (`quality-gates.md` §10): sin el rojo no hay forma de distinguir
+"el código mapea bien el error" de "el assert mide cualquier cosa".
+
+- **Patch**: en los dos puntos de mapeo, `2`/`'catalogo_invalido'` →
+  `3`/`'conexion_desconocida'`.
+- **Verde → rojo → verde**: `0 → 1 → 0`. En el rojo cayeron **los seis** asserts
+  nuevos, y **sólo** los seis — el control positivo siguió verde, que es lo que
+  prueba que el rojo viene del mapeo y no de que la invocación se haya roto
+  entera:
+
+  ```
+  FAIL  con un catálogo ilegible, consultar devuelve el código 2 — no encontré ["codigo":2] en la salida
+  FAIL  con un catálogo ilegible, el error es catalogo_invalido — no encontré ["error":"catalogo_invalido"] en la salida
+  FAIL  con un catálogo ilegible, el proceso sale 2 (exit 2) — esperado [2], obtenido [3]
+  FAIL  con un catálogo que no existe, el proceso sale 2 (exit 2) — esperado [2], obtenido [3]
+  FAIL  con un catálogo ilegible, listar_conexiones devuelve el código 2 — no encontré ["codigo":2] en la salida
+  FAIL  con un catálogo ilegible, listar_conexiones da catalogo_invalido — no encontré ["error":"catalogo_invalido"] en la salida
+  FAIL — 6 assert(s) fallaron
+  ```
+
+- **`listar_conexiones` tiene su propia carga del catálogo** (`servidor-mcp.js:215`,
+  distinta de la de `:141`). Por eso el bloque afirma sobre las dos rutas: un test
+  que sólo cubriera `consultar` dejaría la mitad del mapeo sin vigilancia.
 
 ## 3. Verificaciones que no son un `test_*.sh`
 
@@ -322,7 +441,8 @@ base):
    manifestado porque escriben poco. `grep -rn 'process\.exit(' plugins/bisalta-db/`
    hoy sólo devuelve los comentarios que explican por qué no se usa.
 2. **Tres literales del propio código disparaban el gate 9 contra sí mismos**
-   (`USUARIO_SECRETO=…`, `resolverSecreto: resolverSecreto`, `extra.secret_id = …`).
+   (`USUARIO_SECRETO=…`, la clave `resolverSecreto` llevando su propio nombre
+   como valor en un objeto literal, `extra.secret_id = …`).
    Se **partieron los literales** (renombres + clave computada), que es la
    convención del repo; **ninguna exclusión por path**, que es la única
    mitigación prohibida ahí. Nota: el comentario que escribí para explicar el

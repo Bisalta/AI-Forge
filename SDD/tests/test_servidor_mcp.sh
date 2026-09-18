@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SDD/tests/test_servidor_mcp.sh — plugins/bisalta-db/scripts/servidor-mcp.js
 # y conexion.js. AC23-AC37 del contract
-# SDD/contracts/2026-09-18-bisalta-db-mcp.md v2.
+# SDD/contracts/2026-09-18-bisalta-db-mcp.md v3.
 #
 # No hay base ni cuenta de AWS acá, y no hace falta: los binarios externos
 # (`aws`, `psql`, `sqlcmd`) se sustituyen por stubs al frente del PATH que
@@ -409,6 +409,55 @@ salida="$(servidor_jsonrpc '{"jsonrpc":"2.0","id":1,"method":"tools/call","param
 cuerpo="$(cuerpos "$salida")"
 assert_contains "$cuerpo" '"codigo":2' "sin el argumento sql, la herramienta devuelve el código 2"
 assert_contains "$cuerpo" '"error":"uso"' "sin el argumento sql, el error es uso"
+
+# ---------------------------------------------------------------------------
+# Catálogo ilegible → código 2 `catalogo_invalido` (contract v3, tabla de
+# errores). El catálogo vivo NO se toca: se apunta la variable de entorno a
+# una ruta aparte, así el resto del archivo sigue corriendo contra el fixture
+# bueno.
+#
+# 🔴 CONTROL POSITIVO AL LADO. Un "sale 2" no dice nada si esa misma
+# invocación saliera 2 por cualquier otro motivo: la última afirmación del
+# bloque corre el MISMO comando contra el catálogo vivo y exige que NO salga
+# 2 y que NO nombre `catalogo_invalido`.
+# ---------------------------------------------------------------------------
+CATALOGO_ILEGIBLE="$TMP_DIR/catalogo-ilegible.json"
+printf '%s\n' '{ esto no es json valido' > "$CATALOGO_ILEGIBLE"
+CATALOGO_AUSENTE="$TMP_DIR/catalogo-que-no-existe.json"
+rm -f "$CATALOGO_AUSENTE"
+
+# consultar, por la herramienta MCP
+salida="$(printf '%s\n' "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" \
+  | env PATH="$PATH_CON_STUBS" TMPDIR="$SYSTMP" BISALTA_DB_CATALOGO="$CATALOGO_ILEGIBLE" \
+        "$NODE_BIN" "$SERVIDOR" 2>/dev/null)"
+cuerpo="$(cuerpos "$salida")"
+assert_contains "$cuerpo" '"codigo":2' "con un catálogo ilegible, consultar devuelve el código 2"
+assert_contains "$cuerpo" '"error":"catalogo_invalido"' "con un catálogo ilegible, el error es catalogo_invalido"
+
+# consultar, por CLI — acá se mide el EXIT del proceso, que es lo que pide la
+# tabla de errores del contract.
+env PATH="$PATH_CON_STUBS" TMPDIR="$SYSTMP" BISALTA_DB_CATALOGO="$CATALOGO_ILEGIBLE" \
+  "$NODE_BIN" "$SERVIDOR" --consultar 'proveedores-dev' --sql 'SELECT 1' >/dev/null 2>&1
+assert_exit 2 "$?" "con un catálogo ilegible, el proceso sale 2"
+
+env PATH="$PATH_CON_STUBS" TMPDIR="$SYSTMP" BISALTA_DB_CATALOGO="$CATALOGO_AUSENTE" \
+  "$NODE_BIN" "$SERVIDOR" --consultar 'proveedores-dev' --sql 'SELECT 1' >/dev/null 2>&1
+assert_exit 2 "$?" "con un catálogo que no existe, el proceso sale 2"
+
+# listar_conexiones tiene su propia carga del catálogo, y su propio mapeo.
+salida="$(printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"listar_conexiones","arguments":{}}}' \
+  | env PATH="$PATH_CON_STUBS" TMPDIR="$SYSTMP" BISALTA_DB_CATALOGO="$CATALOGO_ILEGIBLE" \
+        "$NODE_BIN" "$SERVIDOR" 2>/dev/null)"
+cuerpo="$(cuerpos "$salida")"
+assert_contains "$cuerpo" '"codigo":2' "con un catálogo ilegible, listar_conexiones devuelve el código 2"
+assert_contains "$cuerpo" '"error":"catalogo_invalido"' "con un catálogo ilegible, listar_conexiones da catalogo_invalido"
+
+# Control positivo: el mismo comando contra el catálogo vivo no sale 2.
+env PATH="$PATH_CON_STUBS" TMPDIR="$SYSTMP" BISALTA_DB_CATALOGO="$CATALOGO_VIVO" \
+  "$NODE_BIN" "$SERVIDOR" --consultar 'proveedores-dev' --sql 'SELECT 1' >/dev/null 2>&1
+ec_control=$?
+assert_eq "$([ "$ec_control" -eq 2 ] && echo sale-2 || echo no-sale-2)" "no-sale-2" \
+  "control: contra el catálogo vivo la misma invocación NO sale 2"
 
 BISALTA_STUB_PSQL_MODO=timeout
 export BISALTA_STUB_PSQL_MODO

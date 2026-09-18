@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SDD/tests/test_catalogo.sh — plugins/bisalta-db/scripts/catalogo.js y el
 # empaquetado del plugin. AC11-AC14 y AC36 del contract
-# SDD/contracts/2026-09-18-bisalta-db-mcp.md v2.
+# SDD/contracts/2026-09-18-bisalta-db-mcp.md v3.
 #
 # 🔴 PRODUCCIÓN ES IRREPRESENTABLE, NO RECHAZADA POR NOMBRE. `ambiente` admite
 # `dev` y `qa` y nada más. Una lista de nombres prohibidos es red; esto es

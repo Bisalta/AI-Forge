@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SDD/tests/test_lista_blanca.sh — plugins/bisalta-db/scripts/lista-blanca.js.
-# AC15-AC22 del contract SDD/contracts/2026-09-18-bisalta-db-mcp.md v2.
+# AC15-AC22 del contract SDD/contracts/2026-09-18-bisalta-db-mcp.md v3.
 #
 # Port de tests/consultaLecturaWrapper.test.mjs de Bisalta/Proveedores-Back
 # (rama feat-PROV-131-api-comprassync): los doce casos, incluidos los cinco de

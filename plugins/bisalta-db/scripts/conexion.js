@@ -2,7 +2,7 @@
 'use strict';
 //
 // plugins/bisalta-db/scripts/conexion.js — resolución del secreto y ejecución
-// del cliente CLI del dialecto (contract v2, "Entrega de la credencial al
+// del cliente CLI del dialecto (contract v3, "Entrega de la credencial al
 // cliente").
 //
 // 🔴 LA CREDENCIAL NUNCA VIAJA POR argv. Un argumento de línea de comandos es

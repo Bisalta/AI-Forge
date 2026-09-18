@@ -7,7 +7,7 @@
 // dependencias de paquete. `@modelcontextprotocol/server-postgres` está
 // deprecado desde 2025 y tiene inyección SQL que se salta su propio modo de
 // solo lectura; el SDK oficial traería package.json, lockfile y un árbol de
-// node_modules a un repo que hoy no tiene ningún manifiesto (contract v2,
+// node_modules a un repo que hoy no tiene ningún manifiesto (contract v3,
 // "Dependencias nuevas").
 //
 // Dos herramientas: `consultar(conexion, sql)` y `listar_conexiones()`.
@@ -40,7 +40,7 @@ const NOMBRE_SERVIDOR = 'bisalta-db';
 const VERSION_SERVIDOR = '0.1.0';
 const VERSION_PROTOCOLO = '2024-11-05';
 
-// Topes duros de la respuesta (contract v2, "Respuesta de `consultar`"). Son
+// Topes duros de la respuesta (contract v3, "Respuesta de `consultar`"). Son
 // la ÚNICA barrera entre las filas y el transcript de la sesión: riesgo
 // aceptado con dueño, no control.
 const LIMITE_FILAS = 1000;

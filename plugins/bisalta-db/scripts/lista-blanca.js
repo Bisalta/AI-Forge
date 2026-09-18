@@ -16,7 +16,7 @@
 // `DELETE ... WHERE id IN (SELECT ...)`.
 //
 // Una lista blanca por dialecto: un mismo patrón estaría mal en alguna
-// dirección (contract v2, decisión 3).
+// dirección (contract v3, decisión 3).
 //
 // Uso como CLI (el SQL entra por stdin, nunca por argv):
 //   printf '%s' "SELECT 1" | node lista-blanca.js postgres
