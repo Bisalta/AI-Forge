@@ -223,3 +223,102 @@ producir el resultado que declara esperar, no sólo uno que lo asume. Sin
 mitigaciones prohibidas: no se tocó `secret-scan.sh`, no se bajó ningún
 threshold, no se usó `--no-verify`. `postgres-inverso.sql` y
 `sqlserver-inverso.sql` no se tocaron — ningún hallazgo los mencionaba.
+
+---
+
+## Ronda 3 — la clase del defecto, no la instancia (rechazo de ronda 2, RT21)
+
+### Summary
+
+El reviewer encontró tres MAJOR (J1, J2, J3) y cinco minor. Los tres MAJOR
+son **la misma forma** que M5 (ronda 2) ya había corregido en AC1,
+reaparecida en AC5/AC6/AC7 porque la corrección de ronda 2 fue por
+instancia señalada, no por forma — la propia AC6 de ronda 2 ya nombraba
+"`sys.tables` es un catálogo del sistema" quince líneas después de dejar
+`sys.tables` intacto en AC5. Corregidos los tres:
+
+- **J1** (AC5, `RUNBOOK.md:227` en la versión pre-ronda-3): `sys.tables`
+  reemplazado por el mismo patrón `<tabla_real>` que AC1 ya usaba, con el
+  mismo matiz de rojo-falso sobre tabla vacía extendido también a AC1.
+- **J2** (AC6, `RUNBOOK.md:241,252-253`): el login de scratch recibía
+  `db_datawriter` pero nunca `db_datareader`; al revocar `db_datawriter`
+  quedaba sin ninguna membresía, midiendo "principal sin roles" en vez de
+  "login aprovisionado por este runbook". Corregido agregando
+  `db_datareader` (nunca revocada) junto con `db_datawriter`, mismo
+  criterio que AC2.
+- **J3** (AC7, `RUNBOOK.md:277`): la mutación se verificaba con una
+  consulta de catálogo distinta del cursor `##ac7_check` real (líneas
+  297-314). Corregido: el mismo bloque `##ac7_check` se corre contra la
+  instancia mutada, exigiendo `tiene_user = 1` en la fila `master`.
+
+Cinco minors: `-v ON_ERROR_STOP=1` (semántica de `psql`) retirado de la
+única invocación de `sqlcmd` que lo llevaba; `@db_name` pasado como
+parámetro de `sp_executesql` en vez de concatenado crudo en el literal de
+`##ac7_check`; la justificación de descartar `sp_MSforeachdb` reescrita
+para nombrar la diferencia real (filtro explícito y auditable, no un
+salto interno no documentado) y AC10 extendido a bases que estaban
+`OFFLINE`/`RESTORING`; "devuelven una fila" corregido en AC1 (y aplicado
+también a AC5) para exigir `<tabla_real>` con al menos una fila; el
+identificador de cluster de Postgres aclarado como tal, no endpoint.
+
+Un efecto secundario detectado y corregido en el camino, no pedido por el
+reviewer: al correr `sdd-run-gates.sh` con `-o` apuntando al verification
+report, el runner sobreescribe el archivo completo (`> "$OUT"`), no sólo
+el bloque superior — la corrida de esta ronda volteó el addendum entero
+de rondas 1 y 2 (corridas previas del runner, triple de mutación AC9,
+correcciones de ronda 2) antes de que el addendum de ronda 3 se agregara
+encima del archivo ya vacío. Reconstruido desde el commit `fd9447e`
+(última versión completa previa a esta ronda) sin tocar una palabra de
+los dos primeros — commit `09ef8b5`.
+
+### Task Status (ronda 3)
+
+Ocho hallazgos (3 majors, 5 minors). Completed: 8. Blocked: 0. Skipped: 0.
+
+### Validation Executed (ronda 3)
+
+- Citas de línea de J1/J2/J3 verificadas contra el commit `fd9447e` (el
+  que el reviewer tenía delante), con `git show fd9447e:... | grep -n` /
+  `git show fd9447e:... | nl -ba | sed -n`, no de memoria — las tres
+  coinciden exactamente con las citadas en el hallazgo.
+- Barrido de clase (`SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`,
+  addendum de ronda 3, sección "Barrido de clase"): cinco greps sobre el
+  árbol corregido — catálogo-como-dato (`sys.`/`information_schema.`/
+  `pg_catalog.`), mutación con estado final divergente de producción
+  (`Mutación declarada`), bandera de `sqlcmd` sin semántica en su cliente,
+  y el patrón exacto de concatenación cruda del minor de `@db_name`. Cero
+  coincidencias adicionales en los cuatro; el quinto grep confirma que el
+  patrón corregido no reaparece en ningún otro archivo.
+- `grep -ni "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md`
+  → línea 390 (desplazada desde 352 por la reescritura de AC1/AC5/AC6/AC7).
+- `bash SDD/tests/secret-scan.sh` → `0` (sin hallazgos sobre 148 archivos,
+  incluido el addendum de ronda 3 reconstruido).
+- `bash SDD/tests/run.sh` → `14 passed, 0 failed (14 total)`.
+- `bash plugins/sdd-flow/scripts/sdd-lint-contract.sh SDD/contracts/2026-09-18-bisalta-db-mcp.md` → `0`.
+- Escalera completa vía runner sobre el commit `8093281` (tree limpio,
+  hash `d473492882905d6b10119938a3ff0536011fec76`): `bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -o SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md` → verde en los cuatro gates aplicables (2, 4, 9, suite completa). Los dos commits siguientes (`3a71f95`, `09ef8b5`) sólo tocan el verification report (addendum de ronda 3 + restauración de rondas 1-2); no requieren un nuevo sello del runner porque no cambian código — reverificado directamente con `secret-scan.sh` y la suite completa después de cada uno.
+
+### Blockers (ronda 3)
+
+Ninguno.
+
+### Files Changed (ronda 3)
+
+- `plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` (mod — AC1, AC5, AC6, AC7, AC10)
+- `plugins/bisalta-db/aprovisionamiento/sqlserver-parte-b.sql` (mod — sólo comentario de cabecera)
+- `plugins/bisalta-db/aprovisionamiento/postgres-parte-a.sql` (mod — sólo comentario de cabecera)
+- `SDD/briefs/R1-infra-accesos-lectura.md` (mod, este archivo)
+- `SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md` (mod — addendum de ronda 3 + restauración de rondas 1-2)
+
+### Final Statement (ronda 3)
+
+Los tres MAJOR y cinco minor de ronda 3 quedan corregidos, y el barrido de
+clase pedido por el brief (RT21) confirma cero instancias adicionales de
+los cuatro patrones de defecto en el resto del árbol. Sin mitigaciones
+prohibidas: no se tocó `secret-scan.sh`, no se bajó ningún threshold, no
+se usó `--no-verify`. AC1–AC8 y AC10 siguen `manual-only`,
+`pendiente-de-ejecucion` — ningún AC se declara `pass` sin haber corrido
+contra una base real. AC9 sin cambios (ningún fix tocó `secret-scan.sh` ni
+agregó un literal con forma de credencial); su triple ya está en el
+addendum de rondas 1-2, restaurado íntegro en este mismo verification
+report.
