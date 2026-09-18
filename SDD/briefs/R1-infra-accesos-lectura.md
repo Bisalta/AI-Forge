@@ -153,3 +153,73 @@ Ninguno.
 ### Final Statement
 
 R1 completo: 7 archivos nuevos en `plugins/bisalta-db/aprovisionamiento/`, sin tocar `plugins/bisalta-db/scripts/`, `SDD/tests/`, `doc_architecture.md` ni `doc_quality_gates.md` (todos de R2, per contract). AC9 y AC10 automatizados y en verde con su evidencia; AC1–AC8 documentados `manual-only` con pasos exactos y mutaciones, estado `pendiente-de-ejecucion` — ningún AC se declara `pass` sin haber corrido. Sin mitigaciones prohibidas: ninguna exclusión por path se agregó a `secret-scan.sh` (no se tocó el script), el literal problemático encontrado en la documentación se resolvió partiéndolo, no excluyéndolo. Único desvío del ambiente respecto de lo documentado: `shellcheck` estaba ausente pese a que `doc_quality_gates.md` lo daba por instalado — corregido instalándolo (no es una decisión del contract, es restaurar el prerequisito declarado); no toqué ese doc, es de R2 (T5.2 de su brief ya lo tiene como tarea).
+
+---
+
+## Ronda 2 — correcciones del review (rechazo de ronda 1)
+
+### Summary
+
+El reviewer encontró dos blockers y siete majors/minors, los diez sobre el
+runbook `manual-only` (el diagnóstico de fondo: cinco de los ocho
+procedimientos `manual-only` no podían producir el resultado que
+declaraban esperar — RT11, medición muerta). Ningún hallazgo tocó las
+sentencias SQL de aprovisionamiento; sólo sus comentarios de cabecera
+(citas al contract) cambiaron. Corregidos los diez: B1 (línea del triple
+AC9 mal citada, 55→54, propagada a las dos citas), B2/M4 (AC7: comprobación
+real reemplazada por un cursor T-SQL de verdad en vez de un
+`LEFT JOIN ... ON 1=0` que nunca podía matchear, y la referencia a un
+archivo inexistente), M1/M2/M3 (AC2/AC6: mutación y comprobación real
+sobre el mismo objeto de scratch, `DROP` como último paso), M5 (AC1: tabla
+real en vez de `information_schema.tables`), M6 (`-v ON_ERROR_STOP=1` /
+`-b` en los seis `psql -f`/`sqlcmd -i` afectados), M7 (`SQLCMDPASSWORD` en
+vez de `-P`, invariante cerrada del contract), y los cinco minors (v1→v2,
+citar el contract por sección/AC en vez de "punto N del brief", host de
+Aurora completo, AC4 con comprobación de catálogo en vez de depender del
+mensaje de error de conexión). Detalle punto por punto, con la mención
+"por qué" de cada uno, en el addendum de ronda 2 de
+`SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`.
+
+Un efecto secundario detectado y corregido en el camino: el primer
+borrador del addendum de ronda 2 reproducía, contiguo, el valor de
+relleno de la mutación de AC9 — el mismo patrón autorreferencial que ya
+había aparecido en `RUNBOOK.md` en ronda 1, ahora en la evidencia. El
+runner lo cortó en gate 9 (commit `bc25273`); corregido describiendo el
+valor en piezas, sin tocar `secret-scan.sh`.
+
+### Task Status (ronda 2)
+
+Diez hallazgos (2 blockers, 5 majors, 3 minors agrupados en un punto de
+"minor" con 4 sub-ítems más el de `aad6c58`). Completed: 10. Blocked: 0.
+Skipped: 0.
+
+### Validation Executed (ronda 2)
+
+- `wc -l plugins/bisalta-db/aprovisionamiento/postgres-parte-a.sql` → `53` antes y después de todos los fixes (los cambios fueron a comentarios de cabecera, no a sentencias; el archivo no creció).
+- Triple AC9 re-corrido contra el árbol de ronda 2: `bash SDD/tests/secret-scan.sh` → `0` (verde) → mutación (línea 54 nueva) → `bash SDD/tests/secret-scan.sh` → `1`, nombrando `postgres-parte-a.sql:54` (rojo) → `git checkout --` → `bash SDD/tests/secret-scan.sh` → `0` (verde). Detalle en el addendum de ronda 2 del verification report.
+- `grep -ni "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` → línea 352, exit 0 (desplazada desde 261 por la reescritura de las secciones AC1/AC2/AC5–AC7).
+- `bash SDD/tests/run.sh` → `14 passed, 0 failed (14 total)`.
+- Escalera completa vía runner, corrida dos veces sobre commits sucesivos de ronda 2: `bc25273` (rojo en gate 9, autoinfligido por el borrador del addendum) → `fd9447e` (verde en los cuatro gates aplicables, evidencia sellada en el commit `bb592b1`): `bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -o SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`.
+
+### Blockers (ronda 2)
+
+Ninguno.
+
+### Files Changed (ronda 2)
+
+- `plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` (mod — reescritura de las secciones AC1, AC2, AC3, AC4, AC5, AC6, AC7, AC10 y prerequisitos)
+- `plugins/bisalta-db/aprovisionamiento/postgres-parte-a.sql` (mod — sólo comentarios de cabecera)
+- `plugins/bisalta-db/aprovisionamiento/postgres-parte-b.sql` (mod — sólo comentarios de cabecera)
+- `plugins/bisalta-db/aprovisionamiento/sqlserver-parte-a.sql` (mod — sólo comentarios de cabecera)
+- `plugins/bisalta-db/aprovisionamiento/sqlserver-parte-b.sql` (mod — sólo comentarios de cabecera)
+- `SDD/briefs/R1-infra-accesos-lectura.md` (mod, este archivo)
+- `SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md` (mod — addendum de ronda 2 + reseal del runner)
+
+### Final Statement (ronda 2)
+
+Los diez hallazgos de ronda 1 quedan corregidos: los cinco `manual-only`
+señalados (AC1, AC2, AC6, AC7 ×2) ahora tienen un procedimiento que puede
+producir el resultado que declara esperar, no sólo uno que lo asume. Sin
+mitigaciones prohibidas: no se tocó `secret-scan.sh`, no se bajó ningún
+threshold, no se usó `--no-verify`. `postgres-inverso.sql` y
+`sqlserver-inverso.sql` no se tocaron — ningún hallazgo los mencionaba.
