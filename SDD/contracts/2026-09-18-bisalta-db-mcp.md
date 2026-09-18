@@ -1,6 +1,15 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v2
+- **Versión**: v3
+
+### Cambios v2 → v3 (ratificación del planner, 18-sep-2026)
+
+Cuatro puntos que `AGENT_r2` levantó al ejecutar y que el contract no cerraba. Ninguno cambia un AC de R1; los cuatro están medidos, no supuestos.
+
+1. **`AC38(a)` pasa a `N/A — razonado`.** El plugin `bisalta-db` **no trae ningún `.sh`**: su código de producto es Node plano. Medido el 18-sep-2026: bajo `bash`, un patrón sin coincidencias se pasa literal y `shellcheck` sale **2** (`openBinaryFile: does not exist`), así que agregar `plugins/bisalta-db/scripts/*.sh` al glob del gate 2 lo **pone en rojo permanente**. Sus tres archivos de test sí son bash y ya entran por `SDD/tests/*.sh`. Cuando ese plugin agregue un `.sh`, el glob se amplía en el mismo cambio. Queda escrito en `SDD/docs/doc_quality_gates.md`, gate 2. Los puntos (b) y (c) de `AC38` se mantienen y se cumplieron.
+2. **La tabla de comportamiento de error suma una fila**: catálogo ilegible o inválido → exit **2**. La tabla de v2 no cubría el caso, y `AGENT_r2` lo trató como error de configuración, que es la clasificación correcta: sin catálogo válido no hay conexión que nombrar, así que no puede ser un error de conexión.
+3. **`AC34` se satisface con el harness.** El AC pide que el servidor responda `initialize` y `tools/list` con exactamente las dos herramientas, corriendo sin paquetes instalados — eso corre y pasa. El handshake contra una sesión real de Claude Code **no es `AC34`**: es el riesgo de `protocolVersion` ya declarado en la sección Riesgos, y sigue abierto hasta que alguien instale el plugin. `AC34` no es `manual-only`.
+4. **El endpoint de réplica es una precondición nombrada, no un supuesto.** Las dos entradas de Postgres del catálogo usan el endpoint `cluster-ro-`, derivado del de escritura, porque es lo que sostiene la garantía `endpoint-replica-lectura`. No se pudo verificar contra AWS desde esta máquina. **Si ese cluster no tuviera réplica de lectura, se quita la garantía del catálogo — no se cambia el host por el de escritura.** Verificación previa al primer uso, anotada en el README del plugin.
 
 ### Cambios v1 → v2 (ratificación del planner, 18-sep-2026)
 
@@ -172,6 +181,7 @@ Arreglo con `nombre`, `dialecto`, `ambiente`, `base` y `garantias` de cada entra
 | Conexión rechazada o caída | 6 | `{ "error": "conexion_fallida" }` con el mensaje del cliente, sin la credencial |
 | `statement_timeout` alcanzado (120 s) | 7 | `{ "error": "tiempo_agotado" }` |
 | Binario del cliente ausente | 8 | `{ "error": "cliente_ausente" }` nombrando el binario que falta |
+| Catálogo ilegible o inválido (v3) | 2 | `{ "error": "catalogo_invalido" }` con el motivo del rechazo. Es error de configuración, no de conexión: sin catálogo válido no hay conexión que nombrar. |
 
 ## Garantías por motor (asimetría declarada, no disimulada)
 
@@ -337,10 +347,11 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 
 | Riesgo | Mitigación |
 |---|---|
-| El `protocolVersion` declarado no es el que Claude Code negocia hoy. | AC34 lo verifica con un handshake real. Si falla, es un `contract-change-request`, no una decisión del implementador. |
+| El `protocolVersion` declarado no es el que Claude Code negocia hoy. | **Sigue abierto tras R2.** `AC34` verifica el handshake contra el harness, no contra una sesión real de Claude Code — eso exige instalar el plugin y reiniciar. Es lo primero que hay que probar en el gate humano. Si falla, es un `contract-change-request`. |
 | El mecanismo exacto por el que un plugin declara un servidor MCP stdio no está verificado en este repo — ningún plugin existente lo hace. | Primera tarea del brief de R2: verificarlo contra la documentación y dejarlo escrito. Si no se puede, queda `BLOCKED` y pregunta. |
 | `sqlcmd` ausente en la máquina de referencia: las reglas del dialecto `sqlserver` se prueban, pero la ejecución real no. | AC5 y AC6 son `manual-only` y dependen de R1. La lista blanca de ese dialecto sí queda mutation-tested. |
 | `shellcheck` ausente: el gate 2 saldría `[SKIPPED]`, nunca verde. | Prerequisito declarado en los dos briefs: instalarlo antes de la primera corrida de gates. |
 | La suite tarda ~62 s hoy y los triples de mutación la alargan. | El umbral de `doc_quality_gates.md` se revisa con el número medido al cerrar, igual que en GEN-101. |
 | Las filas de copias de producción quedan en el transcript. | Riesgo aceptado con dueño (ver arriba). No hay mitigación técnica en este alcance. |
+| El cluster de dev/qa podría no tener réplica de lectura, y las dos entradas de Postgres declaran la garantía `endpoint-replica-lectura` sobre un endpoint `cluster-ro-` derivado, no verificado. | Precondición nombrada del primer uso (v3, punto 4): si no hay réplica, **se quita la garantía**, no se cambia el host. Anotado en el README del plugin. |
 | Una cifra citada en prosa drifta respecto del árbol que describe — ya pasó en este mismo contract entre v1 y v2. | `AC38` y `AC40` se verifican por derivación del árbol, no contra un número escrito. Registrado en `SDD/retro.md`. |
