@@ -631,13 +631,15 @@ Completed: 11. Blocked: 0. Skipped: 0.
   `.sh` nuevo, mismo total que ronda 4).
 - `bash plugins/sdd-flow/scripts/sdd-lint-contract.sh SDD/contracts/2026-09-18-bisalta-db-mcp.md` → `0`.
 - `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` → `0` (sin `.sh` nuevo en `plugins/bisalta-db/`).
-- Escalera completa vía runner sobre el commit de esta ronda (hash y tree
-  en el encabezado del verification report, sellado por
-  `sdd-run-gates.sh`): `bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -o SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`.
-- `bash SDD/tests/secret-scan.sh` corrido una vez más **después** de
-  commitear el árbol final (post-runner, con el addendum de ronda 5 ya
-  pegado) — el único verde que cuenta según la trampa D34/D35. Comando y
-  exit code en el verification report.
+- Escalera completa vía runner sobre el commit `8cc326d` (tree
+  `4f8cbf7cbfc5f2403f82008d196381aa958d048b`, sellado por
+  `sdd-run-gates.sh`): `bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -o SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md` → verde en los cuatro gates aplicables (2, 4, 9, suite completa), exit 0.
+- El addendum de ronda 5 se pegó después (trampa D34/D35) y se commiteó
+  en `39acc0d`. `bash SDD/tests/secret-scan.sh` corrido una vez más
+  **después** de ese commit, sobre el árbol final ya commiteado (árbol
+  limpio, `git status --short` sin salida) → `secret-scan: sin hallazgos
+  sobre 163 archivos versionados (1 excluido: self)`, exit `0` — el único
+  verde que cuenta según la trampa D34/D35.
 
 ### AC41/AC42 — estado tras ronda 5
 
