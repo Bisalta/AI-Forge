@@ -1,22 +1,22 @@
 # Gates run — generado por sdd-run-gates.sh v0.12.0
 
-- **Branch**: `feat-GEN-108-mcp-bisalta-db` · **Commit**: `ee4a5ae` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:2478fcac35a40aaf`) · **Fecha**: 2026-09-18T19:36:12Z
-- Tree: `ae92622029227a55f833e8dc5ce9cbabe782bb15` — LIMPIO
+- **Branch**: `feat-GEN-108-mcp-bisalta-db` · **Commit**: `24c366c` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-09-18T20:02:47Z
+- Tree: `9eac66a57c58d837981083a058900eb5c1776eee` — LIMPIO
 - Este archivo lo escribió el runner, no un modelo. Editarlo a mano invalida la evidencia.
 
 | # | Gate | Comando | Exit | Timestamp UTC | Resultado |
 |---|---|---|---|---|---|
-| 1 | format / style | — | — | 2026-09-18T19:35:16Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
-| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-09-18T19:35:16Z | verde |
-| 3 | type-check | — | — | 2026-09-18T19:35:17Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
-| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-09-18T19:35:17Z | verde |
-| 5 | integration | — | — | 2026-09-18T19:35:44Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
-| 6 | build | — | — | 2026-09-18T19:35:44Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
-| 7 | e2e | — | — | 2026-09-18T19:35:44Z | [SKIPPED] sin comando en el doc (N/A) |
-| 8 | cobertura del diff | — | — | 2026-09-18T19:35:44Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
-| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-09-18T19:35:44Z | verde |
-| 10 | smoke manual | — | — | 2026-09-18T19:35:45Z | [SKIPPED] sin comando en el doc (N/A) |
-| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-09-18T19:35:45Z | verde |
+| 1 | format / style | — | — | 2026-09-18T20:01:51Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
+| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-09-18T20:01:51Z | verde |
+| 3 | type-check | — | — | 2026-09-18T20:01:52Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
+| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-09-18T20:01:52Z | verde |
+| 5 | integration | — | — | 2026-09-18T20:02:19Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
+| 6 | build | — | — | 2026-09-18T20:02:19Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
+| 7 | e2e | — | — | 2026-09-18T20:02:19Z | [SKIPPED] sin comando en el doc (N/A) |
+| 8 | cobertura del diff | — | — | 2026-09-18T20:02:19Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
+| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-09-18T20:02:19Z | verde |
+| 10 | smoke manual | — | — | 2026-09-18T20:02:20Z | [SKIPPED] sin comando en el doc (N/A) |
+| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-09-18T20:02:20Z | verde |
 
 ## Output por gate (últimas 15 líneas)
 
@@ -49,7 +49,7 @@ PASS  test_usage_summary.sh
 ### Gate 9 — security (exit 0)
 
 ```
-secret-scan: sin hallazgos sobre 159 archivos versionados (1 excluido: self)
+secret-scan: sin hallazgos sobre 160 archivos versionados (1 excluido: self)
 ```
 
 ### Gate — — suite completa (exit 0)
@@ -73,8 +73,6 @@ PASS  test_usage_summary.sh
 ```
 
 
----
-
 # Addendum de `AGENT_r2` — lo que el runner no sabe
 
 > Todo lo de **arriba** de esta línea lo escribió `sdd-run-gates.sh`; no se tocó.
@@ -85,7 +83,13 @@ PASS  test_usage_summary.sh
 > pegar después.
 
 - **Agente**: `AGENT_r2` · **Ronda**: 2 · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v3**
-- **Rama**: `feat-GEN-108-mcp-bisalta-db` (base `prod`) · **Commit de la evidencia**: ver §0
+- **Rama**: `feat-GEN-108-mcp-bisalta-db` (base `prod`)
+- **Corrida del runner que sella esta evidencia**: commit `24c366c`, tree
+  `9eac66a57c58d837981083a058900eb5c1776eee`, LIMPIO — 4 verdes, 0 rojos,
+  7 `[SKIPPED]`. **Ese árbol tampoco contiene este addendum** (`D34`: el runner
+  trunca el archivo de `-o`), así que la afirmación del gate 9 sobre el árbol
+  **final** se declara aparte, medida a mano — §0.1. Es el hueco que la ronda 1
+  dejó abierto y el que este report cierra.
 - **ACs**: AC11–AC40 (AC1–AC10 son de R1, ya `APPROVED`)
 
 ## 0. Ronda 2 — el BLOCKER del gate 9, y por qué la evidencia de la ronda 1 no lo vio
