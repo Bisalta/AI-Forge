@@ -1,12 +1,24 @@
 # Task brief — R1 · infra: accesos de solo lectura en Postgres dev/qa y Dev SQL
 
 - **Agente**: `AGENT_r1` · **Modelo**: `sonnet`
-- **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v2**, ACs **AC1–AC10** (el bump v1 → v2 no tocó ninguno de ellos)
+- **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v5**, ACs **AC1–AC10 + AC41 + AC42**
 - **Arquetipo**: `infra`
 - **Repo**: `.` · **Branch**: `feat-GEN-108-mcp-bisalta-db` (ya creada; **NO crear otra, NO commitear a `prod`**)
 - **Proxima subtask**: `GEN-108.1`, id `cd0ed6b7-fde8-4381-9a69-e4e684498813` (informativo — **vos no tocás Proxima**)
 - **Verification report**: `SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`
 - **Depende de**: nada. Es el primero del orden de integración R1 → R2.
+- **Ronda**: reapertura tras `APPROVED`. Origen: contract-change-request externo de **Patrick Ocampo** (Slack, 18-sep-2026), ratificado en v4/v5.
+
+## Qué cambió desde que cerraste APPROVED
+
+Tu trabajo anterior está bien y **no se tira**. Lo que cambió es que Patrick midió el sistema y encontró un hueco que ni vos ni el reviewer podían ver, porque no estaba en el código:
+
+1. **`pg_read_all_data` alcanza TODO el cluster desde que el rol existe.** Postgres concede `CONNECT` a PUBLIC por omisión, y `pg_read_all_data` es membresía de cluster. **La Parte B no es una barrera**: para cuando corre, el acceso ya existe. Medido: son **29 bases** en dev/qa, no las 2 del catálogo. Corregí la prosa de `postgres-parte-b.sql` y del runbook que la presenta como si concediera el acceso — hoy dice algo falso.
+2. **Nace la Parte 0** (`postgres-parte-0.sql`, archivo nuevo): corre **antes** de crear nada, lista las bases del cluster y **aborta si el cluster contiene alguna base `_prod`**. El discriminante **no es el nombre `stg`** — está medido que falla en las dos direcciones. Imprime además a qué bases llega cada rol de verdad, que es la única forma de ver el `CONNECT` heredado de PUBLIC. Es **AC41**.
+3. **`db_denydatawriter` va junto con `db_datareader`** en el mismo loop de `sqlserver-parte-b.sql`. El `DENY` le gana a cualquier `GRANT`. Es **AC42**, y obliga a corregir la tabla "Garantías por motor" del runbook, que hoy dice que el rol es la única barrera.
+4. **Cifras corregidas contra `plugins/bisalta-db/aprovisionamiento/INVENTARIO.md`** (medido, en el árbol): Dev SQL tiene **32** bases, no "~35"; 1383 GB; las 32 `ONLINE` y ninguna en solo lectura. Grepeá "~35" y "35 bases" sobre todo el árbol antes de cerrar.
+5. **`SSISDB` (id 36) no la excluye `database_id > 4`** y no es una base de negocio. Dejala **dentro** del loop por ahora y **anotá en el runbook que es una decisión pendiente de Patrick**, no un efecto colateral del filtro.
+6. El catálogo suma la garantía `deny-escritura` para `sqlserver`: `plugins/bisalta-db/catalogo.json`, entrada `dev-sql`. Lo verifica `AC14`, que ya existe.
 
 ## Problema
 

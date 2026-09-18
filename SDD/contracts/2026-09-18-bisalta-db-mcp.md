@@ -15,7 +15,9 @@ Con eso, **la frontera de responsabilidad queda cerrada así**:
 | **Ian Vargas** | Verificar que el cluster de dev/qa tenga `ReaderEndpoint` (`describe-db-clusters`) — cierra la precondición del v3 punto 4 |
 | **Esteban Fait o Sebastián** | La aprobación de datos de producción que la política de uso de IA exige. Precondición de **habilitar el plugin al equipo**, no de construirlo |
 
-**El punto (b) es el único que no admite atajo**: si la contraseña viaja de Patrick a Ian para que Ian la cargue, se rompe exactamente la propiedad que este plugin existe para dar. Va de quien la genera al secreto, y de ahí sólo la lee el proceso.
+**ACs nuevos** (los cambios de v4 eran de diseño y no traían cómo verificarse — sin AC no se prueban): `AC41` y `AC42`, abajo.
+
+**El punto (b) es el único que no admite atajo**",: si la contraseña viaja de Patrick a Ian para que Ian la cargue, se rompe exactamente la propiedad que este plugin existe para dar. Va de quien la genera al secreto, y de ahí sólo la lee el proceso.
 
 ### Cambios v3 → v4 (contract-change-request externo, 18-sep-2026)
 
@@ -358,6 +360,14 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 **AC39** — `SDD/docs/doc_architecture.md` incluye `plugins/bisalta-db/` en el layout y en las reglas de ubicación de archivos.
 
 **AC40** — `bash SDD/tests/run.sh` sale 0 con los tres archivos de test nuevos, y **ningún archivo de test preexistente se modifica**: `git diff --name-only origin/prod..HEAD -- 'SDD/tests/test_*.sh'` lista exactamente los tres nuevos y ninguno más. La cantidad de tests preexistentes **no se cita como constante** en ningún lado: se deriva del árbol.
+
+**AC41** — La Parte 0 corrida contra un cluster que contiene al menos una base cuyo nombre termina en `_prod` **aborta con exit distinto de 0**, sin crear ningún rol; corrida contra un cluster sin ninguna `_prod`, sale 0 y continúa. El discriminante es **lo que el cluster contiene**, nunca el nombre de la base que se quiere consultar.
+`manual-only: requiere un cluster Postgres real; ningún harness de este repo levanta uno.`
+**Mutación declarada**: cambiar la condición de aborto de `_prod` a `_stg`; corrida contra el cluster de dev/qa (que contiene `controlactivos_stg` y ninguna `_prod`), la Parte 0 tiene que abortar — o sea, la comprobación de que continúa se pone roja; restaurar la condición.
+
+**AC42** — Tras correr la parte B de SQL Server, el user tiene en cada base de usuario en línea **las dos** membresías: `db_datareader` y `db_denydatawriter`. Un `INSERT` falla con `DENY` aunque alguien le conceda `INSERT` explícitamente después.
+`manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
+**Mutación declarada**: quitar `db_denydatawriter` del loop y conceder `INSERT` directo al user sobre una tabla de scratch; el `INSERT` tiene que pasar — o sea, la comprobación de que falla se pone roja. Restaurar el loop y revocar el `INSERT`: el `DENY` vuelve a ganar.
 
 ## Checklist del arquetipo
 
