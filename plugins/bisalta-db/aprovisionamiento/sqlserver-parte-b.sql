@@ -9,12 +9,21 @@
 -- Recorre sys.databases con un CURSOR EXPLÍCITO (contract v2, AC7 y
 -- sección "Garantías por motor (asimetría declarada, no disimulada)",
 -- cerrada, no reabrir). NO usar sp_MSforeachdb: no está soportado desde
--- SQL Server 2016+ y salta bases en algunos estados (ej. RESTORING,
--- OFFLINE) sin avisar.
+-- SQL Server 2016+, y su exclusión de bases en estados como RESTORING u
+-- OFFLINE es un comportamiento interno no documentado, sin condición
+-- visible en el llamado ni forma de auditar qué bases quedaron afuera.
+-- El filtro de este script, en cambio, es una condición explícita en el
+-- WHERE del cursor (abajo): visible, versionada en este archivo, y
+-- reproducible corriendo la misma consulta a mano contra sys.databases.
 --
 -- Filtro: database_id > 4 (excluye master=1, tempdb=2, model=3, msdb=4,
--- las cuatro bases de sistema) y state = 0 (ONLINE únicamente). ~35 bases
--- de usuario medidas el 18-sep-2026 (AC7).
+-- las cuatro bases de sistema) y state = 0 (ONLINE únicamente) — control
+-- explícito del filtro, no un salto implícito del proveedor. ~35 bases
+-- de usuario medidas el 18-sep-2026 (AC7). Una base OFFLINE o RESTORING
+-- al momento de esta corrida queda fuera de `state = 0` igual que
+-- quedaría fuera de sp_MSforeachdb, y por el mismo motivo que una base
+-- nueva (AC10, "Acción operativa" en RUNBOOK.md): re-correr este script
+-- cubre ambos huecos.
 --
 -- Corre con un login con privilegio de sysadmin en la instancia — nunca
 -- con el propio bisalta_lectura que este script crea.

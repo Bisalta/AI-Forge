@@ -136,9 +136,12 @@ psql -h sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com
 
 Esperado: `\dt` lista al menos una tabla base (si `proveedores_dev` no
 tiene ninguna todavía, el AC no se puede verificar hasta que exista una —
-avisarlo en el estado, no forzar la lectura contra un catálogo); las dos
-conexiones abren y las dos consultas sobre `<tabla_real>` devuelven una
-fila. Adicional: `SELECT rolname, rolinherit FROM pg_roles WHERE rolname IN ('claude_lectura','neo_lectura');`
+avisarlo en el estado, no forzar la lectura contra un catálogo); elegir
+`<tabla_real>` con al menos una fila (una tabla legible pero vacía da
+rojo falso: cero filas de una tabla vacía no se distingue de cero filas
+por falta de permiso). Las dos conexiones abren y las dos consultas sobre
+`<tabla_real>` terminan sin error de permiso y devuelven esa fila.
+Adicional: `SELECT rolname, rolinherit FROM pg_roles WHERE rolname IN ('claude_lectura','neo_lectura');`
 tiene que devolver `rolinherit = true` para ambos (nunca `NOINHERIT`).
 
 ### AC2 — un `INSERT` con `claude_lectura` falla
@@ -221,15 +224,31 @@ la credencial al cliente"): `-P` la deja visible en la tabla de procesos
 de la máquina, y este runbook lo corre alguien con `sysadmin` en una
 máquina compartida. En vez de `-P`, la contraseña va en `SQLCMDPASSWORD`,
 asignada sólo para ese proceso hijo (prefijo `VAR=valor comando`, no
-`export`):
+`export`).
+
+`sys.tables` es un catálogo del sistema, no una tabla de `EXACTUS`: leerlo
+no prueba que el login lea datos reales de esa base (mismo motivo que AC1
+descarta `information_schema.tables`). Primero identificar una tabla real
+de `EXACTUS` (`<tabla_real>` abajo):
 
 ```
-SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d EXACTUS -Q "SELECT TOP 1 1 FROM sys.tables;"
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d EXACTUS -Q "SELECT name FROM sys.tables;"
 ```
 
-Esperado: devuelve una fila. El mismo patrón (`SQLCMDPASSWORD=... sqlcmd
-...`, nunca `-P`) aplica a todas las invocaciones de `sqlcmd` de abajo que
-autentican como `bisalta_lectura`.
+y después leer de ella con el login:
+
+```
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d EXACTUS -Q "SELECT TOP 1 * FROM <tabla_real>;"
+```
+
+Esperado: la primera consulta lista al menos una tabla base (si
+`EXACTUS` no tuviera ninguna, el AC no se puede verificar hasta que
+exista una — avisarlo en el estado, no forzar la lectura contra un
+catálogo); elegir `<tabla_real>` con al menos una fila (una tabla legible
+pero vacía da rojo falso — mismo criterio que AC1). La segunda consulta
+sobre `<tabla_real>` termina sin error de permiso y devuelve esa fila. El
+mismo patrón (`SQLCMDPASSWORD=... sqlcmd ...`, nunca `-P`) aplica a todas las
+invocaciones de `sqlcmd` de abajo que autentican como `bisalta_lectura`.
 
 ### AC6 — un `INSERT` con ese login falla
 
@@ -238,15 +257,24 @@ agregar el user a `db_datawriter`:
 
 ```
 sqlcmd -S 10.24.40.137 -E -Q "CREATE DATABASE zz_scratch_ac6;"
-sqlcmd -S 10.24.40.137 -E -d zz_scratch_ac6 -Q "CREATE USER bisalta_lectura FOR LOGIN bisalta_lectura; ALTER ROLE db_datawriter ADD MEMBER bisalta_lectura; CREATE TABLE t (id int);"
+sqlcmd -S 10.24.40.137 -E -d zz_scratch_ac6 -Q "CREATE USER bisalta_lectura FOR LOGIN bisalta_lectura; ALTER ROLE db_datareader ADD MEMBER bisalta_lectura; ALTER ROLE db_datawriter ADD MEMBER bisalta_lectura; CREATE TABLE t (id int);"
 SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d zz_scratch_ac6 -Q "INSERT INTO t VALUES (1);"
 ```
 
+`db_datareader` se agrega junto con `db_datawriter` porque es la membresía
+que `sqlserver-parte-b.sql` deja en producción: si el estado final de la
+comprobación negativa fuera un login sin ninguna membresía, la prueba
+mediría "un principal sin roles no puede hacer `INSERT`", no "el login
+aprovisionado por este runbook, con `db_datareader`, no puede hacer
+`INSERT`" — que es lo que AC6 afirma (mismo criterio que AC2, donde
+`claude_lectura` conserva `pg_read_all_data` durante toda la comprobación).
+
 Esperado en este paso: el `INSERT` **se pone en verde** (confirma que la
-mutación cambió el permiso). Después, revocar sólo la membresía —
-**la base de scratch sigue viva**: la comprobación real tiene que correr
-sobre la misma tabla `t`, no sobre `EXACTUS` — y volver a correr
-exactamente el mismo `INSERT`:
+mutación cambió el permiso). Después, revocar sólo la membresía de
+`db_datawriter` — **`db_datareader` sigue asignada y la base de scratch
+sigue viva**: la comprobación real tiene que correr sobre la misma tabla
+`t`, no sobre `EXACTUS`, con el login dejado exactamente como lo deja
+producción — y volver a correr exactamente el mismo `INSERT`:
 
 ```
 sqlcmd -S 10.24.40.137 -E -d zz_scratch_ac6 -Q "ALTER ROLE db_datawriter DROP MEMBER bisalta_lectura;"
@@ -273,28 +301,24 @@ sqlcmd -S 10.24.40.137 -E -Q "DROP DATABASE zz_scratch_ac6;"
 editado contra esa instancia:
 
 ```
-sqlcmd -S <instancia-de-prueba> -E -b -v ON_ERROR_STOP=1 -i sqlserver-parte-b.sql
-sqlcmd -S <instancia-de-prueba> -E -d master -Q "SELECT name FROM sys.database_principals WHERE name = 'bisalta_lectura';"
+sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-parte-b.sql
 ```
 
-Esperado en este paso: `bisalta_lectura` **aparece también en `master`**
-(la comprobación real, "ninguna base de sistema", se pone en rojo). Después
-restaurar el filtro `database_id > 4` en `sqlserver-parte-b.sql` (revertir
-la edición, ej. `git checkout -- sqlserver-parte-b.sql` si no se
-commiteó) y correrlo de nuevo contra la instancia de prueba para dejarla
-limpia — nunca contra `Dev SQL`.
-
-Comprobación real sobre `Dev SQL`, con el filtro real ya restaurado en el
-archivo: un `LEFT JOIN ... ON 1=0` no sirve acá — `sys.database_principals`
-es un catálogo **por base**, así que desde una sola conexión a `master`
-nunca se ve el principal de otra base, con o sin aprovisionamiento. La
-comprobación real recorre las bases con un cursor explícito (mismo patrón
-que `sqlserver-parte-b.sql`) y consulta `sys.database_principals` **dentro
-de cada una**, acumulando el resultado en una tabla temporal global
-(visible entre cambios de `USE` dentro de la misma sesión):
+La comprobación real es siempre el mismo bloque `##ac7_check` de abajo —
+nunca una consulta distinta contra `master` sola: un `LEFT JOIN ... ON
+1=0` no sirve acá — `sys.database_principals` es un catálogo **por
+base**, así que desde una sola conexión a `master` nunca se ve el
+principal de otra base, con o sin aprovisionamiento. La comprobación real
+recorre las bases con un cursor explícito (mismo patrón que
+`sqlserver-parte-b.sql`) y consulta `sys.database_principals` **dentro de
+cada una**, acumulando el resultado en una tabla temporal global (visible
+entre cambios de `USE` dentro de la misma sesión). `@db_name` va como
+parámetro de `sp_executesql`, no concatenado crudo dentro del literal de
+cadena: una base con un apóstrofo en el nombre rompería el batch si se
+concatenara.
 
 ```
-sqlcmd -S 10.24.40.137 -E -b -Q "
+sqlcmd -S <instancia-de-prueba> -E -b -Q "
 CREATE TABLE ##ac7_check (db_name SYSNAME, tiene_user BIT);
 DECLARE @db_name SYSNAME;
 DECLARE @sql NVARCHAR(MAX);
@@ -303,8 +327,8 @@ OPEN db_cursor;
 FETCH NEXT FROM db_cursor INTO @db_name;
 WHILE @@FETCH_STATUS = 0
 BEGIN
-  SET @sql = N'USE ' + QUOTENAME(@db_name) + N'; INSERT INTO ##ac7_check (db_name, tiene_user) SELECT ''' + @db_name + N''', CASE WHEN EXISTS (SELECT 1 FROM sys.database_principals WHERE name = ''bisalta_lectura'') THEN 1 ELSE 0 END;';
-  EXEC sp_executesql @sql;
+  SET @sql = N'USE ' + QUOTENAME(@db_name) + N'; INSERT INTO ##ac7_check (db_name, tiene_user) SELECT @p_db_name, CASE WHEN EXISTS (SELECT 1 FROM sys.database_principals WHERE name = ''bisalta_lectura'') THEN 1 ELSE 0 END;';
+  EXEC sp_executesql @sql, N'@p_db_name SYSNAME', @p_db_name = @db_name;
   FETCH NEXT FROM db_cursor INTO @db_name;
 END
 CLOSE db_cursor;
@@ -313,6 +337,20 @@ SELECT db_name, tiene_user FROM ##ac7_check ORDER BY db_name;
 DROP TABLE ##ac7_check;
 "
 ```
+
+Esperado en este paso (corrido contra la instancia de prueba, con el
+filtro de `sqlserver-parte-b.sql` todavía quitado): la fila `db_name =
+'master'` devuelve `tiene_user = 1` — la comprobación real, "ninguna base
+de sistema", se pone en rojo con el mismo cursor que se usa para el
+resultado final, no con una consulta distinta. Después restaurar el
+filtro `database_id > 4` en `sqlserver-parte-b.sql` (revertir la edición,
+ej. `git checkout -- sqlserver-parte-b.sql` si no se commiteó) y correrlo
+de nuevo contra la instancia de prueba para dejarla limpia — nunca contra
+`Dev SQL`.
+
+Comprobación real sobre `Dev SQL`, con el filtro real ya restaurado en el
+archivo: correr el mismo bloque `##ac7_check` de arriba, cambiando sólo
+`-S` a `10.24.40.137`.
 
 El cursor recorre `sys.databases` **completo** (`state = 0`, sin filtrar
 `database_id`), a propósito: es la única forma de confirmar el lado
@@ -344,7 +382,7 @@ automatizable de R1 junto con AC10, y su triple (verde → rojo → verde) se
 corre y se pega con comando y exit code en
 `SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`.
 
-## AC10 — el hueco de una base nueva en SQL Server
+## AC10 — el hueco de una base nueva (o recién disponible) en SQL Server
 
 `db_datareader` es un permiso **por base** en SQL Server, a diferencia de
 `pg_read_all_data` en Postgres, que es un permiso de **cluster**. Esto
@@ -356,9 +394,17 @@ hay manera de evitar esto en SQL Server sin un trigger de servidor sobre
 `CREATE DATABASE` — fuera del scope de este runbook — así que la asimetría
 se documenta acá en vez de compensarse con código nuevo (contract v2,
 sección "Garantías por motor (asimetría declarada, no disimulada)").
-**Acción operativa**: cada vez que se agregue una base
-nueva a `Dev SQL` que el catálogo de `bisalta-db` vaya a usar, re-correr
-`sqlserver-parte-b.sql` antes de agregar esa base al catálogo.
+
+El mismo hueco existe, por el mismo motivo, para una base que **ya
+existía pero estaba `OFFLINE` o `RESTORING`** cuando corrió
+`sqlserver-parte-b.sql`: el filtro `state = 0` (ONLINE únicamente, ver
+comentario del script) no la alcanza en esa corrida, y queda tan
+descubierta como una base creada después. **Acción operativa**: cada vez
+que se agregue una base nueva a `Dev SQL`, o que una base existente pase
+a estar `ONLINE` después de haber estado en otro estado durante la
+última corrida, que el catálogo de `bisalta-db` vaya a usar, re-correr
+`sqlserver-parte-b.sql` antes de agregar (o reactivar) esa base en el
+catálogo.
 
 ## Inverso
 
