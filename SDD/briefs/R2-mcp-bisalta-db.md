@@ -1,7 +1,7 @@
 # Task brief — R2 · third-party-integration: plugin `bisalta-db`
 
 - **Agente**: `AGENT_r2` · **Modelo**: `opus`
-- **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v1**, ACs **AC11–AC40**
+- **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v2**, ACs **AC11–AC40**
 - **Arquetipo**: `third-party-integration`
 - **Repo**: `.` · **Branch**: `feat-GEN-108-mcp-bisalta-db` (ya creada; **NO crear otra, NO commitear a `prod`**)
 - **Proxima subtask**: `GEN-108.2`, id `ef6a48da-28b2-4877-b041-7e58c4fb633a` (informativo — **vos no tocás Proxima**)
@@ -77,7 +77,11 @@ Los tests viven **sólo** en `SDD/tests/` e invocan los scripts por su path comp
 - [ ] T4.3 Escribir `test_servidor_mcp.sh` alimentando stdin con tramas JSON-RPC y afirmando sobre stdout. **AC23–AC37.**
 - [ ] T4.4 Correr los triples de mutación de AC23, AC24, AC25, AC31, AC33 y AC35.
 - [ ] T5.1 Registrar el plugin en `.claude-plugin/marketplace.json` y escribir `plugin.json` y el README. **AC36.**
-- [ ] T5.2 Actualizar `SDD/docs/doc_quality_gates.md`: agregar `plugins/bisalta-db/scripts/*.sh` al glob del gate 2 si escribiste algún `.sh`, y **corregir el prerequisito de `shellcheck`** — el doc lo da por instalado en `/opt/homebrew/bin` y el 18-sep-2026 no está. Re-medir el tiempo de la suite y actualizar el umbral. **AC38.**
+- [ ] T5.2 Actualizar `SDD/docs/doc_quality_gates.md` — **AC38**, tres puntos, cada uno medido:
+  (a) agregar `plugins/bisalta-db/scripts/*.sh` al glob del gate 2 si escribiste algún `.sh`;
+  (b) la sección "Suite completa" declara **12 archivos de test** y hay **14** — reemplazá la cifra por la derivación, no por otro número congelado;
+  (c) re-medir el tiempo de la suite con los tres tests nuevos y escribirlo con su fecha.
+  Sobre `shellcheck`: el 18-sep-2026 a las 11:26 **no estaba en el PATH** y a las 11:37 **sí** — el binario llevaba un año en el Cellar y lo que faltaba era el symlink, que `brew install` recreó. O sea que el doc no mentía: describía un estado que se rompió y volvió. Corregí la redacción para que **nombre la verificación en vez de prometer la presencia** (`command -v shellcheck`), que es lo único que no envejece.
 - [ ] T5.3 Actualizar `SDD/docs/doc_architecture.md` con `plugins/bisalta-db/` en el layout y en las reglas de ubicación. **AC39.**
 - [ ] T5.4 Entrada en `CHANGELOG.md`.
 - [ ] T6.1 Commitear (árbol limpio) y correr la escalera completa: `bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -o SDD/verification/feat-GEN-108-mcp-bisalta-db-R2.md`. **AC40.**
@@ -137,7 +141,7 @@ La mutación se aplica **sobre el sistema que el AC vigila, nunca sobre el test*
 | `SDD/docs/doc_architecture.md` | lectura humana y de agentes | AC39 |
 | `CHANGELOG.md` | ninguno automatizado | prosa, sin test |
 
-Los doce archivos de test preexistentes **no se modifican** y tienen que seguir verdes: es AC40.
+Los archivos de test preexistentes **no se modifican** y tienen que seguir verdes: es AC40, que se verifica derivando del árbol (`git diff --name-only origin/prod..HEAD -- 'SDD/tests/test_*.sh'` lista sólo tus tres nuevos). **No escribas la cantidad de tests como constante en ningún archivo** — es el defecto que motivó el bump v1 → v2.
 
 ## Advisory (no bloquean, el reviewer los reporta)
 

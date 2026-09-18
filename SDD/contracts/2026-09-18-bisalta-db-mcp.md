@@ -1,6 +1,12 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v1
+- **Versión**: v2
+
+### Cambios v1 → v2 (ratificación del planner, 18-sep-2026)
+
+Defecto encontrado al validar el retorno de `AGENT_r1`: `AC40` y el impact set citaban **"los doce archivos de test preexistentes"**, valor copiado de `SDD/docs/doc_quality_gates.md`, que quedó obsoleto — **hay 14** (`ls SDD/tests/test_*.sh | wc -l`, medido el 18-sep-2026). Es la clase de defecto de `SDD/retro.md` RT20: una cifra citada en prosa que drifta respecto de la realidad que describe. La corrección **no** es escribir 14: es dejar de congelar el número. `AC40` pasa a verificarse por derivación y `AC38` absorbe la corrección del doc.
+
+**`AGENT_r1` sigue válido bajo v2**: ninguno de los AC1–AC10 cambió. No se re-spawnea.
 - **Ticket**: GEN-108 (subtareas GEN-108.1 · GEN-108.2)
 - **Repo**: `Bisalta/AI-Forge` · **Rama base**: `prod` · **Rama de trabajo**: `feat-GEN-108-mcp-bisalta-db`
 - **Capa de integración**: git + remote → PR
@@ -101,7 +107,7 @@ Símbolos y archivos existentes que se modifican, con sus consumidores grepeados
 | `SDD/docs/doc_quality_gates.md` | se agregan `plugins/bisalta-db/scripts/*.sh` al glob del gate 2 y se corrige el prerequisito de `shellcheck` | `sdd-run-gates.sh` parsea su tabla de gates | AC38 |
 | `SDD/docs/doc_architecture.md` | se agrega `plugins/bisalta-db/` al layout y a las reglas de ubicación | lectura humana y de agentes | AC39 |
 
-**No se modifica ningún símbolo ejecutable existente.** Todo el código nuevo es aditivo, en archivos nuevos. Por eso no hay análisis de regresión de callers: la suite existente (12 archivos de test) tiene que seguir verde sin cambios, y eso es AC40.
+**No se modifica ningún símbolo ejecutable existente.** Todo el código nuevo es aditivo, en archivos nuevos. Por eso no hay análisis de regresión de callers: la suite existente tiene que seguir verde sin cambios, y eso es AC40. **La cantidad de archivos de esa suite se deriva del árbol, no se cita acá** — una cifra congelada en prosa es exactamente lo que este cambio de versión corrige.
 
 ## Source of truth
 
@@ -304,11 +310,12 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 
 **AC37** — Quitar la entrada de una conexión del catálogo hace que `consultar` sobre ese nombre devuelva exit 3, sin reiniciar el servidor ni tocar código. Es el kill switch local que exige el arquetipo.
 
-**AC38** — `SDD/docs/doc_quality_gates.md` declara el estado real de `shellcheck` en la máquina de referencia y el glob del gate 2 incluye los scripts del plugin nuevo.
+**AC38** — `SDD/docs/doc_quality_gates.md` queda consistente con el árbol en tres puntos, cada uno medido y no supuesto: (a) el glob del gate 2 incluye los scripts del plugin nuevo; (b) la cantidad de archivos de test que la sección "Suite completa" declara coincide con `ls SDD/tests/test_*.sh | wc -l`, o la cifra se reemplaza por esa derivación; (c) el tiempo medido de la suite se re-mide y se escribe con su fecha.
+**Mutación declarada**: cambiar a `99` la cantidad de archivos de test declarada en el doc; la verificación de (b) tiene que ponerse roja; restaurar el valor correcto.
 
 **AC39** — `SDD/docs/doc_architecture.md` incluye `plugins/bisalta-db/` en el layout y en las reglas de ubicación de archivos.
 
-**AC40** — `bash SDD/tests/run.sh` sale 0 con los tres archivos de test nuevos, y los doce archivos de test preexistentes siguen verdes sin modificación.
+**AC40** — `bash SDD/tests/run.sh` sale 0 con los tres archivos de test nuevos, y **ningún archivo de test preexistente se modifica**: `git diff --name-only origin/prod..HEAD -- 'SDD/tests/test_*.sh'` lista exactamente los tres nuevos y ninguno más. La cantidad de tests preexistentes **no se cita como constante** en ningún lado: se deriva del árbol.
 
 ## Checklist del arquetipo
 
@@ -336,3 +343,4 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 | `shellcheck` ausente: el gate 2 saldría `[SKIPPED]`, nunca verde. | Prerequisito declarado en los dos briefs: instalarlo antes de la primera corrida de gates. |
 | La suite tarda ~62 s hoy y los triples de mutación la alargan. | El umbral de `doc_quality_gates.md` se revisa con el número medido al cerrar, igual que en GEN-101. |
 | Las filas de copias de producción quedan en el transcript. | Riesgo aceptado con dueño (ver arriba). No hay mitigación técnica en este alcance. |
+| Una cifra citada en prosa drifta respecto del árbol que describe — ya pasó en este mismo contract entre v1 y v2. | `AC38` y `AC40` se verifican por derivación del árbol, no contra un número escrito. Registrado en `SDD/retro.md`. |
