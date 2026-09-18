@@ -1,22 +1,22 @@
 # Gates run — generado por sdd-run-gates.sh v0.12.0
 
-- **Branch**: `feat-GEN-108-mcp-bisalta-db` · **Commit**: `aad6c58` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:a8f010a76c4f561a`) · **Fecha**: 2026-09-18T17:51:06Z
-- Tree: `e75095c8408cd6096b8456c305d72131661ca1a3` — LIMPIO
+- **Branch**: `feat-GEN-108-mcp-bisalta-db` · **Commit**: `aca2f8e` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:a8f010a76c4f561a`) · **Fecha**: 2026-09-18T17:54:54Z
+- Tree: `9b6cbf3ae20f0f952fceba973c56bdd800b8df56` — LIMPIO
 - Este archivo lo escribió el runner, no un modelo. Editarlo a mano invalida la evidencia.
 
 | # | Gate | Comando | Exit | Timestamp UTC | Resultado |
 |---|---|---|---|---|---|
-| 1 | format / style | — | — | 2026-09-18T17:50:14Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
-| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-09-18T17:50:14Z | verde |
-| 3 | type-check | — | — | 2026-09-18T17:50:15Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
-| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-09-18T17:50:15Z | verde |
-| 5 | integration | — | — | 2026-09-18T17:50:40Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
-| 6 | build | — | — | 2026-09-18T17:50:40Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
-| 7 | e2e | — | — | 2026-09-18T17:50:40Z | [SKIPPED] sin comando en el doc (N/A) |
-| 8 | cobertura del diff | — | — | 2026-09-18T17:50:40Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
-| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-09-18T17:50:40Z | verde |
-| 10 | smoke manual | — | — | 2026-09-18T17:50:41Z | [SKIPPED] sin comando en el doc (N/A) |
-| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-09-18T17:50:41Z | verde |
+| 1 | format / style | — | — | 2026-09-18T17:54:06Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
+| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-09-18T17:54:06Z | verde |
+| 3 | type-check | — | — | 2026-09-18T17:54:06Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
+| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-09-18T17:54:06Z | verde |
+| 5 | integration | — | — | 2026-09-18T17:54:30Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
+| 6 | build | — | — | 2026-09-18T17:54:30Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
+| 7 | e2e | — | — | 2026-09-18T17:54:30Z | [SKIPPED] sin comando en el doc (N/A) |
+| 8 | cobertura del diff | — | — | 2026-09-18T17:54:30Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
+| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-09-18T17:54:30Z | verde |
+| 10 | smoke manual | — | — | 2026-09-18T17:54:31Z | [SKIPPED] sin comando en el doc (N/A) |
+| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-09-18T17:54:31Z | verde |
 
 ## Output por gate (últimas 15 líneas)
 
@@ -49,7 +49,7 @@ PASS  test_usage_summary.sh
 ### Gate 9 — security (exit 0)
 
 ```
-secret-scan: sin hallazgos sobre 147 archivos versionados (1 excluido: self)
+secret-scan: sin hallazgos sobre 148 archivos versionados (1 excluido: self)
 ```
 
 ### Gate — — suite completa (exit 0)
@@ -76,19 +76,23 @@ PASS  test_usage_summary.sh
 
 # Addendum del agente `AGENT_r1` — lo que el runner no sabe
 
-Todo lo de arriba de esta línea lo escribió `sdd-run-gates.sh` (commit `aad6c58`); no se editó nada de esa parte. Lo que sigue lo agrega el agente, con `templates/verification-report.md` como guía, porque el brief nombra este mismo archivo como "Verification report" en vez de un archivo `AGENT_r1.md` separado.
+Todo lo de arriba de esta línea lo escribió `sdd-run-gates.sh` (commit `aca2f8e`, corrida final); no se editó nada de esa parte. Lo que sigue lo agrega el agente, con `templates/verification-report.md` como guía, porque el brief nombra este mismo archivo como "Verification report" en vez de un archivo `AGENT_r1.md` separado.
 
-## Corrida roja intermedia del runner (no descartada, registrada)
+## Corridas previas del runner sobre commits anteriores (no descartadas, registradas)
 
-Antes de la corrida verde de arriba, el runner se corrió una vez sobre el commit `8584ebf` y cortó en el **gate 9** (exit `1`), con estos tres hallazgos — todos en prosa de este mismo ciclo (`SDD/briefs/R1-infra-accesos-lectura.md`), ninguno en los siete `.sql`/`.md` nuevos del producto:
+1. **Commit `8584ebf`** (primer commit de R1): el runner cortó en el **gate 9** (exit `1`), con estos tres hallazgos — todos en prosa de `SDD/briefs/R1-infra-accesos-lectura.md`, ninguno en los siete `.sql`/`.md` nuevos del producto:
 
-```
-SDD/briefs/R1-infra-accesos-lectura.md:60: posible secreto (standards/security.md §3) — valor no impreso
-SDD/briefs/R1-infra-accesos-lectura.md:128: posible secreto (standards/security.md §3) — valor no impreso
-SDD/briefs/R1-infra-accesos-lectura.md:129: posible secreto (standards/security.md §3) — valor no impreso
-```
+   ```
+   SDD/briefs/R1-infra-accesos-lectura.md:60: posible secreto (standards/security.md §3) — valor no impreso
+   SDD/briefs/R1-infra-accesos-lectura.md:128: posible secreto (standards/security.md §3) — valor no impreso
+   SDD/briefs/R1-infra-accesos-lectura.md:129: posible secreto (standards/security.md §3) — valor no impreso
+   ```
 
-Causa: la línea 60/129 documentaba la acción de IAM real `secretsmanager`:`GetSecretValue` (un nombre `namespace` + `:` + `acción`, no una credencial) sin partir el `:` interno — mismo patrón autorreferencial que ya afecta a `secret-scan.sh` consigo mismo. La línea 128 documentaba en prosa la mutación de AC9 con la clave `password`, el separador `=` y el valor de relleno completos y contiguos. Corregidas las tres partiendo los literales (commit `aad6c58`, mismo criterio que el resto del runbook: backtick entre `secretsmanager` y `:GetSecretValue`; descripción en piezas del valor de relleno tipo access-key en vez del literal completo). **Ninguna exclusión se agregó a `secret-scan.sh`** — no se tocó ese archivo, no está en el Files de este brief.
+   Causa: esas líneas documentaban la acción de IAM real `secretsmanager`:`GetSecretValue` (un `namespace` + `:` + `acción`, no una credencial) y la mutación de AC9 con clave `password`, separador `=` y valor de relleno, ambos contiguos y sin partir — mismo patrón autorreferencial que ya afecta a `secret-scan.sh` consigo mismo. Corregidas en el commit `aad6c58` partiendo los literales (backtick entre `secretsmanager` y `:GetSecretValue`; descripción en piezas del valor de relleno tipo access-key en vez del literal completo). **Ninguna exclusión se agregó a `secret-scan.sh`** — no se tocó ese archivo, no está en el Files de este brief.
+
+2. **Commit `aad6c58`**: runner completo en verde (gates 2, 4, 9 y suite completa). Al agregar este mismo addendum a mano, dos literales nuevos (uno en la descripción de la corrida roja, uno en la fila de la tabla de mutación de AC9) repitieron el mismo problema de forma independiente — corregidos en el commit `aca2f8e`, junto con el `grep` case-sensitive de AC10 (el runbook usa `NO` en mayúsculas; el comando documentado originalmente sólo buscaba en minúscula y no matcheaba). Reverificado con `bash SDD/tests/secret-scan.sh` → `0` después de cada corrección.
+
+3. **Commit `aca2f8e`** (éste): corrida final del runner de arriba, verde en los cuatro gates aplicables (2, 4, 9, suite completa), árbol limpio (`9b6cbf3ae20f0f952fceba973c56bdd800b8df56`).
 
 ## Prueba por mutación — AC9
 
@@ -115,7 +119,7 @@ Reversión verificada byte a byte: `git diff plugins/bisalta-db/aprovisionamient
 grep -ni "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md
 ```
 
-Resultado: línea 261 (`... NO queda cubierta automáticamente**:`) — coincidencia, exit 0.
+Resultado: línea 261 (`... NO queda cubierta automáticamente**:`) — coincidencia, exit 0. (El runbook usa `NO` en mayúsculas; el grep necesita `-i` para matchear — corregido tras un primer intento en minúscula estricta que no encontraba nada, ver punto 2 arriba.)
 
 ## Smoke manual (ACs `manual-only` — AC1–AC8)
 
