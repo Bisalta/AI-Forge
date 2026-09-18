@@ -1,6 +1,22 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v3
+- **Versión**: v4
+
+### Cambios v3 → v4 (contract-change-request externo, 18-sep-2026)
+
+Origen: mensaje de **Patrick Ocampo** en Slack (DM con Ian Vargas, 2026-09-18 12:46 CST) más los dos inventarios medidos ese mismo día. Es el primer CCR de este ciclo que no nace de un review: nace de que la persona que iba a ejecutar el aprovisionamiento midió el sistema y encontró un hueco de diseño. **Reabre R1**, que estaba `APPROVED`.
+
+1. **`pg_read_all_data` alcanza TODO el cluster desde que el rol existe.** Postgres concede `CONNECT` a PUBLIC por omisión en toda base, y `pg_read_all_data` es membresía de cluster: nadie tiene que conceder nada. **La Parte B no es una barrera** — para cuando corre, el acceso ya existe. Medido: el rol alcanza **29 bases** en el cluster de dev/qa, no las 2 del catálogo.
+2. **Nace una Parte 0**, antes de crear nada: lista las bases del cluster y **aborta si el cluster contiene alguna base `_prod`**. El discriminante **no es el nombre `stg`** — rechazar por nombre es red, no barrera, y está medido que falla en las dos direcciones: `controlactivos_stg` es un clon que vive en dev/qa, y las cinco `_stg` peligrosas son peligrosas por estar en el cluster de producción, no por llamarse así. La Parte 0 imprime además a qué bases llega cada rol de verdad, que es la única forma de ver el `CONNECT` heredado de PUBLIC (en el ACL de la base no se ve).
+3. **El aprovisionamiento de Postgres lo provee Patrick.** Los cuatro `.sql` de Postgres que produjo R1 quedan **reemplazados**, no corregidos. R1 conserva el lado de SQL Server, que es lo que Patrick pidió que le armemos.
+4. **SQL Server SÍ tiene una segunda red: `db_denydatawriter`.** Rol fijo de base que pone `DENY` sobre `INSERT`/`UPDATE`/`DELETE`, y en SQL Server el `DENY` le gana a cualquier `GRANT`. Va junto con `db_datareader` en el mismo loop. La tabla "Garantías por motor" y el enum de `garantias` del catálogo quedan corregidos: `sqlserver` pasa de una garantía a dos.
+5. **IAM auth: descartado por ahora.** Clave en Secrets Manager; las genera Patrick. Deja de ser decisión abierta y pasa a mejora anotada.
+6. **`ambiente` describe el cluster, no el nombre de la base.** `controlactivos_stg` sobre el cluster de dev/qa es `ambiente: dev`, y eso es cierto: dice dónde vive. Lo que hace irrepresentable a producción no es el sufijo del nombre sino que **ninguna entrada apunte al cluster de producción ni a `Prod SQL`**.
+7. **Cifras corregidas contra el inventario medido** (`plugins/bisalta-db/aprovisionamiento/INVENTARIO.md`): Dev SQL tiene **32** bases de usuario, no "~35"; **1383 GB** en total; las 32 `ONLINE` y **ninguna en solo lectura**; y `CONSTRUPLAZA_EFLOW` (266.92 GB) es la segunda más grande y no estaba en el inventario que el contract citaba.
+8. **Dialectos: siguen siendo dos.** Redshift y Odoo son el motivo por el que el catálogo es multi-conexión, **no trabajo de este ciclo** (decisión de Ian Vargas, 18-sep-2026). El enum de `dialecto` no cambia. Cuando entre Redshift hará falta un tercer dialecto: habla protocolo Postgres pero no acepta el mismo SQL, así que `postgres` le quedaría mal en alguna dirección.
+9. **La aprobación de Dev SQL queda asentada** en `plugins/bisalta-db/aprovisionamiento/APROBACIONES.md`, textual y con su fuente, como Patrick pidió. La segunda aprobación (Esteban Fait o Sebastián, por política de datos de producción) **sigue pendiente** y es precondición de habilitar el plugin al equipo.
+
+**`AGENT_r2` no se reabre**: ninguno de los AC11–AC40 cambia por esto, salvo el enum de `garantias` del catálogo, que se trata como parte del scope reabierto de R1 y se verifica con los tests ya existentes de `AC14`.
 
 ### Cambios v2 → v3 (ratificación del planner, 18-sep-2026)
 
@@ -143,7 +159,7 @@ Arreglo de objetos. El validador **rechaza cualquier campo no listado acá** y c
 | `base` | requerido | cadena no vacía | el catálogo entero se rechaza |
 | `secret_id` | requerido | identificador o ARN del secreto | el catálogo entero se rechaza |
 | `region` | requerido | cadena no vacía | el catálogo entero se rechaza |
-| `garantias` | requerido | arreglo de al menos un elemento, cada uno exactamente `rol-solo-lectura`, `sesion-read-only` o `endpoint-replica-lectura` | el catálogo entero se rechaza |
+| `garantias` | requerido | arreglo de al menos un elemento, cada uno exactamente `rol-solo-lectura`, `sesion-read-only`, `endpoint-replica-lectura` o `deny-escritura` (v4) | el catálogo entero se rechaza |
 
 **No existe un campo de usuario ni de contraseña.** Los dos salen del secreto, que tiene la forma estándar de RDS: un campo llamado `username` y otro llamado `password`, ambos en la carga JSON del secreto.
 
@@ -187,12 +203,13 @@ Arreglo con `nombre`, `dialecto`, `ambiente`, `base` y `garantias` de cada entra
 
 | | Postgres (`dev`/`qa`) | SQL Server (`Dev SQL`) |
 |---|---|---|
-| Rol de solo lectura | sí | sí — **y es la única barrera** |
+| Rol de solo lectura | sí | sí |
 | Sesión abierta en solo lectura | sí, `default_transaction_read_only=on` | **no existe equivalente** |
+| `DENY` de escritura sobre el rol | no aplica | sí, `db_denydatawriter` — el `DENY` le gana a cualquier `GRANT` (v4) |
 | Motor que rechaza escrituras | sí, endpoint `cluster-ro-` de Aurora | **no hay réplica** |
 | Alcance del permiso | `pg_read_all_data`, de cluster | `db_datareader`, **por base**: una base nueva no queda cubierta sola |
 
-Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que evita que alguien asuma que todas las conexiones son igual de seguras.
+Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que evita que alguien asuma que todas las conexiones son igual de seguras. **Medido el 18-sep-2026**: las 32 bases de Dev SQL están `ONLINE` y **ninguna** tiene `is_read_only`, así que del lado del motor no hay ninguna barrera — el rol y el `DENY` son todo lo que hay.
 
 ## Entrega de la credencial al cliente
 
