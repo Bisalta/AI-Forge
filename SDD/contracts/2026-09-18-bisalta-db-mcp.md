@@ -1,6 +1,21 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v4
+- **Versión**: v5
+
+### Cambios v4 → v5 (decisión de Ian Vargas, 18-sep-2026)
+
+**El aprovisionamiento lo escribimos nosotros, los dos motores.** Revierte el punto 3 de v4: los `.sql` de Postgres de R1 **no** se reemplazan por los de Patrick. Razón: descargarlo a él de ese trabajo. Lo que sí se incorpora es todo lo que su medición encontró — la Parte 0, el hallazgo de `pg_read_all_data`, y `db_denydatawriter`.
+
+Con eso, **la frontera de responsabilidad queda cerrada así**:
+
+| Quién | Qué |
+|---|---|
+| **Este ciclo (R1)** | Escribir los `.sql` de los dos motores, la Parte 0, el loop de SQL Server, el runbook y la verificación de cada AC |
+| **Patrick Ocampo** | (a) Correr los scripts — requiere privilegios de administración de cluster y de instancia. (b) **Generar las contraseñas y cargarlas en Secrets Manager**, sin que pasen por Ian ni por una sesión de IA. (c) La política IAM sobre esos secretos. (d) Decidir `SSISDB` dentro o fuera del loop. (e) Ratificar el discriminante de la Parte 0, que es mecanismo suyo y se le está cambiando la condición |
+| **Ian Vargas** | Verificar que el cluster de dev/qa tenga `ReaderEndpoint` (`describe-db-clusters`) — cierra la precondición del v3 punto 4 |
+| **Esteban Fait o Sebastián** | La aprobación de datos de producción que la política de uso de IA exige. Precondición de **habilitar el plugin al equipo**, no de construirlo |
+
+**El punto (b) es el único que no admite atajo**: si la contraseña viaja de Patrick a Ian para que Ian la cargue, se rompe exactamente la propiedad que este plugin existe para dar. Va de quien la genera al secreto, y de ahí sólo la lee el proceso.
 
 ### Cambios v3 → v4 (contract-change-request externo, 18-sep-2026)
 
@@ -8,7 +23,7 @@ Origen: mensaje de **Patrick Ocampo** en Slack (DM con Ian Vargas, 2026-09-18 12
 
 1. **`pg_read_all_data` alcanza TODO el cluster desde que el rol existe.** Postgres concede `CONNECT` a PUBLIC por omisión en toda base, y `pg_read_all_data` es membresía de cluster: nadie tiene que conceder nada. **La Parte B no es una barrera** — para cuando corre, el acceso ya existe. Medido: el rol alcanza **29 bases** en el cluster de dev/qa, no las 2 del catálogo.
 2. **Nace una Parte 0**, antes de crear nada: lista las bases del cluster y **aborta si el cluster contiene alguna base `_prod`**. El discriminante **no es el nombre `stg`** — rechazar por nombre es red, no barrera, y está medido que falla en las dos direcciones: `controlactivos_stg` es un clon que vive en dev/qa, y las cinco `_stg` peligrosas son peligrosas por estar en el cluster de producción, no por llamarse así. La Parte 0 imprime además a qué bases llega cada rol de verdad, que es la única forma de ver el `CONNECT` heredado de PUBLIC (en el ACL de la base no se ve).
-3. **El aprovisionamiento de Postgres lo provee Patrick.** Los cuatro `.sql` de Postgres que produjo R1 quedan **reemplazados**, no corregidos. R1 conserva el lado de SQL Server, que es lo que Patrick pidió que le armemos.
+3. ~~**El aprovisionamiento de Postgres lo provee Patrick.**~~ **Revertido en v5**: los escribimos nosotros, los dos motores. Los hallazgos de Patrick se incorporan igual.
 4. **SQL Server SÍ tiene una segunda red: `db_denydatawriter`.** Rol fijo de base que pone `DENY` sobre `INSERT`/`UPDATE`/`DELETE`, y en SQL Server el `DENY` le gana a cualquier `GRANT`. Va junto con `db_datareader` en el mismo loop. La tabla "Garantías por motor" y el enum de `garantias` del catálogo quedan corregidos: `sqlserver` pasa de una garantía a dos.
 5. **IAM auth: descartado por ahora.** Clave en Secrets Manager; las genera Patrick. Deja de ser decisión abierta y pasa a mejora anotada.
 6. **`ambiente` describe el cluster, no el nombre de la base.** `controlactivos_stg` sobre el cluster de dev/qa es `ambiente: dev`, y eso es cierto: dice dónde vive. Lo que hace irrepresentable a producción no es el sufijo del nombre sino que **ninguna entrada apunte al cluster de producción ni a `Prod SQL`**.
