@@ -20,7 +20,7 @@ Para los comandos de verificación, ver [`SDD/docs/doc_quality_gates.md`](./doc_
 |-------|-----------|
 | Distribución | Claude Code plugin marketplace (`.claude-plugin/marketplace.json`) |
 | Runtime de los plugins | Markdown (commands/skills/agents, los interpreta Claude, no un intérprete de código) + JSON de config (`plugin.json`, `hooks.json`) |
-| Scripts ejecutables | Bash 3.2 (piso macOS) — `scripts/*.sh`, `hooks/*.sh`, `SDD/tests/*.sh` |
+| Scripts ejecutables | Bash 3.2 (piso macOS) — `scripts/*.sh`, `hooks/*.sh`, `SDD/tests/*.sh`. **Excepción, desde `bisalta-db` (GEN-108):** Node plano (`plugins/bisalta-db/scripts/*.js`, v22.17 en la máquina de referencia) donde hace falta un proceso de larga vida que hable JSON-RPC por stdio, que bash no da. **Sigue sin haber manifiesto de dependencias**: cero `package.json`, cero `node_modules`, cero `npx` — el precedente es `plugins/usage-monitor/scripts/parse-usage-log.js`, probado desde el harness bash. |
 | Tests | Harness bash propio (`SDD/tests/run.sh` + `SDD/tests/test_*.sh`), sin framework externo |
 | CI | N/A — sin `.github/workflows` (deuda registrada, ver contract de R0) |
 | Auth / DB / infra de app | N/A — no hay backend ni frontend en este repo |
@@ -53,10 +53,21 @@ AI-Forge/
 │   │   │                            contenido de los tres docs de SDD/docs/) — esqueletos que un repo QUE
 │   │   │                            INSTALA el plugin copia y llena; nunca se editan pensando en ESTE repo
 │   │   └── evals/                  ← golden-requirements.md (casos de referencia del propio plugin)
-│   └── project-foundation/         ← segundo plugin: documentos fundacionales de proyecto (PRD/TRD/etc.)
+│   ├── project-foundation/         ← segundo plugin: documentos fundacionales de proyecto (PRD/TRD/etc.)
+│   │   ├── .claude-plugin/plugin.json
+│   │   ├── commands/init.md
+│   │   └── skills/project-foundation/SKILL.md
+│   └── bisalta-db/                 ← consulta de solo lectura a las bases de dev/qa vía servidor MCP propio
 │       ├── .claude-plugin/plugin.json
-│       ├── commands/init.md
-│       └── skills/project-foundation/SKILL.md
+│       ├── .mcp.json               ← declaración del servidor MCP stdio (`command` + `args` con
+│       │                              ${CLAUDE_PLUGIN_ROOT}); el manifiesto lo apunta con "mcpServers"
+│       ├── catalogo.json           ← qué conexiones existen y qué garantías tiene cada una (SOURCE OF TRUTH;
+│       │                              sin usuario ni contraseña: los dos salen del secreto de AWS)
+│       ├── scripts/                ← servidor-mcp.js, lista-blanca.js, catalogo.js, conexion.js — Node plano,
+│       │                              CERO dependencias; sus tests viven en SDD/tests/, nunca acá
+│       ├── aprovisionamiento/      ← .sql + RUNBOOK.md de roles/logins/secretos: son parte de lo que se
+│       │                              instala (agregar una fuente exige re-correrlos), no andamiaje del repo
+│       └── README.md
 ├── docs/                          ← historia de diseño DE ESTE REPO (no de un repo que instale el plugin)
 │   ├── plans/                     ← planes de features del propio AI-Forge
 │   └── specs/                     ← specs de diseño del propio AI-Forge (una por feature del plugin)
@@ -90,6 +101,7 @@ Todo lo que un dev instala vía `/plugin install <nombre>` vive acá. Es la úni
 - `scripts/`: bash invocado por comandos/skills/hooks (`sdd-run-gates.sh` es el runner de evidencia).
 - `standards/`: markdown normativo (quality gates, security, arquetipos, base standards) — la fuente de verdad que commands/skills/agents referencian por sección, nunca recopian.
 - `templates/`: esqueletos que un repo consumidor llena con `/sdd-init`; nunca se editan pensando en el propio AI-Forge.
+- `catalogo.json` / `.mcp.json` / `aprovisionamiento/` (`bisalta-db`): datos y declaraciones que **se instalan con el plugin**. `aprovisionamiento/` es el caso que más se presta a confusión: son `.sql` que este repo no ejecuta nunca, pero **no** son andamiaje de `SDD/` — agregar una fuente de datos nueva obliga a re-correrlos, así que viajan con el producto.
 
 ### `SDD/` — andamiaje de ESTE repo
 
@@ -137,6 +149,9 @@ Al agregar un archivo, decidí por intención:
 4. ¿Nuevo slash-command? → `plugins/<plugin>/commands/<nombre>.md`.
 5. ¿Nueva regla normativa que aplica a cualquier repo que instale el plugin? → `plugins/sdd-flow/standards/<archivo>.md`, referenciada por sección desde donde haga falta — nunca recopiada.
 6. ¿Nuevo test del harness de este repo? → `SDD/tests/test_<algo>.sh`, usando `SDD/tests/lib.sh` para los asserts (nunca un `assert_*` propio).
+7. ¿Código ejecutable que un plugin corre en la máquina de quien lo instala (un servidor MCP, un parser, un cliente de CLI)? → `plugins/<plugin>/scripts/`. Vale tanto para `.sh` como para `.js`; lo que decide es a quién sirve, no en qué lenguaje está.
+8. ¿El test de ese código? → **`SDD/tests/`, nunca dentro de `plugins/`**, y se invoca el script por su path completo desde afuera. Es la regla que sostiene la separación producto/andamiaje: `plugins/bisalta-db/scripts/servidor-mcp.js` se prueba desde `SDD/tests/test_servidor_mcp.sh`, igual que `plugins/sdd-flow/scripts/sdd-run-gates.sh` desde `SDD/tests/test_run_gates.sh`.
+9. ¿Datos de configuración que el plugin lee en tiempo de ejecución (un catálogo, una declaración de servidor MCP)? → raíz del plugin (`plugins/<plugin>/`), no `scripts/`: es lo que un admin edita sin tocar código. En `bisalta-db` son `catalogo.json` y `.mcp.json`.
 
 ---
 
@@ -162,6 +177,7 @@ N/A — no hay API. La única "interfaz pública" de este repo es el árbol de a
   - `SDD_ALLOW_BASE_COMMIT`, `SDD_PROTECTED_BRANCHES` (`guard-git.sh`): escape hatches del chequeo de rama protegida — **no** afectan el chequeo de identidad de agente, que es independiente (ver fila siguiente).
   - `SDD_AGENT_ENFORCE` (`guard-git.sh`, default `0` = sin efecto), `SDD_AGENT_NAME` (default `sdd-agent`), `SDD_AGENT_EMAIL` (default `sdd-agent@users.noreply.github.com`): identidad de agente exigida en los commits (contract R2), activa únicamente con `SDD_AGENT_ENFORCE=1` — no se desactiva con `SDD_ALLOW_BASE_COMMIT` ni con `HEAD` detached (AC36, AC37).
   - `SDD_CHECK_PATTERNS` (`sdd-check.sh`): archivo de patrones prohibidos extra por repo.
+  - `BISALTA_DB_CATALOGO` (default: `plugins/bisalta-db/catalogo.json`) y `BISALTA_DB_BITACORA` (default: `~/.claude/bisalta-db/bitacora.jsonl`), del plugin `bisalta-db`. El catálogo se relee **en cada invocación**: borrar una entrada es el kill switch, sin reiniciar el servidor. **Ninguna credencial viaja por entorno persistido**: el usuario y la contraseña salen de AWS Secrets Manager en cada consulta.
 
 ---
 

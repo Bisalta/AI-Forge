@@ -2,6 +2,55 @@
 
 Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero).
 
+## bisalta-db
+
+### 0.1.0 — 2026-09-18
+
+Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v2).
+Consulta de solo lectura a las bases de dev/qa de Bisalta desde Claude Code y NEO, **sin que
+ninguna credencial entre en el contexto de la sesión**. La credencial no desaparece: pasa de un
+archivo que hoy hay que leerle al modelo —y que queda archivado en el transcript— a un secreto de
+AWS que el proceso resuelve, usa y tira.
+
+- **Servidor MCP propio sobre stdio, cero dependencias npm.** JSON-RPC 2.0 escrito a mano; `psql`,
+  `sqlcmd` y `aws` invocados como CLI. No hay `package.json`, ni lockfile, ni `node_modules`, ni
+  `npx`. El paquete que resolvería esto no sirve: `@modelcontextprotocol/server-postgres` está
+  **deprecado desde 2025 y tiene inyección SQL que se salta su propio modo de solo lectura** —
+  pasa el SQL sin parametrizar y permite salir de la transacción read-only para ejecutar DDL/DML
+  con todos los privilegios de la conexión. Sigue con ~21k descargas semanales.
+- **Lista blanca, no lista negra, y anclada al principio de la sentencia.** Port de la lógica ya
+  probada en `Bisalta/Proveedores-Back` (`scripts/consulta-lectura.sh`), con sus doce casos. Un
+  bloque `DO` puede hacer cualquier cosa y una lista negra lo deja pasar entero; y la palabra tiene
+  que estar **al principio**: la versión laxa pasaba once de los doce tests originales, y el caso
+  que la mató fue `DELETE … WHERE id IN (SELECT …)`. Una lista blanca **por dialecto**: en
+  `sqlserver` se rechazan además `EXEC`/`EXECUTE`, los identificadores `sp_`/`xp_` y cualquier `;`;
+  en `postgres`, la apertura de comilla de dólar.
+- **Producción irrepresentable, no rechazada.** `ambiente` admite `dev` y `qa` y nada más: no hay
+  valor que la nombre. Rechazar por nombre es red, no barrera. El validador rechaza además el
+  catálogo entero si una entrada apunta al cluster o al host de la cuenta de producción.
+- **La credencial nunca por `argv`.** Postgres: archivo temporal en modo 600 apuntado por la
+  variable de archivo de credenciales de libpq, borrado en un `finally` que corre también cuando la
+  consulta falla. SQL Server: variable de entorno acotada al proceso hijo, porque `sqlcmd` no tiene
+  equivalente de archivo — la asimetría queda escrita, no disimulada.
+- **El catálogo no tiene usuario ni contraseña**: los dos salen del secreto, en la forma estándar de
+  RDS. Se relee en cada invocación, así que borrar una entrada es un kill switch inmediato.
+- **Topes duros**: 1000 filas y 1 MiB de `filas` serializado. Truncar no es un error: la respuesta
+  declara `truncado` y cuál de los dos topes se alcanzó primero. Es la única barrera entre las filas
+  y el transcript — riesgo aceptado con dueño, no control.
+- **Bitácora** de una línea JSON por invocación, con la consulta **por hash y nunca en claro**. No
+  rota; registrado como deuda.
+- `aprovisionamiento/` trae el runbook y los `.sql` de roles, logins y secretos (R1). Los corre una
+  persona con privilegios de administración en cada motor; este repo no los ejecuta.
+
+**Lo que dejó el kilometraje**: dos defectos que la suite encontró y que valen por separado. (1) El
+tope de bytes salía vacío porque `process.exit()` **corta lo que `process.stdout` todavía tiene en
+el buffer** cuando la salida va a un pipe — y la respuesta que se perdía era justamente la más
+grande, la que llega al tope. El test de AC27 lo encontró; el arreglo (`process.exitCode`) se aplicó
+a los tres CLI del plugin y al servidor, no sólo a la línea señalada. (2) Tres literales del propio
+código disparaban el gate 9 (`secret-scan`) contra sí mismos — y el comentario escrito para
+explicar el primero reprodujo el problema al citarlo. Se partieron los literales; **ninguna
+exclusión por path**, que es la única mitigación que el repo tiene prohibida ahí.
+
 ## project-foundation
 
 ### 0.1.0 — 2026-08-03

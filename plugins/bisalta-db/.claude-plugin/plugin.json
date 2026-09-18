@@ -1,0 +1,13 @@
+{
+  "name": "bisalta-db",
+  "version": "0.1.0",
+  "description": "Consulta de solo lectura a las bases de dev/qa de Bisalta desde Claude Code, sin que ninguna credencial entre en el contexto de la sesion. Servidor MCP propio sobre stdio, cero dependencias npm: lista blanca por dialecto anclada al principio de cada sentencia, catalogo donde produccion es irrepresentable, y la credencial resuelta desde AWS Secrets Manager en cada invocacion.",
+  "author": {
+    "name": "Bisalta Ltda",
+    "url": "https://github.com/Bisalta"
+  },
+  "homepage": "https://github.com/Bisalta/AI-Forge/tree/prod/plugins/bisalta-db",
+  "license": "UNLICENSED",
+  "keywords": ["mcp", "postgres", "sqlserver", "solo-lectura", "secrets-manager"],
+  "mcpServers": "./.mcp.json"
+}
