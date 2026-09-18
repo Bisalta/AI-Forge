@@ -47,17 +47,17 @@ El aprovisionamiento no es un detalle de operación: es donde vive la garantía.
 
 ## Pasos
 
-- [ ] T1.1 Verificar que `shellcheck` esté instalado (`command -v shellcheck`). Si falta, correr `brew install shellcheck` — sin él el gate 2 sale `[SKIPPED]` y nunca verde.
-- [ ] T1.2 Escribir `postgres-parte-a.sql`: crear los dos roles con `LOGIN`, `GRANT pg_read_all_data` a cada uno, sin `NOINHERIT`. Idempotente: envolver la creación en un bloque que no falle si el rol ya existe.
-- [ ] T1.3 Escribir `postgres-parte-b.sql`: `GRANT CONNECT` sobre la base y lo que `pg_read_all_data` no cubre por sí solo. Idempotente.
-- [ ] T1.4 Escribir `postgres-inverso.sql`: revoca y borra los dos roles, tolerando que no existan.
-- [ ] T1.5 Escribir `sqlserver-parte-a.sql`: login de servidor con la contraseña como parámetro sustituible.
-- [ ] T1.6 Escribir `sqlserver-parte-b.sql`: cursor sobre `sys.databases` filtrando `database_id > 4` y `state = 0` (en línea), creando el user y agregándolo a `db_datareader` en cada una. Idempotente.
-- [ ] T1.7 Escribir `sqlserver-inverso.sql`: recorrido inverso más `DROP LOGIN`.
-- [ ] T1.8 Escribir `RUNBOOK.md` con: prerequisitos, orden de ejecución (primero `proveedores_dev`, verificar, después el resto), la forma del secreto de AWS (dos campos, `username` y `password`, en la forma estándar de RDS — **escribilos en spans separados, nunca contiguos con su valor**, o el gate 9 se detecta a sí mismo), la política IAM, los pasos de verificación de AC1–AC8 con su mutación, y el inverso.
-- [ ] T1.9 **AC10**: el runbook declara explícito que una base nueva de SQL Server **no queda cubierta** hasta re-correr la parte B.
-- [ ] T1.10 Commitear (árbol limpio) y correr la escalera de gates: `bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -o SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`
-- [ ] T1.11 **AC9 con su triple**: correr `bash SDD/tests/secret-scan.sh` (verde) → insertar el literal con forma de credencial en `postgres-parte-a.sql` y volver a correrlo (rojo) → revertir y correrlo otra vez (verde). Las tres corridas, con comando literal y exit code, van al verification report a mano.
+- [x] T1.1 Verificar que `shellcheck` esté instalado (`command -v shellcheck`). Si falta, correr `brew install shellcheck` — sin él el gate 2 sale `[SKIPPED]` y nunca verde. → estaba ausente, instalado con `brew install shellcheck` (0.11.0).
+- [x] T1.2 Escribir `postgres-parte-a.sql`: crear los dos roles con `LOGIN`, `GRANT pg_read_all_data` a cada uno, sin `NOINHERIT`. Idempotente: envolver la creación en un bloque que no falle si el rol ya existe.
+- [x] T1.3 Escribir `postgres-parte-b.sql`: `GRANT CONNECT` sobre la base y lo que `pg_read_all_data` no cubre por sí solo. Idempotente.
+- [x] T1.4 Escribir `postgres-inverso.sql`: revoca y borra los dos roles, tolerando que no existan.
+- [x] T1.5 Escribir `sqlserver-parte-a.sql`: login de servidor con la contraseña como parámetro sustituible.
+- [x] T1.6 Escribir `sqlserver-parte-b.sql`: cursor sobre `sys.databases` filtrando `database_id > 4` y `state = 0` (en línea), creando el user y agregándolo a `db_datareader` en cada una. Idempotente.
+- [x] T1.7 Escribir `sqlserver-inverso.sql`: recorrido inverso más `DROP LOGIN`.
+- [x] T1.8 Escribir `RUNBOOK.md` con: prerequisitos, orden de ejecución (primero `proveedores_dev`, verificar, después el resto), la forma del secreto de AWS (dos campos, `username` y `password`, en la forma estándar de RDS — **escribilos en spans separados, nunca contiguos con su valor**, o el gate 9 se detecta a sí mismo), la política IAM, los pasos de verificación de AC1–AC8 con su mutación, y el inverso.
+- [x] T1.9 **AC10**: el runbook declara explícito que una base nueva de SQL Server **no queda cubierta** hasta re-correr la parte B.
+- [x] T1.10 Commitear (árbol limpio) y correr la escalera de gates: `bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -o SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`
+- [x] T1.11 **AC9 con su triple**: correr `bash SDD/tests/secret-scan.sh` (verde) → insertar el literal con forma de credencial en `postgres-parte-a.sql` y volver a correrlo (rojo) → revertir y correrlo otra vez (verde). Las tres corridas, con comando literal y exit code, van al verification report a mano. → adicionalmente encontrado y corregido en el mismo paso: el propio `RUNBOOK.md` (no un `.sql`) se autodetectaba por `secretsmanager:GetSecretValue` (namespace + acción de IAM con `:` en el medio, no una credencial) — corregido partiendo el literal con un backtick, ver verification report.
 
 ## Acceptance criteria (IDs del contract v1 — no los renumeres)
 
@@ -80,16 +80,16 @@ Ocho de los diez son `manual-only` porque **ningún harness de este repo puede c
 
 | AC | Test / verificación | Archivo | Estado |
 |---|---|---|---|
-| AC1 | | `plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` | |
-| AC2 | | `RUNBOOK.md` | |
-| AC3 | | `RUNBOOK.md` | |
-| AC4 | | `RUNBOOK.md` | |
-| AC5 | | `RUNBOOK.md` | |
-| AC6 | | `RUNBOOK.md` | |
-| AC7 | | `RUNBOOK.md` | |
-| AC8 | | `RUNBOOK.md` | |
-| AC9 | | `SDD/tests/secret-scan.sh` | |
-| AC10 | | | |
+| AC1 | manual-only: sección "AC1 — los dos roles existen y leen de `proveedores_dev`" | `plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` | pendiente-de-ejecucion |
+| AC2 | manual-only + mutación declarada: sección "AC2 — un `INSERT` con `claude_lectura` falla" | `RUNBOOK.md` | pendiente-de-ejecucion |
+| AC3 | manual-only: sección "AC3 — la parte A corrida dos veces deja el mismo estado" | `RUNBOOK.md` | pendiente-de-ejecucion |
+| AC4 | manual-only: sección "AC4 — tras el inverso, `claude_lectura` no conecta" | `RUNBOOK.md` | pendiente-de-ejecucion |
+| AC5 | manual-only: sección "AC5 — el login de `Dev SQL` lee de `EXACTUS`" | `RUNBOOK.md` | pendiente-de-ejecucion |
+| AC6 | manual-only + mutación declarada: sección "AC6 — un `INSERT` con ese login falla" | `RUNBOOK.md` | pendiente-de-ejecucion |
+| AC7 | manual-only + mutación declarada: sección "AC7 — el user existe en todas las bases de usuario y en ninguna de sistema" | `RUNBOOK.md` | pendiente-de-ejecucion |
+| AC8 | manual-only: sección "AC8 — cada secreto existe..." | `RUNBOOK.md` | pendiente-de-ejecucion |
+| AC9 | automatizable + triple de mutación: `bash SDD/tests/secret-scan.sh` (verde→rojo→verde, ver verification report) | `SDD/tests/secret-scan.sh` | pass |
+| AC10 | automatizable (grep): `grep -n "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` | `plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` | pass |
 
 ## Cobertura del impact set
 
@@ -115,12 +115,39 @@ Los siete archivos son nuevos: `git rm` los saca sin tocar nada más. Ningún sc
 
 ### Summary
 
+R1 redacta los siete archivos de aprovisionamiento de solo lectura para el cluster de dev/qa de Postgres (`claude_lectura`, `neo_lectura`, con `pg_read_all_data` sin `NOINHERIT`) y para `Dev SQL` (login único `bisalta_lectura`, `db_datareader` por base vía cursor explícito sobre `sys.databases`). Ninguno se ejecutó contra una base real — es out of scope declarado. `shellcheck` no estaba instalado en esta máquina (contradice lo que `doc_quality_gates.md` documentaba); se instaló con `brew install shellcheck` (0.11.0) para que el gate 2 no salga `[SKIPPED]`. `AC9` (secret-scan) y `AC10` (grep sobre el runbook) son los dos únicos ACs automatizables de R1; corridos con su triple/grep y en verde. Los ocho restantes (AC1–AC8) son `manual-only` — sus pasos exactos, con las tres mutaciones declaradas en el contract (AC2, AC6, AC7), quedan escritos en `RUNBOOK.md`, estado `pendiente-de-ejecucion`.
+
 ### Task Status
+
+Total tasks: 11 (T1.1–T1.11). Completed: 11. Blocked: 0. Skipped: 0.
 
 ### Validation Executed
 
+- `command -v shellcheck` → `1` (ausente) → `brew install shellcheck` → `command -v shellcheck` → `0` (`/opt/homebrew/bin/shellcheck`, v0.11.0).
+- `bash SDD/tests/secret-scan.sh` (baseline, tras `git add plugins/bisalta-db/` para que `git ls-files` viera los archivos nuevos) → `0`.
+- **Triple AC9**: `bash SDD/tests/secret-scan.sh` → `0` (verde) → insertada línea `password=AKIAFAKE1234567890AB` al final de `postgres-parte-a.sql` → `bash SDD/tests/secret-scan.sh` → `1`, nombrando `postgres-parte-a.sql:55`, sin imprimir el valor (rojo) → revertida la línea (`git diff` contra el índice sale vacío, reversión exacta) → `bash SDD/tests/secret-scan.sh` → `0` (verde). Detalle completo en `SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`.
+- Hallazgo adicional durante el mismo paso: el `RUNBOOK.md` original se autodetectaba en dos líneas (`secretsmanager:GetSecretValue`, una acción real de IAM cuyo `:` interno matchea el patrón `secret...[:=]...4+ chars`, no una credencial). Corregido partiendo el literal con un backtick (`` `secretsmanager`:`GetSecretValue` ``) en las dos ocurrencias — mismo criterio que los placeholders de contraseña. Re-corrida tras el fix → `0`.
+- AC10: `grep -n "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` → coincidencia en línea 261 (declaración explícita del hueco de SQL Server).
+- `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` → `0` (sin `.sh` nuevos en R1, gate corrido igual como parte de la escalera completa).
+- `bash SDD/tests/run.sh` (suite completa, 14 archivos) → `0`.
+- Escalera completa vía runner: `bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -o SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md` — ver ese archivo para exit codes gate por gate.
+
 ### Blockers
+
+Ninguno.
 
 ### Files Changed
 
+- `plugins/bisalta-db/aprovisionamiento/postgres-parte-a.sql` (new)
+- `plugins/bisalta-db/aprovisionamiento/postgres-parte-b.sql` (new)
+- `plugins/bisalta-db/aprovisionamiento/postgres-inverso.sql` (new)
+- `plugins/bisalta-db/aprovisionamiento/sqlserver-parte-a.sql` (new)
+- `plugins/bisalta-db/aprovisionamiento/sqlserver-parte-b.sql` (new)
+- `plugins/bisalta-db/aprovisionamiento/sqlserver-inverso.sql` (new)
+- `plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` (new)
+- `SDD/briefs/R1-infra-accesos-lectura.md` (mod, este archivo)
+- `SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md` (new, evidencia + generado por el runner)
+
 ### Final Statement
+
+R1 completo: 7 archivos nuevos en `plugins/bisalta-db/aprovisionamiento/`, sin tocar `plugins/bisalta-db/scripts/`, `SDD/tests/`, `doc_architecture.md` ni `doc_quality_gates.md` (todos de R2, per contract). AC9 y AC10 automatizados y en verde con su evidencia; AC1–AC8 documentados `manual-only` con pasos exactos y mutaciones, estado `pendiente-de-ejecucion` — ningún AC se declara `pass` sin haber corrido. Sin mitigaciones prohibidas: ninguna exclusión por path se agregó a `secret-scan.sh` (no se tocó el script), el literal problemático encontrado en la documentación se resolvió partiéndolo, no excluyéndolo. Único desvío del ambiente respecto de lo documentado: `shellcheck` estaba ausente pese a que `doc_quality_gates.md` lo daba por instalado — corregido instalándolo (no es una decisión del contract, es restaurar el prerequisito declarado); no toqué ese doc, es de R2 (T5.2 de su brief ya lo tiene como tarea).
