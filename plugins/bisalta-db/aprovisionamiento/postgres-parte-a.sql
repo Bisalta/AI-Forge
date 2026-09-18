@@ -2,7 +2,7 @@
 --
 -- Aprovisionamiento de solo lectura para el plugin `bisalta-db` — PARTE A.
 -- Corre UNA VEZ POR CLUSTER: los roles son objetos de cluster en Postgres,
--- no de base (contract SDD/contracts/2026-09-18-bisalta-db-mcp.md v2,
+-- no de base (contract SDD/contracts/2026-09-18-bisalta-db-mcp.md v3,
 -- sección "Garantías por motor (asimetría declarada, no disimulada)").
 --
 -- Cluster objetivo: identificador de cluster sistemas-costruplaza-db.cluster-cfrl3owqzwof
@@ -12,14 +12,14 @@
 -- (RUNBOOK.md, sección "Prerequisitos").
 -- NUNCA correr esto contra el cluster cuyo identificador es cluster-cr4rbgr7qlr6
 -- (cuenta AWS de producción, donde viven los cinco pares _prod/_stg): un rol
--- de login creado ahí queda al lado de producción (contract v2, sección
+-- de login creado ahí queda al lado de producción (contract v3, sección
 -- "Out of scope").
 --
 -- Roles creados: claude_lectura, neo_lectura — dos, no uno, para que
 -- pg_stat_activity distinga quién corrió qué y se pueda revocar a uno sin
--- el otro (contract v2, AC1).
+-- el otro (contract v3, AC1).
 --
--- IMPORTANTE — GRANT pg_read_all_data, y SIN NOINHERIT (contract v2, AC1,
+-- IMPORTANTE — GRANT pg_read_all_data, y SIN NOINHERIT (contract v3, AC1,
 -- cerrada, no reabrir): pg_read_all_data es una MEMBRESÍA
 -- (predefined role de Postgres), no un privilegio directo. Las membresías
 -- no se aplican sin SET ROLE cuando el rol miembro tiene NOINHERIT. El

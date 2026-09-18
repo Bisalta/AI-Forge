@@ -6,7 +6,7 @@
 -- queda cubierta hasta que este script se corra otra vez (AC10, declarado
 -- también en RUNBOOK.md).
 --
--- Recorre sys.databases con un CURSOR EXPLÍCITO (contract v2, AC7 y
+-- Recorre sys.databases con un CURSOR EXPLÍCITO (contract v3, AC7 y
 -- sección "Garantías por motor (asimetría declarada, no disimulada)",
 -- cerrada, no reabrir). NO usar sp_MSforeachdb: no está soportado desde
 -- SQL Server 2016+, y su exclusión de bases en estados como RESTORING u

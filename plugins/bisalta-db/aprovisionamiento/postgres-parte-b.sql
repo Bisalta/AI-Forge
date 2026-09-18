@@ -3,7 +3,7 @@
 -- Aprovisionamiento de solo lectura para el plugin `bisalta-db` — PARTE B.
 -- Corre UNA VEZ POR BASE, conectado a esa base: los GRANT de este archivo
 -- son por base, a diferencia de los roles de la parte A que son de cluster
--- (contract SDD/contracts/2026-09-18-bisalta-db-mcp.md v2, sección
+-- (contract SDD/contracts/2026-09-18-bisalta-db-mcp.md v3, sección
 -- "Garantías por motor (asimetría declarada, no disimulada)").
 --
 -- Orden de ejecución declarado en RUNBOOK.md: primero proveedores_dev,

@@ -11,7 +11,7 @@ que alguien con esos privilegios los corra.
 ## Prerequisitos
 
 - Acceso de administración al cluster Aurora PostgreSQL. Host completo (identificador
-  del cluster + región `us-east-1`, contract v2, fila `Integration` del
+  del cluster + región `us-east-1`, contract v3, fila `Integration` del
   `Architectural Delta`):
   `sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com`
   (dev/qa) — **nunca** `cluster-cr4rbgr7qlr6` (cuenta de producción).
@@ -97,7 +97,7 @@ se documenta partida, el valor real se arma al usarlo).
   threat model del contract (sección "¿Quién puede invocarlo?") pone la
   barrera real en IAM, no en el plugin — un `Resource` amplio la anula.
 - Sin este permiso sobre el ARN puntual, `consultar` devuelve
-  `{ "error": "secreto_inaccesible" }` (exit 5, contract v2, tabla de
+  `{ "error": "secreto_inaccesible" }` (exit 5, contract v3, tabla de
   comportamiento de error) — ese es el comportamiento esperado de un
   proceso sin la policy adjunta, no un bug.
 - No se declara una policy separada para `kms:Decrypt`: los tres secretos
@@ -146,7 +146,7 @@ tiene que devolver `rolinherit = true` para ambos (nunca `NOINHERIT`).
 
 ### AC2 — un `INSERT` con `claude_lectura` falla
 
-**Mutación declarada** (contract v2, AC2): antes de verificar el
+**Mutación declarada** (contract v3, AC2): antes de verificar el
 comportamiento negativo real, otorgar `INSERT` a `claude_lectura` sobre una
 tabla de scratch creada para la prueba:
 
@@ -219,7 +219,7 @@ después de que la consulta de catálogo ya dio cero filas.
 
 ### AC5 — el login de `Dev SQL` lee de `EXACTUS`
 
-La contraseña **nunca** viaja por `argv` (contract v2, sección "Entrega de
+La contraseña **nunca** viaja por `argv` (contract v3, sección "Entrega de
 la credencial al cliente"): `-P` la deja visible en la tabla de procesos
 de la máquina, y este runbook lo corre alguien con `sysadmin` en una
 máquina compartida. En vez de `-P`, la contraseña va en `SQLCMDPASSWORD`,
@@ -252,7 +252,7 @@ invocaciones de `sqlcmd` de abajo que autentican como `bisalta_lectura`.
 
 ### AC6 — un `INSERT` con ese login falla
 
-**Mutación declarada** (contract v2, AC6): en una base de scratch,
+**Mutación declarada** (contract v3, AC6): en una base de scratch,
 agregar el user a `db_datawriter`:
 
 ```
@@ -295,7 +295,7 @@ sqlcmd -S 10.24.40.137 -E -Q "DROP DATABASE zz_scratch_ac6;"
 
 ### AC7 — el user existe en todas las bases de usuario y en ninguna de sistema
 
-**Mutación declarada** (contract v2, AC7): sobre una instancia de prueba
+**Mutación declarada** (contract v3, AC7): sobre una instancia de prueba
 (no `Dev SQL`), editar `sqlserver-parte-b.sql` quitando el filtro
 `database_id > 4` (dejar sólo `state = 0`) y correr el mismo archivo
 editado contra esa instancia:
@@ -392,7 +392,7 @@ correr `sqlserver-parte-b.sql` NO queda cubierta automáticamente**:
 ahí hasta que alguien vuelva a correr `sqlserver-parte-b.sql` completo. No
 hay manera de evitar esto en SQL Server sin un trigger de servidor sobre
 `CREATE DATABASE` — fuera del scope de este runbook — así que la asimetría
-se documenta acá en vez de compensarse con código nuevo (contract v2,
+se documenta acá en vez de compensarse con código nuevo (contract v3,
 sección "Garantías por motor (asimetría declarada, no disimulada)").
 
 El mismo hueco existe, por el mismo motivo, para una base que **ya

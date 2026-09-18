@@ -4,9 +4,9 @@
 -- (10.24.40.137) — PARTE A: login de servidor.
 --
 -- Login único `bisalta_lectura` (no dos, a diferencia de Postgres): el
--- contract v2 cierra "dos roles de Postgres" (AC1) pero no extiende esa
+-- contract v3 cierra "dos roles de Postgres" (AC1) pero no extiende esa
 -- distinción a SQL Server. La asimetría entre motores se documenta, no se
--- compensa (contract v2, sección "Garantías por motor (asimetría
+-- compensa (contract v3, sección "Garantías por motor (asimetría
 -- declarada, no disimulada)"): SQL Server no tiene equivalente de
 -- default_transaction_read_only ni de réplica de lectura, así que el rol
 -- del login es la única barrera, y ese único login
