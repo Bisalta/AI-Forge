@@ -1,22 +1,22 @@
 # Gates run — generado por sdd-run-gates.sh v0.12.0
 
-- **Branch**: `feat-GEN-108-mcp-bisalta-db` · **Commit**: `b9f203b` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-09-21T17:17:56Z
-- Tree: `570c2e3cdf9a50042dbfaff188bf8e91545dbd88` — LIMPIO
+- **Branch**: `feat-GEN-108-mcp-bisalta-db` · **Commit**: `e36be11` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-09-21T17:40:41Z
+- Tree: `a714f6c143928a34d05fabddb2c5fb7c81d75c60` — LIMPIO
 - Este archivo lo escribió el runner, no un modelo. Editarlo a mano invalida la evidencia.
 
 | # | Gate | Comando | Exit | Timestamp UTC | Resultado |
 |---|---|---|---|---|---|
-| 1 | format / style | — | — | 2026-09-21T17:16:53Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
-| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-09-21T17:16:53Z | verde |
-| 3 | type-check | — | — | 2026-09-21T17:16:54Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
-| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-09-21T17:16:54Z | verde |
-| 5 | integration | — | — | 2026-09-21T17:17:24Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
-| 6 | build | — | — | 2026-09-21T17:17:24Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
-| 7 | e2e | — | — | 2026-09-21T17:17:24Z | [SKIPPED] sin comando en el doc (N/A) |
-| 8 | cobertura del diff | — | — | 2026-09-21T17:17:24Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
-| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-09-21T17:17:24Z | verde |
-| 10 | smoke manual | — | — | 2026-09-21T17:17:25Z | [SKIPPED] sin comando en el doc (N/A) |
-| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-09-21T17:17:25Z | verde |
+| 1 | format / style | — | — | 2026-09-21T17:39:29Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
+| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-09-21T17:39:29Z | verde |
+| 3 | type-check | — | — | 2026-09-21T17:39:30Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
+| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-09-21T17:39:30Z | verde |
+| 5 | integration | — | — | 2026-09-21T17:40:05Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
+| 6 | build | — | — | 2026-09-21T17:40:05Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
+| 7 | e2e | — | — | 2026-09-21T17:40:05Z | [SKIPPED] sin comando en el doc (N/A) |
+| 8 | cobertura del diff | — | — | 2026-09-21T17:40:05Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
+| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-09-21T17:40:05Z | verde |
+| 10 | smoke manual | — | — | 2026-09-21T17:40:06Z | [SKIPPED] sin comando en el doc (N/A) |
+| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-09-21T17:40:06Z | verde |
 
 ## Output por gate (últimas 15 líneas)
 
@@ -74,193 +74,172 @@ PASS  test_usage_summary.sh
 
 ---
 
-# Addendum del agente `AGENT_r1` — ronda nueva, contract v9 (alcance por pedido nombrado)
+# Addendum del agente `AGENT_r1` — ronda 2 de review, contract v9 (sin cambio)
 
 **Nota sobre continuidad**: el bloque de arriba lo generó `sdd-run-gates.sh`
-sobre el commit `b9f203b` y **trunca lo que hubiera antes en este archivo**
-(comportamiento conocido del runner, no un defecto de esta ronda — ver
-`CHANGELOG.md` de `sdd-flow` sobre por qué el `-o` siempre reemplaza el
-archivo entero). Los addenda de las rondas anteriores de R1 (rondas 1–5,
-sobre v3–v8) y de R2 no se retranscriben acá: viven íntegros en el
-historial de git, recuperables con `git show <commit>:SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`
-sobre cualquier commit anterior a este (por ejemplo `a8594cd`, el último
-antes de que el contract pasara a v9). Retranscribirlos habría significado
-copiar ~800 líneas de prosa sobre un mecanismo (el loop de `sys.databases`
-con exclusiones) que esta ronda reemplaza — exactamente el patrón de
-citar un valor que ya no describe el estado real que este mismo ciclo
-viene corrigiendo.
+sobre el commit `e36be11` y **trunca lo que hubiera antes en este archivo**
+(comportamiento conocido del runner — mismo aviso que las rondas
+anteriores). El addendum de la ronda 1 (v9, commit `b9f203b`/`299091f`) no
+se retranscribe acá: recuperable con
+`git show 299091f:SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`.
+Esta ronda **no cambió el alcance del contract** (sigue v9): son tres
+MAJOR de prosa de procedimiento sobre los mismos dos `.sql` y `RUNBOOK.md`
+que la ronda 1 ya había reescrito, más dos MINOR.
 
-## Qué cambió y por qué (contract v9, "Cambios v8 → v9")
+## Qué se corrigió esta ronda y por qué (los tres MAJOR del reviewer)
 
-Patrick Ocampo reemplazó el freno por una regla: el alcance de Dev SQL
-arranca en cero y se agrega a pedido nombrado, con fecha y solicitante,
-sin aprobación adicional por base. Esto invierte el default de
-`sqlserver-parte-b.sql` (v4–v8: recorría `sys.databases` concediendo todo
-salvo exclusiones) a uno por lista explícita (`@bases_permitidas`,
-declarada al principio del script). `AC7` y `AC42` cambian de universo en
-el contract (dejan de hablar de "todas las bases salvo `SSISDB`" y pasan
-a hablar de "la lista"), y sus mutaciones cambian con ellos.
-
-Archivos tocados este alcance (AC1–AC10, AC41, AC42 — este agente, R1):
-
-| Archivo | Cambio |
-|---|---|
-| `plugins/bisalta-db/aprovisionamiento/sqlserver-parte-b.sql` | Cursor sobre `@bases_permitidas` (lista explícita, seis nombres) en vez de `sys.databases` con filtro de exclusión. `@bases_prohibidas` como defensa en profundidad (`SSISDB`, `master`, `model`, `msdb`, `tempdb`): si aparecen en la lista, se rechazan y se avisa por `PRINT`, nunca en silencio. Un nombre de la lista ausente de `sys.databases`, o presente pero no `ONLINE`, también se reporta por `PRINT` en vez de saltearse (defecto de `sp_MSforeachdb` que el comentario original ya documentaba, ahora corregido también para el caso de la lista). Lista vacía → el bucle no itera, no crea nada, `GO` cierra en 0. |
-| `plugins/bisalta-db/aprovisionamiento/sqlserver-inverso.sql` | Mismo cambio de cursor, misma lista (comentario de cabecera: "si se edita una, se edita la otra en el mismo cambio"), mismas guardas de defensa en profundidad y de no-saltar-en-silencio. |
-| `plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` | Reescritas las secciones `AC7` y `AC42` (procedimiento, mutación declarada nueva de `AC7` literal del contract v9); `AC10` extendido a la doble causa de la lista (base nunca agregada / base agregada pero no re-corrida); sección "`SSISDB` queda fuera del loop" reescrita en términos de la lista en vez del filtro de exclusión; "Orden de ejecución" paso 7 y párrafo de cabecera actualizados a v9. |
-| `plugins/bisalta-db/README.md` | Sección "Aprovisionamiento": agrega que el alcance arranca en cero y se agrega a pedido nombrado, y que una base pedida pero no agregada a la lista tampoco queda cubierta. |
-
-**No tocado, por instrucción explícita del brief**: `plugins/bisalta-db/catalogo.json`, `plugins/bisalta-db/aprovisionamiento/APROBACIONES.md` (ya actualizados por el planner en `ee92605`), ni ningún archivo de Postgres.
-
-## Ningún valor de la lista se retranscribió en prosa
-
-Verificado con grep sobre los cuatro archivos tocados: los nombres de las
-seis bases (`COMPRAS`, `COMPRAS_STG`, `Ecommerce`, `Ecommerce_qa`,
-`EXACTUS`, `BI`) sólo aparecen **una vez cada uno como dato vivo**: en el
-`INSERT INTO @bases_permitidas` de `sqlserver-parte-b.sql` y en el
-`INSERT` equivalente de `sqlserver-inverso.sql` (que el comentario de
-cabecera declara explícitamente como copia intencional de la misma
-lista, editada junto con la otra). Ni `RUNBOOK.md` ni `README.md` los
-retranscriben — las dos veces que este ciclo señaló esa clase de defecto
-(`SDD/retro.md` RT20, y la reincidencia nombrada en este mismo brief), la
-corrección fue derivar o referenciar el archivo fuente, no copiar el
-valor a un tercer lugar. Tampoco se congeló ninguna cifra derivada del
-tamaño de la lista (GB, porcentaje del servidor, "31 bases", "seis
-bases"): las menciones de conteo que tenía el borrador inicial de este
-addendum y de `RUNBOOK.md` se reemplazaron por referencias a "la lista
-vigente del script" durante esta misma ronda (ver commit `fa86bc8`).
-
-```
-$ grep -rn "COMPRAS_STG" plugins/bisalta-db/ | grep -v aprovisionamiento/APROBACIONES.md
-plugins/bisalta-db/catalogo.json:112:    "base": "COMPRAS_STG",
-plugins/bisalta-db/aprovisionamiento/sqlserver-parte-b.sql:81:  (N'COMPRAS_STG'),
-plugins/bisalta-db/aprovisionamiento/INVENTARIO.md:86:| 4 | `COMPRAS_STG` | 35 | 107.09 | **2026-09-07** |
-plugins/bisalta-db/aprovisionamiento/INVENTARIO.md:120:2. **`COMPRAS` y `COMPRAS_STG` pesan exactamente lo mismo: 107.09 GB**, y la segunda se
-plugins/bisalta-db/aprovisionamiento/sqlserver-inverso.sql:40:  (N'COMPRAS_STG'),
-```
-
-Cuatro archivos, ninguno tocado por este agente salvo los dos `.sql`:
-`catalogo.json` es el dato vivo del catálogo de la aplicación (planner,
-commit `ee92605`); `INVENTARIO.md` es la medición fechada del 18-sep-2026
-(histórico, no se actualiza por cada cambio de lista). Ninguna
-coincidencia en `RUNBOOK.md` ni `README.md` — que es lo que esta sección
-afirma.
-
-## Hallazgo propio, corregido en la misma ronda (no llega a MAJOR porque no se commiteó así)
-
-Al escribir la mutación de `AC7` por primera vez, el cierre en verde
-decía "correr de nuevo `sqlserver-parte-b.sql` real" para volver del rojo
-al verde — pero ese script es aditivo (`IF NOT EXISTS` antes de cada
-`ALTER ROLE ADD MEMBER`) y nunca revierte lo que la corrida mutada
-(`sys.databases` con exclusión) dejó de más en bases fuera de la lista.
-Es la misma clase de defecto que `SDD/debt.md` D40 ya tiene registrada
-para una versión anterior del procedimiento de `AC7`. Se detectó
-releyendo el propio procedimiento antes de correr el runner por segunda
-vez (commit `b9f203b`, mensaje del commit trae el detalle) y se corrigió
-agregando el paso de reversión explícito (`sqlserver-inverso-mutada-v8.sql`,
-copia de trabajo con el mismo cursor de exclusión que la mutación) antes
-de re-confirmar el verde con `##ac7_check`. No se registra como MAJOR de
-review porque nunca llegó a un commit que un reviewer fuera a evaluar
-como cerrado: se corrigió en el mismo ciclo de escritura, antes de la
-corrida de gates que sella esta ronda.
-
-## AC ↔ test binding (R1: AC1–AC10, AC41, AC42)
-
-| AC | Naturaleza | Estado esta ronda | Evidencia / procedimiento |
+| MAJOR | Archivo(s) | Qué estaba mal | Fix aplicado |
 |---|---|---|---|
-| AC1 | `manual-only` | sin cambio — no tocado este alcance | `RUNBOOK.md`, sección "AC1" (sin cambios) |
-| AC2 | `manual-only` | sin cambio | `RUNBOOK.md`, sección "AC2" (sin cambios) |
-| AC3 | `manual-only` | sin cambio | `RUNBOOK.md`, sección "AC3" (sin cambios) |
-| AC4 | `manual-only` | sin cambio | `RUNBOOK.md`, sección "AC4" (sin cambios) |
-| AC5 | `manual-only` | sin cambio | `RUNBOOK.md`, sección "AC5" (sin cambios) |
-| AC6 | `manual-only` | sin cambio | `RUNBOOK.md`, sección "AC6" (sin cambios) |
-| AC7 | `manual-only` | **reescrito** (universo v9: lista explícita, incluida la lista vacía) | `RUNBOOK.md`, sección "AC7 — el user existe exactamente en las bases de la lista y en ninguna otra"; procedimiento y mutación declarada nueva escritos, no ejecutados (requiere instancia real) |
-| AC8 | `manual-only` | sin cambio | `RUNBOOK.md`, sección "AC8" (sin cambios) |
-| AC9 | automatizable | sin cambio de contenido — re-verificado en este árbol | `bash SDD/tests/secret-scan.sh` → exit 0 (gate 9 de arriba, commit `b9f203b`); mutación original del contract sigue documentada en el historial de git (rondas anteriores) porque el archivo que muta (`postgres-parte-a.sql`) no se tocó este alcance |
-| AC10 | verificable por grep, no `manual-only` | **reescrito** (doble causa: no agregada / agregada pero no re-corrida) sin perder la frase literal que el AC exige | `grep -ni "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` → exit 0, línea 641 (ver corrida abajo) |
-| AC41 | `manual-only` | sin cambio — Postgres no se tocó este alcance | `RUNBOOK.md`, sección "AC41" (sin cambios) |
-| AC42 | `manual-only` | **reescrito** (universo v9: cada base de la lista; procedimiento de scratch adaptado a que agregar una base de prueba exige una copia de trabajo de la lista, nunca el archivo real) | `RUNBOOK.md`, sección "AC42 — el user tiene las dos membresías en cada base de la lista, y el `DENY` gana"; procedimiento y mutación reescritos, no ejecutados (requiere instancia real) |
+| 1 | `RUNBOOK.md` (procedimiento "Lista vacía" de AC7) | Pedía dejar un `INSERT INTO @bases_permitidas` sin `VALUES` — `INSERT ... VALUES;` o `INSERT ... VALUES` sin filas es error de sintaxis T-SQL (`Msg 102, Level 15`), `sqlcmd` sale ≠ 0, lo contrario de lo que el paso declara esperar | Reescrito: borrar el statement `INSERT INTO @bases_permitidas (nombre) VALUES (...);` **completo**, dejar sólo el `DECLARE @bases_permitidas TABLE (...);` |
+| 2 | `sqlserver-inverso.sql` (comentario de cabecera), `sqlserver-parte-b.sql` (comentario junto al `INSERT`), `RUNBOOK.md` ("Inverso") | El comentario del inverso afirmaba "si la parte B sólo tocó las bases nombradas, el inverso sólo tiene que revisar esas mismas" — falso cuando la lista se achica: sacar una base de la lista no revoca nada, y `sqlserver-parte-b.sql:77` (antes del fix) prometía que la lista era el único lugar para agregar **o quitar** una base sin que el camino de quitar existiera | Documentado el procedimiento de baja completo (nueva sección "Inverso" → "Procedimiento de baja" en `RUNBOOK.md`, comentarios nuevos en la cabecera de los dos `.sql`) |
+| 3 | `SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md` (este archivo, versión de ronda 1) | La evidencia de AC10 citaba líneas 529/641 como "corrida esta ronda" sobre el árbol sellado (`b9f203b`/`570c2e3`), pero esas líneas eran de `fa86bc8` (el commit **anterior** al fix de AC7, que agregó ~25 líneas al runbook) — no reproducían sobre el árbol que la cabecera declaraba describir (`RT20`) | Ver sección "AC10 — corrida del grep" más abajo: se re-corrió sobre el árbol final y se dejó de citar número de línea (más robusto: la frase no se mueve con el archivo, la línea sí) |
 
-Diez de los doce siguen `manual-only`/`pendiente-de-ejecucion`: ningún
-harness de este repo puede crear un rol de SQL Server, alcanzar la VPC de
-dev/qa, o alcanzar `10.24.40.137` — mismo motivo declarado desde la ronda
-1 de R1, sin cambios. Declarar un "observado" acá sin haber corrido nada
-contra una instancia real sería la validación no corrida que las reglas
-del ciclo prohíben.
+**Hallazgo propio, corregido en la misma ronda, antes de commitear** (no
+llega a MAJOR de review porque nunca se commiteó así): al escribir el fix
+del MAJOR 2, la primera versión del "Procedimiento de baja" decía correr
+`sqlserver-inverso.sql` (real o recortado a una sola base) para revertir
+la baja. Releyendo el script antes de cerrar, `sqlserver-inverso.sql`
+termina con un `DROP LOGIN` **incondicional** — no mira cuántas bases
+quedan en la lista, corre siempre que el login exista. Correrlo con la
+lista completa revertiría *todas* las bases, no sólo la que se quiere dar
+de baja; correrlo con una copia recortada a esa única base evita eso en
+el `DROP USER`/`ALTER ROLE`, pero el `DROP LOGIN` de más abajo se ejecuta
+igual y deja sin login a `bisalta_lectura` para las demás bases que
+seguían activas — es la misma clase de defecto que el MAJOR 2 original
+(un procedimiento que, seguido literal, produce un resultado distinto del
+que declara). Corregido documentando que la copia de trabajo, cuando
+queda al menos otra base activa, tiene que recortar la lista **y** quitar
+el bloque final de `DROP LOGIN` (los tres archivos tocados por el MAJOR 2
+ya reflejan esto).
 
-### AC10 — corrida del grep, esta ronda
+## MINOR aplicados
+
+- `RUNBOOK.md`, paso 7 de "Orden de ejecución": agregado "revisar la
+  salida por líneas `AUSENTE:` / `NO ONLINE:` / `RECHAZADA` antes de
+  seguir" (el script sale 0 aunque una base nombrada no se haya podido
+  cubrir).
+- `RUNBOOK.md`, sección "AC7": el párrafo sobre el filtro `state = 0` del
+  cursor de `##ac7_check` ahora cita `INVENTARIO.md:146` ("las 32 están
+  `ONLINE`") para justificar por qué el filtro alcanza a ver el universo
+  negativo entero **hoy**, y agrega que una base fuera de la lista que no
+  esté `ONLINE` en el futuro se lista aparte y se declara explícitamente
+  no medida por esta comprobación.
+
+## Barrido de clase antes de cerrar (pedido explícito del brief de ronda 2)
+
+Tres preguntas, cada una con el comando que se corrió:
+
+1. **¿Queda otro procedimiento que, seguido literal, produzca un
+   resultado distinto del que declara?** Sí — el hallazgo propio del
+   `DROP LOGIN` incondicional de arriba, encontrado releyendo el propio
+   fix del MAJOR 2 antes de commitear, y corregido en el mismo commit
+   (`e36be11`). Grep de otras trampas de sintaxis del mismo tipo (`INSERT
+   ... VALUES` sin filas, bloques que si se recortan a medias dejan
+   T-SQL inválido):
+   ```
+   $ grep -n "sin ninguna fila\|sin filas\|VALUES sin" plugins/bisalta-db/aprovisionamiento/*.sql plugins/bisalta-db/aprovisionamiento/*.md
+   plugins/bisalta-db/aprovisionamiento/RUNBOOK.md:465:SYSNAME PRIMARY KEY);` — un `INSERT ... VALUES` sin ninguna fila (ya sea
+   ```
+   Única coincidencia: la frase que el propio MAJOR 1 corrigió esta
+   ronda (ahora describe el fix, no el defecto). Ninguna otra instancia.
+2. **¿Otra justificación que valga sólo bajo un supuesto no dicho?**
+   Grep de las formas "único lugar" / "la única forma" sobre los archivos
+   de este directorio:
+   ```
+   $ grep -rn "único lugar\|ÚNICO lugar\|la única forma" plugins/bisalta-db/aprovisionamiento/*.sql plugins/bisalta-db/aprovisionamiento/*.md
+   plugins/bisalta-db/aprovisionamiento/sqlserver-parte-b.sql:88:-- Lista explícita de bases con acceso concedido. ÚNICO lugar del script
+   ```
+   Esa es la misma línea que el MAJOR 2 corrigió (ahora referencia
+   también el procedimiento de baja, en vez de callarlo). El otro caso
+   señalado por el reviewer ("universo negativo entero", MINOR) ya se
+   corrigió arriba citando `INVENTARIO.md:146` en vez de asumirlo sin
+   decirlo. No se encontró una tercera instancia.
+3. **¿Otra salida pegada con números de línea de un árbol que ya no es
+   el sellado?** Grep sobre este mismo archivo de verification antes de
+   escribir este addendum (sobre la versión de ronda 1, recuperada de
+   `299091f`, antes de que el runner la truncara):
+   ```
+   $ git show 299091f:SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md | grep -n "línea [0-9]\|líneas [0-9]"
+   180:| AC10 | verificable por grep, no `manual-only` | **reescrito** (doble causa: no agregada / agregada pero no re-corrida) sin perder la frase literal que el AC exige | `grep -ni "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` → exit 0, línea 641 (ver corrida abajo) |
+   201:La coincidencia de la línea 641 es la del texto de `AC10` propiamente
+   202:dicho; la de la línea 529 es una mención de la misma idea dentro del
+   ```
+   Es exactamente el MAJOR 3 que este addendum corrige más abajo. No se
+   encontró una segunda instancia del patrón en el resto del árbol
+   (`SDD/debt.md`, `SDD/briefs/`, `plugins/bisalta-db/README.md` no citan
+   líneas de `RUNBOOK.md`).
+
+## AC10 — corrida del grep, ronda 2 (MAJOR 3 corregido)
+
+La versión de ronda 1 de esta sección citaba las líneas **529 y 641**
+como si describieran el árbol que ese report sellaba (`b9f203b` /
+`570c2e3`) — pero esas líneas eran de `fa86bc8`, el commit **anterior**
+al fix de AC7 (`b9f203b`), que agregó ~25 líneas al runbook y corrió el
+número real a 554/666 sobre ese árbol (y a 569/681 sobre el árbol de esta
+ronda, después de los fixes de MAJOR 1/2 — confirmando que el número
+efectivamente se mueve con cada edición del archivo, que es el motivo del
+fix). Esta ronda deja de citar línea y cita sólo la frase, que es lo que
+`AC10` exige textualmente y no se mueve con el archivo:
 
 ```
-$ grep -ni "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md
-529:**Con la lista explícita (v9), una base de scratch no queda cubierta
-641:todavía no escrita en `@bases_permitidas`, NO queda cubierta
+$ git rev-parse HEAD
+e36be11a5ffdb2e7029cb6c0eba4f04c18da0bbf
+$ grep -i "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md
+**Con la lista explícita (v9), una base de scratch no queda cubierta
+todavía no escrita en `@bases_permitidas`, NO queda cubierta
 $ echo $?
 0
 ```
 
-La coincidencia de la línea 641 es la del texto de `AC10` propiamente
-dicho; la de la línea 529 es una mención de la misma idea dentro del
-procedimiento de `AC42` — ambas válidas, ninguna es ruido.
+Dos coincidencias, ninguna es ruido: la primera es una mención de la
+misma idea dentro del procedimiento de `AC42`; la segunda es el texto de
+`AC10` propiamente dicho (la frase que el AC exige literalmente, "NO
+queda cubierta").
 
-## Impact set
-
-Símbolos/archivos que referencian los dos `.sql` tocados, grepeados sobre
-el árbol completo (excluyendo este mismo directorio de verificación):
+## Impact set (re-corrido esta ronda, sin cambios respecto de ronda 1)
 
 ```
 $ grep -rl "sqlserver-parte-b.sql\|sqlserver-inverso.sql" . 2>/dev/null | grep -v '^\./\.git' | grep -v '/verification/'
 plugins/bisalta-db/aprovisionamiento/sqlserver-parte-b.sql
-plugins/bisalta-db/aprovisionamiento/sqlserver-parte-a.sql
 plugins/bisalta-db/aprovisionamiento/sqlserver-inverso.sql
 plugins/bisalta-db/aprovisionamiento/RUNBOOK.md
+plugins/bisalta-db/aprovisionamiento/sqlserver-parte-a.sql
 SDD/debt.md
 SDD/briefs/R1-infra-accesos-lectura.md
 ```
 
-- `sqlserver-parte-a.sql`: menciona a `sqlserver-parte-b.sql` en su
-  comentario de cabecera (que `db_denydatawriter` "va junto con
-  `db_datareader` en `sqlserver-parte-b.sql`") — cita la relación entre
-  los dos scripts, no el mecanismo de recorrido; no necesita cambio y no
-  se tocó.
-- `RUNBOOK.md`: cubierto arriba, es el propio archivo reescrito.
-- `SDD/debt.md`: D40 referencia el AC7 de una ronda anterior — no se
-  edita (no es un archivo de este brief) pero se lo cita en este
-  addendum para dejar constancia de que el defecto que describe no se
-  repitió en el procedimiento nuevo (ver sección de arriba).
-- `SDD/briefs/R1-infra-accesos-lectura.md`: brief de una ronda anterior,
-  histórico — no se edita.
+Mismo conjunto que la ronda 1 (ver análisis por archivo en el addendum de
+esa ronda, recuperable con `git show 299091f:...`): `sqlserver-parte-a.sql`
+sólo menciona a `sqlserver-parte-b.sql` en su comentario de cabecera, sin
+necesitar cambio; `SDD/debt.md` y `SDD/briefs/R1-infra-accesos-lectura.md`
+son históricos, no se editan. Ningún archivo `.js` de runtime referencia
+estos `.sql` — sin regresión de callers en el servidor MCP; la suite de
+`SDD/tests/` (17 archivos) sigue verde sin cambios (ver gate 4/suite
+completa de arriba).
 
-Ningún símbolo de código ejecutable (`.js`) referencia estos dos `.sql`;
-son artefactos de infraestructura que ejecuta una persona con
-`sysadmin`, no el servidor MCP. Por eso no hay regresión de callers en
-runtime que verificar con la suite — la suite de `SDD/tests/` (17
-archivos) sigue verde sin cambios, como muestra el gate 4/suite completa
-de arriba.
+## AC ↔ test binding (esta ronda: sin cambio de universo, corrección de prosa)
+
+| AC | Estado esta ronda | Evidencia |
+|---|---|---|
+| AC7 | `manual-only`, procedimiento corregido (MAJOR 1: lista vacía ya no es error de sintaxis) | `RUNBOOK.md`, sección "AC7", subsección "Lista vacía, parte del mismo AC" |
+| AC10 | verificable por grep, re-verificado sin cambio de universo (MAJOR 3: evidencia corregida) | `grep -i "no queda cubierta" plugins/bisalta-db/aprovisionamiento/RUNBOOK.md` → exit 0 (ver corrida arriba) |
+| AC42 | `manual-only`, sin cambio de universo — el procedimiento de scratch de AC42 no usa `sqlserver-inverso.sql`, no le aplica el MAJOR 2 | sin cambios respecto de ronda 1 |
+
+El resto de los ACs (AC1-AC6, AC8, AC9, AC41) no se tocaron esta ronda:
+ninguno de los tres MAJOR ni los dos MINOR los menciona. Ver la tabla
+completa de ronda 1 (`git show 299091f:SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`)
+para su estado, sin cambios.
 
 ## Rojos preexistentes de la base
 
-Ninguno: la suite completa y el secret-scan salen verdes desde el primer
-commit de esta ronda (`fa86bc8`) hasta el commit sellado (`b9f203b`).
+Ninguno: la suite completa y el secret-scan salen verdes en el commit
+sellado de esta ronda (`e36be11`, ver escalera de arriba).
 
 ## Secret-scan sobre el árbol final ya commiteado (fuera del sellado del runner)
 
-Este mismo archivo de verificación queda fuera del árbol que el runner
-selló (el `Tree:` de la cabecera es anterior a este addendum). Corrida
-sobre el árbol final, **después** de commitear el addendum de arriba
-(commit `299091f`, árbol limpio confirmado con `git status --short` antes
-de correr):
-
-```
-$ git rev-parse HEAD
-299091fcf069a1d53c90cde533d5fee6f18eff23
-$ bash SDD/tests/secret-scan.sh
-secret-scan: sin hallazgos sobre 164 archivos versionados (1 excluido: self)
-$ echo $?
-0
-```
-
-Este párrafo final se agrega en un commit posterior a `299091f`, ya que
-el propio archivo de evidencia no puede documentar su propio hash de
-commit sin haberse commiteado primero — el mismo patrón en cascada que
-`D34`/`D35` describen para este runner.
+Este mismo archivo de verification queda fuera del árbol que el runner
+selló (el `Tree:` de la cabecera es anterior a este addendum) — mismo
+patrón en cascada que las rondas anteriores (`D34`/`D35`). Corrida sobre
+el árbol final, después de commitear este addendum, en un commit
+posterior.
 
