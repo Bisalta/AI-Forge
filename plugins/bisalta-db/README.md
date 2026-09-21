@@ -303,8 +303,15 @@ eso `aprovisionamiento/postgres-parte-0.sql` corre **antes** de crear
 ningún rol y aborta si el cluster contiene alguna base `_prod` — es la
 barrera real, no `postgres-parte-b.sql`.
 
-🔴 En SQL Server, **una base nueva no queda cubierta** hasta re-correr la
-parte B del runbook: `db_datareader` y `db_denydatawriter` son por base.
+🔴 En SQL Server, el alcance **arranca en cero y se agrega a pedido
+nombrado**: el login no toca ninguna base de negocio hasta que alguien la
+pide por su nombre, y entonces se concede el mismo día — queda registrado
+con fecha y solicitante en `aprovisionamiento/APROBACIONES.md`. La parte B
+del runbook recorre una **lista explícita** declarada en el propio
+script, no todas las bases de la instancia: **una base nueva, o una
+pedida pero todavía no agregada a esa lista, no queda cubierta** hasta
+que alguien la sume ahí y re-corra la parte B — `db_datareader` y
+`db_denydatawriter` son por base.
 
 ## Tests
 

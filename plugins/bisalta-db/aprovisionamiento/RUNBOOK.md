@@ -1,6 +1,6 @@
 # Runbook — aprovisionamiento de solo lectura para `bisalta-db`
 
-Contract: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v6, requerimiento R1 (`infra`), AC1–AC10, AC41, AC42.
+Contract: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v9, requerimiento R1 (`infra`), AC1–AC10, AC41, AC42.
 
 Este runbook lo ejecuta **una persona con privilegios de administración** en
 cada motor y en la cuenta de AWS de dev/qa. Ningún script de este directorio
@@ -25,6 +25,25 @@ aprovisionamiento de Postgres lo sigue escribiendo este runbook —
 `postgres-parte-0.sql` es implementación de referencia hasta que llegue el
 de Patrick — con el hallazgo de la ronda 5 de review ya corregido (PASO 1
 de `postgres-parte-0.sql` ahora discrimina de verdad, ver su comentario).
+
+**v9 (regla de Patrick Ocampo, Slack 21-sep-2026 10:31; lista de Ian
+Vargas, 21-sep-2026)**: el freno de SQL Server se levanta con una regla,
+no con una lista de exclusiones. El alcance de Dev SQL arranca en **cero**
+y se agrega **a pedido nombrado**: `sqlserver-parte-b.sql` deja de
+recorrer `sys.databases` filtrando exclusiones y pasa a recorrer una
+**lista explícita** declarada al principio del script
+(`@bases_permitidas`) — su `INSERT` es la fuente de verdad de qué está
+concedido hoy; este runbook no la retranscribe para no mantener dos
+copias del mismo valor que puedan desincronizarse (el historial de
+pedidos, con fecha y solicitante, vive en `APROBACIONES.md`). `AC7` y
+`AC42` cambian
+de universo con esto: dejan de hablar de "todas las bases de usuario en
+línea salvo `SSISDB`" y pasan a hablar de la lista. Las guardas contra
+`SSISDB`, `master`, `model`, `msdb` y `tempdb` **se mantienen como defensa
+en profundidad**, no como el criterio de alcance: si alguien las escribe
+en la lista por error, el script las rechaza igual y avisa por qué (ver
+`AC7` abajo). La aprobación completa está en `APROBACIONES.md`, que este
+runbook no reemplaza ni resume.
 
 ## Prerequisitos
 
@@ -59,9 +78,9 @@ de `postgres-parte-0.sql` ahora discrimina de verdad, ver su comentario).
 5. `postgres-parte-b.sql` conectado al resto de las bases del catálogo
    (`proveedores_qa`, y cualquier base que se agregue después).
 6. `sqlserver-parte-a.sql` contra la instancia `Dev SQL`.
-7. `sqlserver-parte-b.sql` contra la misma instancia (recorre todas las
-   bases de usuario en una sola corrida, otorgando `db_datareader` y
-   `db_denydatawriter` a cada una).
+7. `sqlserver-parte-b.sql` contra la misma instancia (recorre la lista
+   explícita declarada al principio del script, otorgando `db_datareader`
+   y `db_denydatawriter` a cada base nombrada ahí).
 8. **Verificar AC5** contra `EXACTUS` y **AC42** (ver abajo).
 9. Crear los tres secretos en Secrets Manager (ver "Forma del secreto" y
    "Política IAM" abajo) y verificar AC8.
@@ -369,32 +388,31 @@ comprobación real ya corrida, borrar la base de scratch:
 sqlcmd -S 10.24.40.137 -E -Q "DROP DATABASE zz_scratch_ac6;"
 ```
 
-### AC7 — el user existe en todas las bases de usuario salvo `SSISDB` y en ninguna de sistema
+### AC7 — el user existe exactamente en las bases de la lista y en ninguna otra
 
-**Mutación declarada** (contract v3, AC7): sobre una instancia de prueba
-(no `Dev SQL`), editar `sqlserver-parte-b.sql` quitando el filtro
-`database_id > 4` (dejar sólo `state = 0`) y correr el mismo archivo
-editado contra esa instancia:
-
-```
-sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-parte-b.sql
-```
-
-La comprobación real es siempre el mismo bloque `##ac7_check` de abajo —
+`AC7` (contract v9) ya no habla de "todas las bases de usuario en línea
+salvo `SSISDB`": habla de la lista explícita que declara
+`sqlserver-parte-b.sql` (`@bases_permitidas`). La comprobación real tiene
+dos mitades y las dos se leen del mismo bloque `##ac7_check` de abajo —
 nunca una consulta distinta contra `master` sola: un `LEFT JOIN ... ON
 1=0` no sirve acá — `sys.database_principals` es un catálogo **por
 base**, así que desde una sola conexión a `master` nunca se ve el
-principal de otra base, con o sin aprovisionamiento. La comprobación real
-recorre las bases con un cursor explícito (mismo patrón que
-`sqlserver-parte-b.sql`) y consulta `sys.database_principals` **dentro de
-cada una**, acumulando el resultado en una tabla temporal global (visible
-entre cambios de `USE` dentro de la misma sesión). `@db_name` va como
-parámetro de `sp_executesql`, no concatenado crudo dentro del literal de
-cadena: una base con un apóstrofo en el nombre rompería el batch si se
-concatenara.
+principal de otra base, con o sin aprovisionamiento. La comprobación
+recorre las bases con un cursor explícito y consulta
+`sys.database_principals` **dentro de cada una**, acumulando el resultado
+en una tabla temporal global (visible entre cambios de `USE` dentro de la
+misma sesión). `@db_name` va como parámetro de `sp_executesql`, no
+concatenado crudo dentro del literal de cadena: una base con un apóstrofo
+en el nombre rompería el batch si se concatenara.
+
+El cursor de esta comprobación recorre `sys.databases` **completo**
+(`state = 0`, sin filtrar por `database_id` ni por lista), a propósito:
+es la única forma de ver el universo negativo entero — todo lo que no
+está en la lista, más `SSISDB` y las cuatro de sistema — en la misma
+corrida que el universo positivo.
 
 ```
-sqlcmd -S <instancia-de-prueba> -E -b -Q "
+sqlcmd -S <instancia> -E -b -Q "
 CREATE TABLE ##ac7_check (db_name SYSNAME, tiene_user BIT);
 DECLARE @db_name SYSNAME;
 DECLARE @sql NVARCHAR(MAX);
@@ -414,38 +432,74 @@ DROP TABLE ##ac7_check;
 "
 ```
 
-Esperado en este paso (corrido contra la instancia de prueba, con el
-filtro de `sqlserver-parte-b.sql` todavía quitado): la fila `db_name =
-'master'` devuelve `tiene_user = 1` — la comprobación real, "ninguna base
-de sistema", se pone en rojo con el mismo cursor que se usa para el
-resultado final, no con una consulta distinta. Después restaurar el
-filtro `database_id > 4` en `sqlserver-parte-b.sql` (revertir la edición,
-ej. `git checkout -- sqlserver-parte-b.sql` si no se commiteó) y correrlo
-de nuevo contra la instancia de prueba para dejarla limpia — nunca contra
-`Dev SQL`.
+Qué contar como "está en la lista" al leer el resultado: la lista misma,
+tal como la declara `sqlserver-parte-b.sql` al momento de la corrida —
+este runbook no retranscribe una copia independiente de esos nombres para
+no mantener el mismo valor en dos lugares que puedan desincronizarse
+(ver la nota de cabecera sobre `@bases_permitidas`). Abrir el archivo,
+mirar su bloque `INSERT INTO @bases_permitidas`, y usar esos nombres
+exactos como el universo positivo esperado.
 
-Comprobación real sobre `Dev SQL`, con el filtro real ya restaurado en el
-archivo: correr el mismo bloque `##ac7_check` de arriba, cambiando sólo
-`-S` a `10.24.40.137`.
+**Comprobación real (verde), contra `Dev SQL`**, con `sqlserver-parte-b.sql`
+real ya corrido: correr el bloque de arriba con `-S 10.24.40.137`.
+Esperado: `tiene_user = 1` en cada fila cuyo `db_name` esté en
+`@bases_permitidas` del script vigente, y `tiene_user = 0` en absolutamente
+cualquier otra fila — incluidas `SSISDB`, `master`, `model`, `msdb`,
+`tempdb`, y cualquier base de usuario que no haya sido pedida por nombre.
 
-El cursor recorre `sys.databases` **completo** (`state = 0`, sin filtrar
-`database_id`), a propósito: es la única forma de confirmar el lado
-negativo (bases de sistema) en la misma corrida que el lado positivo
-(bases de usuario). Esperado: `tiene_user = 1` en cada una de las **31**
-bases con `database_id > 4` que **no** sean `SSISDB` (`INVENTARIO.md`
-mide 32 bases con `database_id > 4`, medido — no "~35"; de esas 32, 31
-quedan cubiertas) y en ninguna fila `tiene_user = 0` entre esas 31;
-`tiene_user = 0` en las cuatro bases de sistema (`master`, `model`,
-`msdb`, `tempdb`) **y en `SSISDB`** (`database_id = 36`). `SSISDB` ya no
-es una decisión pendiente (contract v6, "Cambios v5 → v6", punto 1,
-decisión de Patrick Ocampo): queda excluida del loop por nombre, no por
-`database_id` — ver comentario de `sqlserver-parte-b.sql` y sección
-"`SSISDB` queda fuera del loop" más abajo.
+**Lista vacía, parte del mismo AC** (contract v9: *"con la lista vacía, el
+script no crea ningún user y sale 0"*): sobre una instancia de prueba, en
+una copia de trabajo `sqlserver-parte-b-lista-vacia.sql`, dejar el
+`INSERT INTO @bases_permitidas` sin ninguna fila (la declaración de la
+tabla queda, sólo se le quitan los `VALUES`). Correrla:
 
-### AC42 — el user tiene las dos membresías, y el `DENY` gana
+```
+sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-parte-b-lista-vacia.sql
+echo $?
+```
 
-Comprobación real, sobre `EXACTUS` en `Dev SQL` — ya aprovisionada por
-`sqlserver-parte-b.sql` real, con las dos membresías:
+Esperado: exit `0`. Correr después el bloque `##ac7_check` contra esa
+misma instancia: `tiene_user = 0` en absolutamente todas las filas —
+ningún `bisalta_lectura` en ninguna base. Es el estado de arranque que
+`APROBACIONES.md` describe (punto 1: "el login arranca sin acceso a
+ninguna base de negocio").
+
+**Mutación declarada** (contract v9, AC7): sobre una instancia de prueba
+(no `Dev SQL`), en una copia de trabajo `sqlserver-parte-b-mutada-v8.sql`,
+reemplazar el cursor sobre `@bases_permitidas` por el cursor que el
+script tenía hasta v8 — un recorrido de `sys.databases` con el filtro de
+exclusión de esa época (`database_id > 4 AND name <> 'SSISDB' AND state =
+0`), sin tocar el resto del script (las guardas de `@bases_prohibidas`
+siguen ahí, ya sin efecto porque ya no se filtra por lista). Correr esa
+copia contra la instancia de prueba:
+
+```
+sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-parte-b-mutada-v8.sql
+```
+
+Correr el mismo bloque `##ac7_check` de arriba contra esa instancia.
+Esperado en este paso: aparecen filas con `tiene_user = 1` en bases de
+usuario de esa instancia que **no** están en `@bases_permitidas` — es la
+comprobación de "en ninguna otra" poniéndose roja, porque el cursor
+mutado concede a todo salvo las exclusiones (`database_id > 4`, no
+`SSISDB`), exactamente la forma que v9 dejó atrás. Restaurar el cursor
+por lista (descartar la copia mutada, usar `sqlserver-parte-b.sql` real)
+y volver a correr la corrida esperada contra la instancia de prueba para
+confirmar el verde de cierre antes de tocar `Dev SQL` con el archivo real.
+
+`SSISDB` sigue sin ser una decisión pendiente (contract v6, "Cambios v5 →
+v6", punto 1, decisión de Patrick Ocampo): en v9 queda fuera porque nunca
+está en `@bases_permitidas`, y si alguien la agregara por error,
+`@bases_prohibidas` la rechaza igual (ver comentario de
+`sqlserver-parte-b.sql` y sección "`SSISDB` queda fuera del loop" más
+abajo).
+
+### AC42 — el user tiene las dos membresías en cada base de la lista, y el `DENY` gana
+
+`AC42` (contract v9) verifica las dos membresías **en cada base de la
+lista explícita** de `sqlserver-parte-b.sql`. Comprobación real, sobre
+`EXACTUS` en `Dev SQL` — una de las bases nombradas en `@bases_permitidas`,
+ya aprovisionada por `sqlserver-parte-b.sql` real con las dos membresías:
 
 ```
 sqlcmd -S 10.24.40.137 -E -d EXACTUS -Q "
@@ -458,31 +512,41 @@ ORDER BY r.name;
 "
 ```
 
-Esperado: dos filas, `db_datareader` y `db_denydatawriter`.
+Esperado: dos filas, `db_datareader` y `db_denydatawriter`. Repetir la
+misma consulta cambiando `-d EXACTUS` por cada una de las demás bases que
+declare `@bases_permitidas` en `sqlserver-parte-b.sql` vigente (abrir el
+script para ver cuáles son, no retranscribirlas acá): dos filas en cada
+una.
 
 **La segunda mitad del AC no se corrobora sobre `zz_scratch_ac6`** (hallazgo
-de la ronda 5 de review, BLOCKER): esa base la arma el procedimiento de AC6
-(sección de arriba) con `CREATE USER` + `ALTER ROLE db_datareader ADD
-MEMBER` únicamente — nunca corre `sqlserver-parte-b.sql`, así que
-`bisalta_lectura` ahí **nunca tiene** `db_denydatawriter`. Un `GRANT INSERT`
-sobre esa base pasaría igual con o sin el `DENY` real, así que no prueba
-nada sobre el `DENY`. Se corrobora en cambio sobre una base de scratch
-fresca aprovisionada por el script real — la única forma de que el estado
-contra el que corre la comprobación sea el que el AC afirma:
+de la ronda 5 de review, BLOCKER, sigue vigente en v9): esa base la arma el
+procedimiento de AC6 (sección de arriba) con `CREATE USER` + `ALTER ROLE
+db_datareader ADD MEMBER` únicamente — nunca corre `sqlserver-parte-b.sql`,
+así que `bisalta_lectura` ahí **nunca tiene** `db_denydatawriter`. Un
+`GRANT INSERT` sobre esa base pasaría igual con o sin el `DENY` real, así
+que no prueba nada sobre el `DENY`.
+
+**Con la lista explícita (v9), una base de scratch no queda cubierta
+sólo por correr `sqlserver-parte-b.sql` real** — a diferencia de hasta v8,
+donde el cursor recorría `sys.databases` entero y una base nueva entraba
+sola. Para corroborar sobre una base de scratch hace falta agregarla,
+igual que se agregaría una base real: en una **copia de trabajo**
+`sqlserver-parte-b-mas-scratch.sql` (nunca el archivo real, que sólo
+declara las bases con pedido y fecha registrados en `APROBACIONES.md`),
+agregar una fila más al `INSERT INTO @bases_permitidas` con
+`(N'zz_scratch_ac42')`, sin tocar nada más del script:
 
 ```
 sqlcmd -S 10.24.40.137 -E -Q "CREATE DATABASE zz_scratch_ac42;"
-sqlcmd -S 10.24.40.137 -E -b -i sqlserver-parte-b.sql
+sqlcmd -S 10.24.40.137 -E -b -i sqlserver-parte-b-mas-scratch.sql
 ```
 
-`sqlserver-parte-b.sql` no toma `-d`: recorre `sys.databases` completo
-(comentario del script), así que esta corrida re-procesa también las 31
-bases ya provistas — idempotente ahí (comentario "Idempotente" del
-script, `IF NOT EXISTS` antes de cada `ALTER ROLE ADD MEMBER`, ninguna
-fila cambia) — y de paso agrega a `bisalta_lectura`, con **las dos**
-membresías, en `zz_scratch_ac42`, que es nueva y todavía no lo tenía.
-Confirmar con la misma consulta de arriba, cambiando `-d EXACTUS` por
-`-d zz_scratch_ac42`: dos filas.
+Esta corrida re-procesa también las bases reales de la lista — idempotente ahí
+(comentario "Idempotente" del script, `IF NOT EXISTS` antes de cada
+`ALTER ROLE ADD MEMBER`, ninguna fila cambia) — y de paso agrega a
+`bisalta_lectura`, con **las dos** membresías, en `zz_scratch_ac42`, que
+es nueva y todavía no lo tenía. Confirmar con la misma consulta de
+arriba, cambiando `-d EXACTUS` por `-d zz_scratch_ac42`: dos filas.
 
 Ahora sí, sobre esa base con las dos membresías reales:
 
@@ -496,18 +560,20 @@ pesar del `GRANT` explícito — ahora sí es la comprobación de que
 `db_denydatawriter` es lo que lo bloquea, porque el estado de la base
 contra la que corre lo tiene de verdad.
 
-**Mutación declarada** (contract v5, AC42): en una copia de trabajo de
-`sqlserver-parte-b.sql` (`sqlserver-parte-b-sin-denydatawriter.sql`),
-quitar el bloque que agrega `db_denydatawriter` (dejar sólo
-`db_datareader`). Para el rojo hace falta una base sin ninguna de las dos
-membresías todavía — `zz_scratch_ac42` ya las tiene las dos por el paso de
-arriba, y `ALTER ROLE ... ADD MEMBER` es aditivo: volver a correr el
-script sobre ella no las quita. Recrearla fresca:
+**Mutación declarada** (contract v5/v9, AC42): partiendo de
+`sqlserver-parte-b-mas-scratch.sql`, hacer una segunda copia
+`sqlserver-parte-b-sin-denydatawriter-mas-scratch.sql` quitando el bloque
+que agrega `db_denydatawriter` (dejar sólo `db_datareader`), con la fila
+de `zz_scratch_ac42` todavía en la lista. Para el rojo hace falta una
+base sin ninguna de las dos membresías todavía — `zz_scratch_ac42` ya las
+tiene las dos por el paso de arriba, y `ALTER ROLE ... ADD MEMBER` es
+aditivo: volver a correr un script sobre ella no las quita. Recrearla
+fresca:
 
 ```
 sqlcmd -S 10.24.40.137 -E -Q "DROP DATABASE zz_scratch_ac42;"
 sqlcmd -S 10.24.40.137 -E -Q "CREATE DATABASE zz_scratch_ac42;"
-sqlcmd -S 10.24.40.137 -E -b -i sqlserver-parte-b-sin-denydatawriter.sql
+sqlcmd -S 10.24.40.137 -E -b -i sqlserver-parte-b-sin-denydatawriter-mas-scratch.sql
 sqlcmd -S 10.24.40.137 -E -d zz_scratch_ac42 -Q "CREATE TABLE t (id int); GRANT INSERT ON t TO bisalta_lectura;"
 SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d zz_scratch_ac42 -Q "INSERT INTO t VALUES (1);"
 ```
@@ -516,26 +582,32 @@ Esperado en este paso: el `INSERT` **pasa** — es la comprobación de que
 "falla" se pone roja sin `db_denydatawriter` en el loop, sobre una base
 que nunca tuvo esa membresía.
 
-Restaurar el loop (descartar la copia mutada, usar `sqlserver-parte-b.sql`
-real) y confirmar el **verde de cierre** —el contract exige literalmente
-que "el `DENY` vuelve a ganar", no sólo que se limpie— corriendo el mismo
-`INSERT` sobre la misma tabla y el mismo `GRANT` que acaban de dejarlo
-pasar, sin borrar nada todavía:
+Restaurar el loop confirmando el **verde de cierre** —el contract exige
+literalmente que "el `DENY` vuelve a ganar", no sólo que se limpie—
+corriendo `sqlserver-parte-b-mas-scratch.sql` (la copia **con** DENY, no
+el archivo real): el archivo real nunca declaró `zz_scratch_ac42` en su
+lista y no debería — agregar ahí una base de scratch sería agregar una
+base a la lista de producción sin pedido ni fecha registrados, que es
+justo lo que la regla de Patrick prohíbe (contract v9, "Cambios v8 →
+v9", punto 1). El mismo `INSERT` corre sobre la misma tabla y el mismo
+`GRANT` que acaban de dejarlo pasar, sin borrar nada todavía:
 
 ```
-sqlcmd -S 10.24.40.137 -E -b -i sqlserver-parte-b.sql
+sqlcmd -S 10.24.40.137 -E -b -i sqlserver-parte-b-mas-scratch.sql
 SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d zz_scratch_ac42 -Q "INSERT INTO t VALUES (1);"
 ```
 
 Esperado: el `INSERT` **vuelve a fallar** con `The INSERT permission was
-denied` — `sqlserver-parte-b.sql` real agrega `db_denydatawriter` (que la
-corrida mutada nunca agregó) y el `DENY` gana sobre el mismo `GRANT` que
-sigue vivo. Recién ahora, con el triple completo (verde real → rojo de
-mutación → verde de cierre) corrido, limpiar:
+denied` — la copia con DENY intacto lo agrega de nuevo (que la corrida
+mutada nunca agregó) y el `DENY` gana sobre el mismo `GRANT` que sigue
+vivo. Recién ahora, con el triple completo (verde real → rojo de
+mutación → verde de cierre) corrido, limpiar — incluidas las dos copias
+de trabajo, que nunca se commitean:
 
 ```
 sqlcmd -S 10.24.40.137 -E -d zz_scratch_ac42 -Q "REVOKE INSERT ON t FROM bisalta_lectura;"
 sqlcmd -S 10.24.40.137 -E -Q "DROP DATABASE zz_scratch_ac42;"
+rm -f sqlserver-parte-b-mas-scratch.sql sqlserver-parte-b-sin-denydatawriter-mas-scratch.sql
 ```
 
 ### AC8 — cada secreto existe, tiene los dos campos, y es legible con la política IAM
@@ -564,38 +636,39 @@ corre y se pega con comando y exit code en
 
 `db_datareader` y `db_denydatawriter` son permisos **por base** en SQL
 Server, a diferencia de `pg_read_all_data` en Postgres, que es un permiso
-de **cluster**. Esto significa que **una base nueva agregada a la instancia `Dev SQL` después de correr `sqlserver-parte-b.sql` NO queda cubierta automáticamente**:
-`bisalta_lectura` no tendrá `CREATE USER` ni ninguna de las dos
-membresías ahí hasta que alguien vuelva a correr `sqlserver-parte-b.sql`
-completo — y mientras tanto esa base nueva no tiene ni la lectura ni la
-segunda red del `DENY`. No hay manera de evitar esto en SQL Server sin un
-trigger de servidor sobre `CREATE DATABASE` — fuera del scope de este
-runbook — así que la asimetría se documenta acá en vez de compensarse con
-código nuevo (contract v5, sección "Garantías por motor (asimetría
-declarada, no disimulada)").
+de **cluster**. Con la lista explícita de v9 esto se vuelve doblemente
+cierto: **una base agregada a `Dev SQL`, o pedida por nombre pero
+todavía no escrita en `@bases_permitidas`, NO queda cubierta
+automáticamente**: `bisalta_lectura` no tendrá `CREATE USER` ni ninguna
+de las dos membresías ahí hasta que alguien (a) agregue esa base al
+`INSERT INTO @bases_permitidas` de `sqlserver-parte-b.sql` y (b) vuelva a
+correr el script completo — y mientras tanto esa base nueva no tiene ni
+la lectura ni la segunda red del `DENY`. No hay manera de evitar esto en
+SQL Server sin un trigger de servidor sobre `CREATE DATABASE` — fuera del
+scope de este runbook — así que la asimetría se documenta acá en vez de
+compensarse con código nuevo (contract v5, sección "Garantías por motor
+(asimetría declarada, no disimulada)").
 
-El mismo hueco existe, por el mismo motivo, para una base que **ya
-existía pero estaba `OFFLINE` o `RESTORING`** cuando corrió
-`sqlserver-parte-b.sql`: el filtro `state = 0` (ONLINE únicamente, ver
-comentario del script) no la alcanza en esa corrida, y queda tan
-descubierta como una base creada después. **Acción operativa**: cada vez
-que se agregue una base nueva a `Dev SQL`, o que una base existente pase
-a estar `ONLINE` después de haber estado en otro estado durante la
-última corrida, que el catálogo de `bisalta-db` vaya a usar, re-correr
-`sqlserver-parte-b.sql` antes de agregar (o reactivar) esa base en el
-catálogo.
+El mismo hueco existe, por el mismo motivo, para una base que **ya está
+en la lista pero estaba `OFFLINE` o `RESTORING`** al momento de correr
+`sqlserver-parte-b.sql`: el script la nombra por `PRINT` en vez de
+saltearla en silencio (ver comentario del script, "SIN SALTOS
+SILENCIOSOS"), pero no le crea nada en esa corrida, y queda tan
+descubierta como una base recién pedida. **Acción operativa**: cada vez
+que se pida una base nueva, o que una base ya listada pase a estar
+`ONLINE` después de haber estado en otro estado durante la última
+corrida, (a) agregarla (si no estaba) al `INSERT` de
+`sqlserver-parte-b.sql` y a `sqlserver-inverso.sql` en el mismo cambio,
+(b) registrar el pedido con fecha y solicitante en `APROBACIONES.md`, y
+(c) re-correr `sqlserver-parte-b.sql` — en ese orden, antes de agregar
+esa base al catálogo de `bisalta-db`.
 
 ## `SSISDB` queda fuera del loop
 
 `SSISDB` (`database_id = 36`, 5.77 GB, `INVENTARIO.md`) es el catálogo de
 SQL Server Integration Services, no una base de negocio: guarda los
 proyectos desplegados con sus parámetros y connection managers —un lugar
-donde viven cadenas de conexión— más los logs de ejecución. El filtro
-`database_id > 4` de `sqlserver-parte-b.sql` **no la excluye por sí solo**
-— sólo saca las cuatro bases de sistema (`master`, `tempdb`, `model`,
-`msdb`, `database_id` 1 a 4) — así que sin una exclusión aparte
-`bisalta_lectura` habría quedado con `db_datareader` y `db_denydatawriter`
-ahí igual que en cualquier otra base de usuario.
+donde viven cadenas de conexión— más los logs de ejecución.
 
 **Decisión tomada** (contract v6, "Cambios v5 → v6", punto 1 — Patrick
 Ocampo, Slack 2026-09-18 15:52 CST): `SSISDB` queda **fuera** del loop de
@@ -610,13 +683,20 @@ no al catálogo de la aplicación: aunque nunca se agregara a
 `catalogo.json`, dejarla dentro del loop igual le daría a `bisalta_lectura`
 acceso de lectura a credenciales, sin que el catálogo lo medie.
 
-`sqlserver-parte-b.sql` excluye `SSISDB` **por nombre**, explícito en el
-`WHERE` del cursor, además del filtro `database_id > 4` que no la agarra
-(ver comentario del script). Tras esta corrida, `bisalta_lectura` no
-existe como user en `SSISDB` — AC7 la cuenta junto a las cuatro bases de
-sistema con `tiene_user = 0` (ver sección de AC7 más arriba), no entre las
-31 bases de usuario cubiertas. No entra tampoco al catálogo de la
-aplicación (`plugins/bisalta-db/catalogo.json`) — nadie la agregó ahí.
+**Desde v9, el criterio de alcance es la lista** (`@bases_permitidas`), no
+un filtro de exclusión sobre `sys.databases` — `SSISDB` queda fuera
+simplemente porque nunca fue pedida por nombre, igual que cualquier otra
+base de `Dev SQL` que tampoco esté en la lista. Lo que v9 agrega es la
+**defensa en profundidad**: `SSISDB` sigue estando además en
+`@bases_prohibidas`, así que si alguien la escribiera por error en
+`@bases_permitidas`, el script la rechaza igual y lo dice por `PRINT` (ver
+comentario de `sqlserver-parte-b.sql`) — nunca la procesa en silencio, ni
+siquiera si quedara nombrada en la lista por accidente. Tras cualquier
+corrida, `bisalta_lectura` no existe como user en `SSISDB` — AC7 la
+cuenta junto a las cuatro bases de sistema con `tiene_user = 0` (ver
+sección de AC7 más arriba), no entre las bases de la lista. No entra
+tampoco al catálogo de la aplicación (`plugins/bisalta-db/catalogo.json`)
+— nadie la agregó ahí.
 
 ## Inverso
 
@@ -624,9 +704,12 @@ aplicación (`plugins/bisalta-db/catalogo.json`) — nadie la agregó ahí.
   la parte B, en orden (ver comentario del archivo sobre por qué el `DROP
   ROLE` requiere limpiar todas las bases primero).
 - SQL Server: `sqlserver-inverso.sql`, una sola corrida contra la instancia
-  (recorre todas las bases igual que la parte B, quitando `bisalta_lectura`
-  de `db_denydatawriter` explícitamente antes de borrar el user en cada
-  una — contract v5, AC42 — y al final borra el login).
+  (recorre la misma lista explícita que la parte B, quitando
+  `bisalta_lectura` de `db_denydatawriter` explícitamente antes de borrar
+  el user en cada una — contract v5, AC42 — y al final borra el login).
+  Si se agrega una base a `sqlserver-parte-b.sql`, se agrega la misma fila
+  a `sqlserver-inverso.sql` en el mismo cambio (ver comentario de
+  cabecera de ese archivo).
 - AWS: los tres secretos se borran a mano desde la cuenta de dev/qa (no
   hay script: crear/borrar secretos está fuera del scope de este runbook,
   igual que crearlos).
