@@ -238,8 +238,22 @@ sellado de esta ronda (`e36be11`, ver escalera de arriba).
 ## Secret-scan sobre el árbol final ya commiteado (fuera del sellado del runner)
 
 Este mismo archivo de verification queda fuera del árbol que el runner
-selló (el `Tree:` de la cabecera es anterior a este addendum) — mismo
-patrón en cascada que las rondas anteriores (`D34`/`D35`). Corrida sobre
-el árbol final, después de commitear este addendum, en un commit
-posterior.
+selló (el `Tree:` de la cabecera es anterior a este addendum). Corrida
+sobre el árbol final, **después** de commitear el addendum de arriba
+(commit `dd73de9`, árbol limpio confirmado con `git status --short` antes
+de correr):
+
+```
+$ git rev-parse HEAD
+dd73de9b2ed67748241bb439dfc62085d819c602
+$ bash SDD/tests/secret-scan.sh
+secret-scan: sin hallazgos sobre 164 archivos versionados (1 excluido: self)
+$ echo $?
+0
+```
+
+Este párrafo final se agrega en un commit posterior a `dd73de9`, ya que
+el propio archivo de evidencia no puede documentar su propio hash de
+commit sin haberse commiteado primero — mismo patrón en cascada que
+`D34`/`D35` describen para este runner.
 
