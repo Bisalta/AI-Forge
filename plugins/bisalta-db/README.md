@@ -130,7 +130,7 @@ la barrera es el texto.
 
 ## Garantías por motor (asimetría declarada, no disimulada)
 
-| | Postgres (`dev`/`qa`) | SQL Server (`dev-sql`) |
+| | Postgres (`dev`/`qa`) | SQL Server (`Dev SQL`) |
 |---|---|---|
 | Rol de solo lectura | sí | sí |
 | Sesión abierta en solo lectura | sí, `default_transaction_read_only=on` | **no existe equivalente** |
@@ -140,7 +140,7 @@ la barrera es el texto.
 
 Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que
 evita que alguien asuma que todas las conexiones son igual de seguras.
-`dev-sql` además es una **copia de producción** (`EXACTUS` 395 GB, `BI`
+Las conexiones de `Dev SQL` son además **copias de producción** (`EXACTUS` 395 GB, `BI`
 177 GB, `COMPRAS` 107 GB): los tamaños no son de desarrollo.
 
 ## El catálogo — `catalogo.json`
@@ -181,7 +181,7 @@ node plugins/bisalta-db/scripts/catalogo.js
 |---|---|---|
 | `proveedores-dev` | base `proveedores_dev` del cluster Aurora de dev/qa | |
 | `proveedores-qa` | base `proveedores_qa` del mismo cluster | |
-| `dev-sql` | base `EXACTUS` de la instancia `Dev SQL` (`10.24.40.137`) | copia de producción |
+| `compras` · `compras-stg` · `ecommerce` · `ecommerce-qa` · `exactus` · `bi` | bases de la instancia `Dev SQL` (`10.24.40.137`), concedidas **a pedido nombrado** — el alcance arranca en cero y cada base entra con fecha y solicitante | copias de producción |
 
 Dos precisiones sobre estos valores:
 

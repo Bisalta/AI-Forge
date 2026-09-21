@@ -1,6 +1,32 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v8
+- **Versión**: v9
+
+### Cambios v8 → v9 (regla de Patrick Ocampo, Slack 21-sep-2026 10:31; lista de Ian Vargas, 21-sep-2026)
+
+**Freno levantado.** Patrick no dio una lista: dio una regla, y es mejor que lo que este contract tenía.
+
+**1. El alcance de Dev SQL arranca en CERO y se agrega a pedido nombrado.** El login no toca ninguna base de negocio hasta que alguien pida una por su nombre. Cuando se pide, **se concede el mismo día y sin aprobación adicional** — sólo queda registrada con fecha y solicitante. Es el **default invertido** respecto de lo que este contract diseñó: el loop de v4–v8 concedía todo salvo las exclusiones, y no podía responder "qué se abrió y por qué". Éste arranca vacío y cada entrada tiene nombre y fecha. Y conserva la extensibilidad que Ian pidió: agregar una base no tiene fricción, sólo deja rastro.
+
+**2. `AC7` y `AC42` cambian de universo.** Dejan de hablar de "todas las bases de usuario en línea salvo `SSISDB`" y pasan a hablar de **la lista explícita del script**. El loop deja de recorrer `sys.databases` filtrando exclusiones y pasa a recorrer una lista declarada. Redacción nueva abajo, con sus mutaciones actualizadas.
+
+**3. Lista inicial (Ian Vargas, 21-sep-2026), verificada contra `INVENTARIO.md`:**
+
+| Motor | Bases | Tamaño |
+|---|---|---|
+| SQL Server (`Dev SQL`) | `COMPRAS`, `COMPRAS_STG`, `Ecommerce`, `Ecommerce_qa`, `EXACTUS`, `BI` | **861.12 GB de 1383.16 — 62% del servidor** |
+| Postgres (`sistemas-costruplaza-db`) | `proveedores_dev`, `proveedores_qa`, `smartcheck_dev`, `smartcheck_qa`, `smartfleet_dev`, `smartfleet_qa` | 6 de 29 |
+
+**4. Asimetría de lo que la lista significa en cada motor — se declara, no se disimula.**
+
+- En **SQL Server** la lista es real a nivel de permiso: `db_datareader` y `db_denydatawriter` son por base, así que **6 nombradas = 6 concedidas, 26 intactas**.
+- En **Postgres NO**. `pg_read_all_data` es membresía de cluster: nombrar 6 bases en el catálogo **no restringe al rol a esas 6**. El rol alcanza toda base del cluster donde `CONNECT` siga concedido a PUBLIC — hoy **26 de las 29** (Patrick revocó `CONNECT` en `portalrh_dev`, `portalrh_qa` y `construplaza`). La lista de 6 es **catálogo, no permiso**: define qué consulta el MCP, no qué puede leer el rol.
+
+Cerrarla de verdad exigiría una de dos cosas, y ninguna se toma en este ciclo: `REVOKE CONNECT … FROM PUBLIC` sobre las 20 restantes (afecta a todos los roles del cluster y exige verificar antes que ninguna app dependa de ese `CONNECT`), o cambiar ese cluster a `GRANT SELECT` por base — que revierte la decisión razonada de Patrick para `sistemas-costruplaza-db`, donde `pg_read_all_data` gana porque es un lugar de trabajo. **Queda como deuda con dueño nombrado, no como propiedad del sistema.**
+
+**5. La aprobación de Dev SQL se reemplaza entera** por el texto del 21-sep-2026, que anula el del 18-sep. El anterior omitía `CONSTRUPLAZA_EFLOW` y además **declaraba un alcance más amplio del que va a existir**. El nuevo lleva siete puntos y una tabla `BASES CONCEDIDAS` con fecha y solicitante, más fecha de revisión al cierre del corte (17-oct-2026).
+
+**6. Sin cambios**: `SSISDB` fuera de forma permanente, más `master`, `model`, `msdb` y `tempdb`. Cada base concedida lleva las dos membresías. La credencial la genera y la carga Patrick.
 
 ### Cambios v7 → v8 (mediciones de Patrick Ocampo, Slack 18-sep-2026 16:58 y 17:15; decisiones de Ian Vargas 21-sep-2026)
 
@@ -313,9 +339,9 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 `manual-only: misma razón que AC5.`
 **Mutación declarada**: agregar el user a `db_datawriter` en una base de scratch; la comprobación tiene que ponerse roja; quitarlo del rol y borrar la base de scratch.
 
-**AC7** — Tras correr la parte B, el user existe en todas las bases de usuario en línea **salvo `SSISDB`** (excluida por decisión de v6), y en **ninguna** de las cuatro bases de sistema (`master`, `model`, `msdb`, `tempdb`) ni en `SSISDB`.
+**AC7** — Tras correr la parte B, el user existe **exactamente en las bases de la lista explícita del script** y en ninguna otra: ni en las bases de usuario que no están en la lista, ni en `SSISDB`, ni en las cuatro de sistema (`master`, `model`, `msdb`, `tempdb`). Con la lista vacía, el script no crea ningún user y sale 0.
 `manual-only: misma razón que AC5.`
-**Mutación declarada**: quitar del cursor el filtro que excluye las bases de sistema y volver a correr la parte B contra una instancia de prueba; la comprobación tiene que ponerse roja; restaurar el filtro.
+**Mutación declarada**: reemplazar el recorrido de la lista explícita por un recorrido de `sys.databases` con filtro de exclusión —la forma que el script tenía hasta v8— y volver a correr la parte B contra una instancia de prueba; la comprobación tiene que ponerse roja, porque aparecerían users en bases fuera de la lista; restaurar el recorrido por lista.
 
 **AC8** — Cada conexión del catálogo tiene un secreto en Secrets Manager con los dos campos de la forma estándar de RDS, legible con la política IAM declarada en el runbook.
 `manual-only: requiere permisos de escritura en Secrets Manager de la cuenta de dev/qa.`
@@ -418,7 +444,7 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 `manual-only: requiere un cluster Postgres real; ningún harness de este repo levanta uno.`
 **Mutación declarada**: cambiar la condición de aborto de `_prod` a `_stg`; corrida contra el cluster de dev/qa (que contiene `controlactivos_stg` y ninguna `_prod`), la Parte 0 tiene que abortar — o sea, la comprobación de que continúa se pone roja; restaurar la condición.
 
-**AC42** — Tras correr la parte B de SQL Server, el user tiene en cada base de usuario en línea **salvo `SSISDB`** **las dos** membresías: `db_datareader` y `db_denydatawriter`. Un `INSERT` falla con `DENY` aunque alguien le conceda `INSERT` explícitamente después.
+**AC42** — Tras correr la parte B de SQL Server, el user tiene en **cada base de la lista explícita** **las dos** membresías: `db_datareader` y `db_denydatawriter`. Un `INSERT` falla con `DENY` aunque alguien le conceda `INSERT` explícitamente después.
 `manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
 **Mutación declarada**: quitar `db_denydatawriter` del loop y conceder `INSERT` directo al user sobre una tabla de scratch; el `INSERT` tiene que pasar — o sea, la comprobación de que falla se pone roja. Restaurar el loop y revocar el `INSERT`: el `DENY` vuelve a ganar.
 

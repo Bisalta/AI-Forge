@@ -31,7 +31,7 @@ const DIALECTOS = ['postgres', 'sqlserver'];
 const AMBIENTES = ['dev', 'qa'];
 // 'deny-escritura' (contract v5, "Contrato de datos" y "Cambios v3 → v4"
 // punto 4): db_denydatawriter en SQL Server. El enum de este archivo es
-// el único lugar del código que lo declara — la entrada `dev-sql` de
+// el único lugar del código que lo declara — las entradas `sqlserver` de
 // catalogo.json la suma en el mismo cambio (contract v5, "AGENT_r2 no se
 // reabre... salvo el enum de garantías del catálogo, que se trata como
 // parte del scope reabierto de R1").

@@ -13,52 +13,83 @@ alcance **medido** — no el alcance supuesto.
 ## Dev SQL (`10.24.40.137:1433`) — login de solo lectura
 
 - **Quién aprueba**: Patrick Ocampo
-- **Cuándo**: 18-sep-2026
-- **Dónde consta**: DM de Slack con Ian Vargas, 2026-09-18 12:46 CST
-- **Estado**: aprobado
+- **Cuándo**: **21-sep-2026**
+- **Dónde consta**: DM de Slack con Ian Vargas, 2026-09-21 10:31 CST
+- **Estado**: aprobado, con alcance **por base y a pedido nombrado**
 
-Texto literal de la aprobación, como Patrick pidió que quedara escrito:
+> 🔴 **Este texto reemplaza en su totalidad al del 18-sep-2026, que queda anulado.** El anterior
+> omitía `CONSTRUPLAZA_EFLOW` en su enumeración y, tras la regla del 21-sep, además declaraba un
+> alcance **más amplio del que va a existir**. Patrick pidió explícitamente que se reemplazara
+> entero y no se le agregara una línea al pie.
 
-> *Patrick Ocampo aprueba un login de solo lectura sobre las bases de Dev SQL
-> (10.24.40.137), sabiendo que son copias de producción — EXACTUS 395 GB, BI 177,
-> COMPRAS 107 — y en conocimiento de que la política las pone bajo aprobación de Esteban
-> o Sebastián.*
+Texto literal de la aprobación vigente:
 
-Y la instrucción con la que lo acompañó:
+```
+Patrick Ocampo, 21-sep-2026.
+Reemplaza en su totalidad el texto del 18-sep-2026, que queda anulado.
 
-> *No lo dejés solo en este DM: ponelo en el expediente del repo, que es donde alguien lo
-> va a ir a buscar dentro de seis meses.*
+Apruebo un login de solo lectura en Dev SQL (10.24.40.137), para uso
+exclusivo del servidor MCP, con alcance POR BASE Y A PEDIDO NOMBRADO.
 
-### Alcance real, medido después de la aprobación
+1. El login arranca sin acceso a ninguna base de negocio.
 
-La aprobación nombra tres bases. El inventario corrido el mismo día
-([`INVENTARIO.md`](./INVENTARIO.md)) midió **32 bases y 1383 GB en total**, e incluye una
-que no está en el texto aprobado:
+2. Cada base se agrega cuando alguien la pide por su nombre. Se concede
+   el mismo dia, sin aprobacion adicional, y queda registrada abajo con
+   fecha y solicitante. Una base nueva no queda cubierta por omision.
 
-| | |
-|---|---|
-| `EXACTUS` | 396.10 GB — la aprobación dice 395 |
-| `BI` | 177.06 GB |
-| `COMPRAS` | 107.09 GB |
-| **`CONSTRUPLAZA_EFLOW`** | **266.92 GB — no nombrada en la aprobación; segunda más grande del servidor** |
-| otras 28 | el resto hasta 1383 GB |
+3. Hechos conocidos al firmar: las bases de Dev SQL son COPIAS DE
+   PRODUCCION, no datos de desarrollo. Medido el 18-sep-2026: 32 bases,
+   1.35 TB, ninguna en solo lectura. COMPRAS_STG pesa exactamente lo
+   mismo que COMPRAS (107.09 GB) y se creo el 7-sep-2026. Las mayores:
+   EXACTUS 395 GB, CONSTRUPLAZA_EFLOW 266.92 GB, BI 177 GB,
+   COMPRAS 107.09 GB.
 
-Esto **no invalida la aprobación**: `db_datareader` sobre el servidor alcanza 31 de las 32
-con o sin esa enumeración (`SSISDB` queda fuera del loop por decisión de Patrick, contract
-v6, "Cambios v5 → v6" punto 1 — no guarda dato de negocio y sí credenciales), y el texto
-dice "las bases de Dev SQL", no una lista cerrada. Se deja escrito porque la diferencia
-entre lo enumerado y lo medido es exactamente el tipo de cosa que después nadie puede
-reconstruir. Comunicado a Patrick el mismo día.
+4. La politica de uso de IA pone los datos de produccion bajo aprobacion
+   de Esteban o Sebastian. Esta aprobacion la firmo yo por encima de esa
+   via, a sabiendas, y no la sustituye para otros casos.
+
+5. Permanentemente fuera de alcance: SSISDB (catalogo de Integration
+   Services, contiene connection managers), master, model, msdb, tempdb.
+
+6. Cada base concedida lleva db_datareader mas db_denydatawriter. En SQL
+   Server el DENY prevalece sobre cualquier GRANT.
+
+7. La credencial se genera y se carga directamente en Secrets Manager,
+   con politica IAM por consumidor. No pasa por ninguna persona fuera de
+   quien firma.
+
+BASES CONCEDIDAS
+fecha        base        solicitante
+(vacio)
+
+Revision: al cierre del corte Exactus->Odoo (17-oct-2026).
+```
+
+### Bases pedidas — registro vivo
+
+Patrick pidió la lista el 21-sep-2026 (*"decime hoy qué bases ocupás para arrancar y quedan
+concedidas hoy"*). Ian Vargas pidió estas seis. **La concesión la ejecuta Patrick al correr el
+loop**; esta tabla registra el pedido con su fecha, que es lo que el punto 2 de la aprobación exige.
+
+| Fecha del pedido | Base | Tamaño | Solicitante | Concedida |
+|---|---|---|---|---|
+| 2026-09-21 | `COMPRAS` | 107.09 GB | Ian Vargas | pendiente de ejecución |
+| 2026-09-21 | `COMPRAS_STG` | 107.09 GB | Ian Vargas | pendiente de ejecución |
+| 2026-09-21 | `Ecommerce` | 16.89 GB | Ian Vargas | pendiente de ejecución |
+| 2026-09-21 | `Ecommerce_qa` | 56.89 GB | Ian Vargas | pendiente de ejecución |
+| 2026-09-21 | `EXACTUS` | 396.10 GB | Ian Vargas | pendiente de ejecución |
+| 2026-09-21 | `BI` | 177.06 GB | Ian Vargas | pendiente de ejecución |
+
+**861.12 GB de los 1383.16 del servidor — el 62%.** Las 26 bases restantes quedan sin conceder, y
+una base nueva no queda cubierta por omisión.
 
 ### Lo que esta aprobación NO cubre
 
-- La política de uso de IA de la empresa pone los datos de producción bajo aprobación de
-  **Esteban Fait o Sebastián**. Patrick aprobó el login sabiéndolo y dejándolo dicho;
-  esa segunda aprobación **sigue pendiente** y es precondición de habilitar el plugin al
-  equipo, no de construirlo.
+- La política de uso de IA pone los datos de producción bajo aprobación de **Esteban Fait o
+  Sebastián**. Patrick firma por encima de esa vía **a sabiendas**, lo dice en el punto 4, y deja
+  escrito que **no la sustituye para otros casos**. Esa segunda aprobación sigue siendo precondición
+  de habilitar el plugin al equipo.
 - `Prod SQL` (`192.168.252.22`). Fuera de alcance, otra cuenta de AWS.
-
----
 
 ## Postgres — cluster de dev/qa (`cfrl3owqzwof`)
 

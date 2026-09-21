@@ -536,7 +536,21 @@ cp "$PLUGIN_DIR/catalogo.json" "$CATALOGO_VIVO"
 # El dialecto sqlserver llega hasta el cliente con su propio comando
 # ---------------------------------------------------------------------------
 reiniciar_registros
-salida="$(servidor_jsonrpc "$(trama_consultar 1 'dev-sql' 'SELECT 1')" "$PATH_CON_STUBS")"
+# GEN-108: el nombre de la conexión se DERIVA del catálogo, no se congela. La
+# versión anterior escribía 'dev-sql' literal y se puso roja el día que el
+# catálogo pasó de una entrada por instancia a una por base (contract v9,
+# regla de Patrick Ocampo: alcance por pedido nombrado). El test no probaba
+# ese nombre: probaba que el dialecto sqlserver llega hasta el cliente con su
+# propio comando. Congelar el nombre convertía un cambio de datos legítimo en
+# un rojo. Misma clase que el total congelado de test_escalation_ledger.sh.
+CONEXION_MSSQL="$(node -e "
+  const c = require('$PLUGIN_DIR/catalogo.json');
+  const e = c.find(x => x.dialecto === 'sqlserver');
+  if (!e) { console.error('el catálogo no tiene ninguna conexión sqlserver'); process.exitCode = 1; }
+  else { process.stdout.write(e.nombre); }
+")"
+assert_eq "$([ -n "$CONEXION_MSSQL" ] && echo si || echo no)" "si" "el catálogo declara al menos una conexión sqlserver"
+salida="$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")"
 cuerpo="$(cuerpos "$salida")"
 assert_contains "$cuerpo" '"dialecto":"sqlserver"' "una conexión sqlserver responde con su dialecto"
 argumentos="$(grep '^ARGS ' "$TMP_DIR/psql-invocado.log")"

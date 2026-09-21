@@ -8,7 +8,11 @@
     "base": "proveedores_dev",
     "secret_id": "bisalta-db/postgres/claude_lectura",
     "region": "us-east-1",
-    "garantias": ["rol-solo-lectura", "sesion-read-only", "endpoint-replica-lectura"]
+    "garantias": [
+      "rol-solo-lectura",
+      "sesion-read-only",
+      "endpoint-replica-lectura"
+    ]
   },
   {
     "nombre": "proveedores-qa",
@@ -19,10 +23,130 @@
     "base": "proveedores_qa",
     "secret_id": "bisalta-db/postgres/claude_lectura",
     "region": "us-east-1",
-    "garantias": ["rol-solo-lectura", "sesion-read-only", "endpoint-replica-lectura"]
+    "garantias": [
+      "rol-solo-lectura",
+      "sesion-read-only",
+      "endpoint-replica-lectura"
+    ]
   },
   {
-    "nombre": "dev-sql",
+    "nombre": "smartcheck-dev",
+    "dialecto": "postgres",
+    "ambiente": "dev",
+    "host": "sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com",
+    "puerto": 5432,
+    "base": "smartcheck_dev",
+    "secret_id": "bisalta-db/postgres/claude_lectura",
+    "region": "us-east-1",
+    "garantias": [
+      "rol-solo-lectura",
+      "sesion-read-only",
+      "endpoint-replica-lectura"
+    ]
+  },
+  {
+    "nombre": "smartcheck-qa",
+    "dialecto": "postgres",
+    "ambiente": "qa",
+    "host": "sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com",
+    "puerto": 5432,
+    "base": "smartcheck_qa",
+    "secret_id": "bisalta-db/postgres/claude_lectura",
+    "region": "us-east-1",
+    "garantias": [
+      "rol-solo-lectura",
+      "sesion-read-only",
+      "endpoint-replica-lectura"
+    ]
+  },
+  {
+    "nombre": "smartfleet-dev",
+    "dialecto": "postgres",
+    "ambiente": "dev",
+    "host": "sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com",
+    "puerto": 5432,
+    "base": "smartfleet_dev",
+    "secret_id": "bisalta-db/postgres/claude_lectura",
+    "region": "us-east-1",
+    "garantias": [
+      "rol-solo-lectura",
+      "sesion-read-only",
+      "endpoint-replica-lectura"
+    ]
+  },
+  {
+    "nombre": "smartfleet-qa",
+    "dialecto": "postgres",
+    "ambiente": "qa",
+    "host": "sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com",
+    "puerto": 5432,
+    "base": "smartfleet_qa",
+    "secret_id": "bisalta-db/postgres/claude_lectura",
+    "region": "us-east-1",
+    "garantias": [
+      "rol-solo-lectura",
+      "sesion-read-only",
+      "endpoint-replica-lectura"
+    ]
+  },
+  {
+    "nombre": "compras",
+    "dialecto": "sqlserver",
+    "ambiente": "dev",
+    "host": "10.24.40.137",
+    "puerto": 1433,
+    "base": "COMPRAS",
+    "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
+    "region": "us-east-1",
+    "garantias": [
+      "rol-solo-lectura",
+      "deny-escritura"
+    ]
+  },
+  {
+    "nombre": "compras-stg",
+    "dialecto": "sqlserver",
+    "ambiente": "dev",
+    "host": "10.24.40.137",
+    "puerto": 1433,
+    "base": "COMPRAS_STG",
+    "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
+    "region": "us-east-1",
+    "garantias": [
+      "rol-solo-lectura",
+      "deny-escritura"
+    ]
+  },
+  {
+    "nombre": "ecommerce",
+    "dialecto": "sqlserver",
+    "ambiente": "dev",
+    "host": "10.24.40.137",
+    "puerto": 1433,
+    "base": "Ecommerce",
+    "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
+    "region": "us-east-1",
+    "garantias": [
+      "rol-solo-lectura",
+      "deny-escritura"
+    ]
+  },
+  {
+    "nombre": "ecommerce-qa",
+    "dialecto": "sqlserver",
+    "ambiente": "dev",
+    "host": "10.24.40.137",
+    "puerto": 1433,
+    "base": "Ecommerce_qa",
+    "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
+    "region": "us-east-1",
+    "garantias": [
+      "rol-solo-lectura",
+      "deny-escritura"
+    ]
+  },
+  {
+    "nombre": "exactus",
     "dialecto": "sqlserver",
     "ambiente": "dev",
     "host": "10.24.40.137",
@@ -30,6 +154,23 @@
     "base": "EXACTUS",
     "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
     "region": "us-east-1",
-    "garantias": ["rol-solo-lectura", "deny-escritura"]
+    "garantias": [
+      "rol-solo-lectura",
+      "deny-escritura"
+    ]
+  },
+  {
+    "nombre": "bi",
+    "dialecto": "sqlserver",
+    "ambiente": "dev",
+    "host": "10.24.40.137",
+    "puerto": 1433,
+    "base": "BI",
+    "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
+    "region": "us-east-1",
+    "garantias": [
+      "rol-solo-lectura",
+      "deny-escritura"
+    ]
   }
 ]
