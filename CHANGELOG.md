@@ -6,7 +6,7 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ### 0.1.0 — 2026-09-18
 
-Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v2).
+Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v8).
 Consulta de solo lectura a las bases de dev/qa de Bisalta desde Claude Code y NEO, **sin que
 ninguna credencial entre en el contexto de la sesión**. La credencial no desaparece: pasa de un
 archivo que hoy hay que leerle al modelo —y que queda archivado en el transcript— a un secreto de
@@ -27,7 +27,10 @@ AWS que el proceso resuelve, usa y tira.
   en `postgres`, la apertura de comilla de dólar.
 - **Producción irrepresentable, no rechazada.** `ambiente` admite `dev` y `qa` y nada más: no hay
   valor que la nombre. Rechazar por nombre es red, no barrera. El validador rechaza además el
-  catálogo entero si una entrada apunta al cluster o al host de la cuenta de producción.
+  catálogo entero si una entrada apunta a un host de la cuenta de producción. **Ojo con el
+  identificador**: `cfrl3owqzwof` y `cr4rbgr7qlr6` son sufijos DNS **de cuenta**, no de cluster —
+  la cuenta de dev tiene cuatro Aurora. Y una letra separa los dos entornos: dev es
+  `sistemas-co`**`s`**`truplaza-db`, prod es `sistemas-co`**`ns`**`truplaza-db`.
 - **La credencial nunca por `argv`.** Postgres: archivo temporal en modo 600 apuntado por la
   variable de archivo de credenciales de libpq, borrado en un `finally` que corre también cuando la
   consulta falla. SQL Server: variable de entorno acotada al proceso hijo, porque `sqlcmd` no tiene
@@ -39,8 +42,27 @@ AWS que el proceso resuelve, usa y tira.
   y el transcript — riesgo aceptado con dueño, no control.
 - **Bitácora** de una línea JSON por invocación, con la consulta **por hash y nunca en claro**. No
   rota; registrado como deuda.
-- `aprovisionamiento/` trae el runbook y los `.sql` de roles, logins y secretos (R1). Los corre una
-  persona con privilegios de administración en cada motor; este repo no los ejecuta.
+- **Dos estrategias de aprovisionamiento, no una.** `pg_read_all_data` donde el cluster es un lugar
+  de trabajo; `GRANT SELECT` por base donde es un archivo de clones fechados. Y en SQL Server,
+  `db_denydatawriter` junto a `db_datareader`: el `DENY` le gana a cualquier `GRANT`, así que el rol
+  deja de ser la única barrera de ese motor.
+- **`SSISDB` fuera del loop**, por nombre y no sólo por `database_id > 4`: es el catálogo de
+  Integration Services, donde viven parámetros y connection managers. Un servidor cuyo propósito es
+  que ninguna credencial pase por el contexto no puede alcanzar el lugar donde viven las cadenas de
+  conexión.
+- `aprovisionamiento/` trae el runbook, el inventario medido de los dos motores y los `.sql` de
+  roles, logins y secretos (R1). Los corre una persona con privilegios de administración en cada
+  motor; este repo no los ejecuta.
+
+**Lo que la medición corrigió, entre v2 y v8**: el ciclo cerró con ocho ratificaciones de contract,
+y las tres que más movieron el diseño no salieron de un review sino de que la persona que iba a
+ejecutar el aprovisionamiento midiera el sistema. `pg_read_all_data` alcanza **todo el cluster**
+desde que el rol existe, porque Postgres concede `CONNECT` a PUBLIC por omisión: los `GRANT` por
+base no son la barrera. El identificador que ambos lados tratábamos como cluster resultó ser el
+sufijo de la cuenta. Y ni el tamaño ni el nombre clasifican el riesgo de una base — `portalrh_qa`
+pesa 55 MB y tiene 3.458 planillas completas con cédulas y salarios, mientras `rrhh`, señalada por
+el nombre, está vacía. La guarda por nombre del aprovisionamiento queda declarada **freno, no
+clasificador**. Detalle en `SDD/retro.md` RT23-RT33.
 
 **Lo que dejó el kilometraje**: dos defectos que la suite encontró y que valen por separado. (1) El
 tope de bytes salía vacío porque `process.exit()` **corta lo que `process.stdout` todavía tiene en
