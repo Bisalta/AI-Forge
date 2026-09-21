@@ -1002,7 +1002,9 @@ Orden para dar de baja una base (por ejemplo, `Ecommerce_qa`, con
    ```
    sqlcmd -S 10.24.40.137 -E -d <base> -Q "IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'bisalta_lectura') DROP USER bisalta_lectura;"
    ```
-   cuando esa base vuelva a estar `ONLINE`, antes de seguir.
+   **Anotarla antes de seguir**; el comando se corre después, cuando esa base
+   vuelva a estar `ONLINE` — con la base caída no se puede, y esperar a que
+   vuelva frenaría la baja sin necesidad.
 
    Correr `sqlserver-inverso.sql` **real, sin modificar**, contra la
    instancia:

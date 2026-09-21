@@ -88,7 +88,10 @@ BEGIN
   BEGIN
     PRINT N'NO ONLINE: ' + @db_name
       + N' existe pero sys.databases.state = ' + CAST(@estado AS NVARCHAR(10))
-      + N' (0 = ONLINE). No se puede USE sobre ella en este estado — reintentar cuando esté ONLINE.';
+      + N' (0 = ONLINE). No se puede USE sobre ella en este estado. Cuando vuelva'
+      + N' a ONLINE, limpieza DIRIGIDA a esa base (DROP USER) — ver RUNBOOK.md,'
+      + N' "Procedimiento de baja", paso 2. NO re-correr este script completo:'
+      + N' revoca de nuevo TODAS las bases vigentes y borra el login.';
   END
   ELSE
   BEGIN

@@ -37,7 +37,16 @@ printf '\n-- test_backfill_gen94_completo (AC21)\n'
 # cerrado. El conteo se deriva del propio ledger.
 n_eventos="$(grep -cE '^\| E[0-9]+ \|' "$LEDGER")"
 n_plan="$(grep -cE '^\| E[0-9]+ \|.*\| plan \|' "$LEDGER")"
-n_clasificadas="$(grep -cE '^\| E[0-9]+ \|.*\| (plan|ejecución|herramienta|decisión) \|' "$LEDGER")"
+# GEN-108: este enum lo escribió el planner al corregir el conteo congelado y
+# NO era el real — puso (plan|ejecución|herramienta|decisión) cuando el enum
+# cerrado de escalations.md es (plan|decisión|medición|otro). Pasó verde porque
+# las 8 filas del backfill son todas `plan`; una fila `medición` habría contado
+# como sin clasificar. Un enum escrito de memoria en el test que verifica el
+# enum es la misma clase que el conteo congelado que este bloque vino a
+# arreglar. Ahora sale del documento, no de la memoria de quien lo escribió.
+ENUM_CLASES="$(sed -n 's/^- `\([a-zá-ú]*\)` — .*/\1/p' "$LEDGER" | tr '\n' '|' | sed 's/|$//')"
+assert_eq "$([ -n "$ENUM_CLASES" ] && echo si || echo no)" "si" "test_backfill_gen94_completo — el enum de Clase se lee del propio ledger"
+n_clasificadas="$(grep -cE "^\| E[0-9]+ \|.*\| ($ENUM_CLASES) \|" "$LEDGER")"
 [ "$n_eventos" -ge 8 ] && ge8="si" || ge8="no"
 assert_eq "$ge8" "si" "test_backfill_gen94_completo — el backfill de GEN-94 + GEN-101 (8 eventos) sigue presente"
 assert_eq "$n_clasificadas" "$n_eventos" "test_backfill_gen94_completo — TODA fila de evento lleva una Clase del enum cerrado"

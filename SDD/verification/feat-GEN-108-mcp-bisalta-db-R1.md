@@ -650,3 +650,55 @@ commiteado. Este párrafo final se agrega en un commit posterior a
 `8424d20`, por el mismo motivo en cascada que `D34`/`D35` describen: el
 archivo de evidencia no puede documentar su propio hash de commit sin
 haberse commiteado primero.
+
+---
+
+# Addendum del planner — resolución del `ESCALATE` de la ronda 3 (v11)
+
+`AGENT_r1` agotó el cap de tres rondas y el reviewer emitió `ESCALATE` con un `MAJOR` abierto.
+El planner lo resuelve sin ronda nueva, porque el fix es de una línea y el reviewer lo dejó
+especificado. Queda escrito acá **qué corrigió el planner y qué afirmación de esta evidencia era
+falsa**, en vez de editar el texto del agente como si nunca hubiera estado mal.
+
+## Lo que estaba mal
+
+La sección de barrido de clase de este reporte afirma:
+
+> *"No queda ninguna remediación que, en el punto del procedimiento donde el runbook la ubica,
+> deshaga un paso anterior."*
+
+**Era falsa.** Sobrevivía una cuarta cita en `sqlserver-inverso.sql:91` — el `PRINT` de base
+`NO ONLINE`, que decía *"reintentar cuando esté ONLINE"*. Es la única de las cuatro que el operador
+recibe **por stdout, en el momento del evento**, corriendo el paso 2 del Procedimiento de baja. Y
+ejecutada donde el procedimiento la ubica —después del paso 3— re-corre el inverso completo, revoca
+las cinco bases que ese paso acaba de re-conceder y borra el login, forzando una segunda rotación en
+Secrets Manager.
+
+## Por qué el barrido no la vio
+
+El barrido grepeó `RUNBOOK.md` con patrones de *"correr"* y los `.sql` sólo con
+`grep|confirmable|sin salida`. **Nunca grepeó `reintent` sobre los `.sql`.** Los patrones se
+derivaron de las tres citas ya corregidas, no del **concepto** que había que barrer. Un barrido
+correcto sobre el recorte equivocado se ve igual que uno correcto.
+
+## Lo que corrigió el planner
+
+1. `sqlserver-inverso.sql:91` — el texto del `PRINT` pasa a prescribir la **limpieza dirigida**,
+   nombra el paso del runbook, y dice explícitamente **`NO re-correr este script completo`** con la
+   consecuencia.
+2. `RUNBOOK.md`, paso 2 del Procedimiento de baja — la frase *"cuando esa base vuelva a estar
+   `ONLINE`, antes de seguir"* admitía la lectura de que había que correr el `DROP USER` antes de
+   continuar, imposible con la base caída. Ahora separa los dos momentos: **anotar ahora, limpiar
+   después**.
+
+## El barrido, ahora por concepto
+
+```
+$ grep -rn "reintent" plugins/bisalta-db/
+RUNBOOK.md:958:  dirigida (no de "reintentar el inverso") evita ese resultado.
+RUNBOOK.md:996:   "reintentar el inverso": para cuando se note esto ya pasó el paso 3,
+RUNBOOK.md:1033:   resuelve reintentando `sqlserver-inverso.sql` completo — eso repetiría
+```
+
+Tres coincidencias, las tres en `RUNBOOK.md`, y **las tres son el contexto que desaconseja hacerlo**.
+Ninguna prescribe re-correr el inverso. Cero en los `.sql`.
