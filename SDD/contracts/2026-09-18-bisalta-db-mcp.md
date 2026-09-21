@@ -1,6 +1,36 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v7
+- **Versión**: v8
+
+### Cambios v7 → v8 (mediciones de Patrick Ocampo, Slack 18-sep-2026 16:58 y 17:15; decisiones de Ian Vargas 21-sep-2026)
+
+Patrick midió **adentro** de las bases y corrió la Parte 0 sobre un segundo cluster. Lo que salió invalida una premisa estructural de este contract y dos heurísticas que usamos para evaluar riesgo.
+
+**1. `cfrl3owqzwof` NO es un cluster: es el sufijo DNS de la cuenta de AWS.** Todos los clusters de esa cuenta lo llevan. Las versiones v1–v7 de este contract, y `INVENTARIO.md`, lo trataron como identificador de cluster. En la cuenta de dev hay **cuatro** Aurora PostgreSQL: `dev-costruplaza-db` (14.20, sin medir), `erp-costruplaza-db` (14.20, el Odoo de stg), `erpodoo-19-dev` (17.9, **con IP pública**) y `sistemas-costruplaza-db` (14.20, de donde salieron las 29 bases). Como los roles son objetos **de cluster**, "lectura en todas las BD de la cuenta" son **cuatro decisiones, no una**.
+
+**2. Lo mismo del lado de producción, y eso debilita una garantía que este contract declaraba.** `cr4rbgr7qlr6` también es sufijo de cuenta: las 12 bases medidas son de `sistemas-construplaza-db` específicamente, y **puede haber más clusters en esa cuenta que nadie enumeró**. El out-of-scope de v1 decía "el cluster `cluster-cr4rbgr7qlr6`" como si fuera uno solo. Se corrige: **el out-of-scope es la cuenta entera de producción, y su contenido no está enumerado.**
+
+**3. Una letra separa dev de producción.** Dev es `sistemas-co`**`s`**`truplaza-db`; prod es `sistemas-co`**`ns`**`truplaza-db`. Queda escrito acá porque ningún mecanismo de este plugin lo detecta: el catálogo declara hosts completos y el validador no compara nombres parecidos.
+
+**4. Ni el tamaño ni el nombre clasifican el riesgo de una base.** Medido por Patrick adentro de `sistemas-costruplaza-db`: `portalrh_qa` tiene **3.458 empleados, 3.309 contratos, 29.848 marcas diarias y 400 nóminas históricas**, con columnas `cedulaCcss`, `identificacion` y `salarioActual/Maximo/Minimo` — **en 55 MB**. `qa` tiene **212.020 clientes** con `cedula`, `salario_anterior` y `salario_nuevo`. `construplaza` tiene 975 empleados y 31 solicitantes con documentos. Y `rrhh` —la que este contract señaló por el nombre— está **vacía**. Las dos heurísticas que v4 usó para marcar riesgo fallaron, cada una en su dirección.
+
+**5. Dos estrategias de aprovisionamiento, no una.** `pg_read_all_data` gana donde el cluster es un **lugar de trabajo** (`sistemas-costruplaza-db`: bases operativas, y el problema real era mantener `ALTER DEFAULT PRIVILEGES`). El `GRANT SELECT` por base gana donde el cluster es un **archivo**: `erp-costruplaza-db` tiene 34 bases, dieciséis de ellas clones fechados de Odoo que nadie borró (~115 GB de fotos de noviembre a agosto), con medio millón de contactos con cédula repetidos en tres fotos distintas. Decisión de Patrick para ese cluster: **sólo `stg_20260828`, con `GRANT SELECT` explícito y sin la membresía**. Sin la membresía el rol igual se conecta a las otras 33 por el `CONNECT` de PUBLIC, pero **no ve una fila** — sólo catálogos.
+
+**6. `AC41` es un freno, no un clasificador.** La Parte 0 abortó en `erp-costruplaza-db` por tres bases con "producción" en el nombre, que resultaron ser **las tres más chicas del cluster** (72, 67 y 9 MB), mientras las que de verdad pesan no dicen "prod" en ninguna parte. Textual de Patrick: *"acertó en detenerse y erró de objetivo: filtra por nombre, y ahí el nombre miente en las dos direcciones."* `AC41` no cambia de condición — cambia lo que el contract afirma sobre ella: **detiene, no decide**. Ningún artefacto de este plugin puede decir "el cluster no tiene producción" a partir de esa guarda.
+
+**7. `portalrh_dev` y `portalrh_qa` quedan FUERA del alcance** (decisión de Ian Vargas, 21-sep-2026). Patrick preguntó si algo se conecta a ellas con un rol distinto de `rh` —lo único que su `REVOKE CONNECT` podría haber roto— e Ian no lo sabe. En vez de responder por inferencia, se quita la dependencia: esas dos bases no entran al catálogo. `construplaza` ya está cerrada por el mismo `REVOKE`. `qa` sigue siendo decisión abierta de Patrick.
+
+**8. Propiedad de `proveedores_dev` y `proveedores_qa`: deuda aceptada, diferida.** Las dos tienen como dueño la cuenta personal `ian.vargas`; si esa cuenta se rota o se va, las tablas quedan huérfanas — el mismo problema del `ALTER DEFAULT PRIVILEGES FOR ROLE`. Decisión de Ian: se acepta y se resuelve después; un superadmin puede mover el propietario. No bloquea este ciclo. Registrado en `SDD/debt.md`.
+
+### Alcance vigente tras v8
+
+| Cluster | Estrategia | Estado |
+|---|---|---|
+| `sistemas-costruplaza-db` (dev/qa) | `pg_read_all_data` | **menos** `portalrh_dev`, `portalrh_qa` y `construplaza`. `qa`: decisión abierta de Patrick |
+| `erp-costruplaza-db` | `GRANT SELECT` por base | sólo `stg_20260828` |
+| `dev-costruplaza-db` | sin definir | **sin medir** |
+| `erpodoo-19-dev` | sin definir | **sin medir** — tiene IP pública |
+| Cuenta de producción entera | ninguna | fuera de alcance, **y sin enumerar** |
 
 ### Cambios v6 → v7 (resolución de `ESCALATE`, 18-sep-2026)
 
@@ -87,7 +117,7 @@ Que Claude Code y NEO consulten las bases de Bisalta mandando SQL y recibiendo f
 ## Out of scope
 
 - **Auditoría por consulta.** CloudTrail registra quién obtuvo el secreto, no qué consultó. Responder "quién leyó qué" exige un servicio HTTP intermedio (Lambda + API Gateway + Cognito); evaluado y descartado por desproporcionado para este alcance.
-- **El cluster `cluster-cr4rbgr7qlr6`** (cuenta AWS de producción). Ahí viven los doce catálogos medidos el 18-sep-2026, incluidos los cinco pares `_prod`/`_stg` de la empresa. Los roles de Postgres son objetos de cluster: crear un login en cualquier `_stg` es crearlo al lado de producción.
+- **La cuenta de AWS de producción entera** (sufijo `cr4rbgr7qlr6` — que es sufijo de CUENTA, no de cluster, corregido en v8; las 12 bases medidas son de `sistemas-construplaza-db`, y la cuenta puede tener más clusters sin enumerar). Ahí viven los doce catálogos medidos el 18-sep-2026, incluidos los cinco pares `_prod`/`_stg` de la empresa. Los roles de Postgres son objetos de cluster: crear un login en cualquier `_stg` es crearlo al lado de producción.
 - **`Prod SQL` (`192.168.252.22`)**, en esa misma cuenta.
 - **Escritura de cualquier tipo.** Una escritura necesaria se corre a mano en DBeaver, donde una persona ve lo que va a pasar antes de que pase.
 - **IAM auth de Aurora.** Hoy `false` en el cluster (verificado con `describe-db-clusters`). Decisión abierta de Patrick Ocampo; si entra, cambia cómo se obtiene la credencial al conectar, no la forma del catálogo.

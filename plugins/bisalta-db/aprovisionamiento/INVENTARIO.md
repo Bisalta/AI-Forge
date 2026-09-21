@@ -9,7 +9,11 @@ archivo está inferida.** Si alguna queda vieja, se re-mide; no se corrige a man
 
 ---
 
-## Postgres — cluster de dev/qa (`cfrl3owqzwof`)
+## Postgres — cluster `sistemas-costruplaza-db` (cuenta de dev)
+
+> 🔴 **Corrección de v8**: las versiones anteriores de este documento titulaban esta sección "cluster `cfrl3owqzwof`". **`cfrl3owqzwof` no es un cluster: es el sufijo DNS de la cuenta de AWS**, y todos los clusters de esa cuenta lo llevan. En la cuenta de dev hay **cuatro** Aurora PostgreSQL — `dev-costruplaza-db`, `erp-costruplaza-db`, `erpodoo-19-dev` y `sistemas-costruplaza-db`. Las 29 bases de abajo son **de este último**. Como los roles de Postgres son objetos de cluster, cubrir la cuenta son cuatro decisiones, no una. Los otros tres siguen **sin medir** salvo `erp-costruplaza-db`, medido por Patrick Ocampo (34 bases, dieciséis clones fechados de Odoo).
+>
+> Y una letra separa dev de producción: dev es `sistemas-co`**`s`**`truplaza-db`, prod es `sistemas-co`**`ns`**`truplaza-db`.
 
 ```sql
 SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY 1;
@@ -44,6 +48,8 @@ corren, el acceso ya está.
 | `wms_dev` | dev |
 
 ### Dos hechos que contradicen supuestos previos
+
+0. 🔴 **Ni el tamaño ni el nombre clasifican el riesgo.** Medido adentro por Patrick el 18-sep-2026, y corrige lo que este documento afirmaba por inferencia: **`portalrh_qa` pesa 55 MB y contiene 3.458 empleados, 3.309 contratos, 29.848 marcas diarias y 400 nóminas históricas**, con columnas `cedulaCcss`, `identificacion` y `salarioActual/Maximo/Minimo`. `qa` tiene 212.020 clientes con `cedula` y salarios. `construplaza`, 975 empleados. Y **`rrhh` —la que este documento señaló por el nombre— está vacía**. Las dos heurísticas fallaron, cada una en su dirección. `portalrh_dev`, `portalrh_qa` y `construplaza` ya tienen revocado el `CONNECT` a PUBLIC (`datacl` de `=Tc/` a `=T/`).
 
 1. **`controlactivos_stg` vive en el cluster de dev/qa.** La regla "stg vive con prod,
    para toda la casa" —medida sobre el cluster de producción y escrita así en el
