@@ -195,3 +195,25 @@ archivos) sigue verde sin cambios (ver gate 4/suite completa de arriba).
 Ninguno: la suite completa y el secret-scan salen verdes en el commit
 sellado de esta ronda (`27029e3`, ver escalera de arriba).
 
+## Secret-scan sobre el árbol final ya commiteado (fuera del sellado del runner)
+
+Este mismo archivo de verification queda fuera del árbol que el runner
+selló (el `Tree:` de la cabecera es anterior a este addendum). Corrida
+sobre el árbol final, **después** de commitear el addendum de arriba
+(commit `9db961a`, árbol limpio confirmado con `git status --short` antes
+de correr):
+
+```
+$ git status --short
+$ git rev-parse HEAD
+9db961ae955bf25f2bbf0923dd00c3f633251827
+$ bash SDD/tests/secret-scan.sh
+secret-scan: sin hallazgos sobre 164 archivos versionados (1 excluido: self)
+$ echo $?
+0
+```
+
+Este párrafo final se agrega en un commit posterior a `9db961a`, ya que
+el propio archivo de evidencia no puede documentar su propio hash de
+commit sin haberse commiteado primero — mismo patrón en cascada que
+`D34`/`D35` describen para este runner.
