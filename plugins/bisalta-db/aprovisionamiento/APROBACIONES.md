@@ -51,16 +51,24 @@ exclusivo del servidor MCP, con alcance POR BASE Y A PEDIDO NOMBRADO.
 5. Permanentemente fuera de alcance: SSISDB (catalogo de Integration
    Services, contiene connection managers), master, model, msdb, tempdb.
 
-6. Cada base concedida lleva db_datareader mas db_denydatawriter. En SQL
-   Server el DENY prevalece sobre cualquier GRANT.
+6. Cada base concedida lleva db_datareader y nada mas. El login no
+   recibe ningun rol ni permiso de escritura. Nota: sin
+   db_denydatawriter no queda un DENY explicito, asi que un GRANT de
+   escritura concedido por error en el futuro no tendria nada que lo
+   anule. La lectura sigue siendo la unica capacidad del login.
 
 7. La credencial se genera y se carga directamente en Secrets Manager,
    con politica IAM por consumidor. No pasa por ninguna persona fuera de
    quien firma.
 
 BASES CONCEDIDAS
-fecha        base        solicitante
-(vacio)
+fecha        base           solicitante
+2026-09-21   COMPRAS        Ian Vargas
+2026-09-21   COMPRAS_STG    Ian Vargas
+2026-09-21   Ecommerce      Ian Vargas
+2026-09-21   Ecommerce_qa   Ian Vargas
+2026-09-21   EXACTUS        Ian Vargas
+2026-09-21   BI             Ian Vargas
 
 Revision: al cierre del corte Exactus->Odoo (17-oct-2026).
 ```
@@ -68,17 +76,19 @@ Revision: al cierre del corte Exactus->Odoo (17-oct-2026).
 ### Bases pedidas — registro vivo
 
 Patrick pidió la lista el 21-sep-2026 (*"decime hoy qué bases ocupás para arrancar y quedan
-concedidas hoy"*). Ian Vargas pidió estas seis. **La concesión la ejecuta Patrick al correr el
-loop**; esta tabla registra el pedido con su fecha, que es lo que el punto 2 de la aprobación exige.
+concedidas hoy"*). Ian Vargas pidió estas seis y **Patrick las concedió el mismo día** (*"las seis
+van… concedidas hoy"*), que es lo que el punto 2 de la aprobación establece. Ian Vargas aclaró que
+son las **iniciales para probar la herramienta**, no el alcance definitivo. La ejecución del loop
+sigue pendiente; la concesión, no.
 
 | Fecha del pedido | Base | Tamaño | Solicitante | Concedida |
 |---|---|---|---|---|
-| 2026-09-21 | `COMPRAS` | 107.09 GB | Ian Vargas | pendiente de ejecución |
-| 2026-09-21 | `COMPRAS_STG` | 107.09 GB | Ian Vargas | pendiente de ejecución |
-| 2026-09-21 | `Ecommerce` | 16.89 GB | Ian Vargas | pendiente de ejecución |
-| 2026-09-21 | `Ecommerce_qa` | 56.89 GB | Ian Vargas | pendiente de ejecución |
-| 2026-09-21 | `EXACTUS` | 396.10 GB | Ian Vargas | pendiente de ejecución |
-| 2026-09-21 | `BI` | 177.06 GB | Ian Vargas | pendiente de ejecución |
+| 2026-09-21 | `COMPRAS` | 107.09 GB | Ian Vargas | **concedida** (Patrick, 21-sep 12:22) |
+| 2026-09-21 | `COMPRAS_STG` | 107.09 GB | Ian Vargas | **concedida** (Patrick, 21-sep 12:22) |
+| 2026-09-21 | `Ecommerce` | 16.89 GB | Ian Vargas | **concedida** (Patrick, 21-sep 12:22) |
+| 2026-09-21 | `Ecommerce_qa` | 56.89 GB | Ian Vargas | **concedida** (Patrick, 21-sep 12:22) |
+| 2026-09-21 | `EXACTUS` | 396.10 GB | Ian Vargas | **concedida** (Patrick, 21-sep 12:22) |
+| 2026-09-21 | `BI` | 177.06 GB | Ian Vargas | **concedida** (Patrick, 21-sep 12:22) |
 
 **861.12 GB de los 1383.16 del servidor — el 62%.** Las 26 bases restantes quedan sin conceder, y
 una base nueva no queda cubierta por omisión.

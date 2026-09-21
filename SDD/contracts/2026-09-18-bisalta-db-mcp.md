@@ -1,6 +1,27 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v9
+- **Versión**: v10
+
+### Cambios v9 → v10 (decisiones de Patrick Ocampo, Slack 21-sep-2026 12:22 y 12:44)
+
+**1. Las seis bases de SQL Server están CONCEDIDAS**, con fecha 21-sep-2026 y solicitante Ian Vargas. Registradas en `APROBACIONES.md`.
+
+**2. Sale `db_denydatawriter`. Cada base concedida lleva `db_datareader` y nada más.** Revierte el punto 4 de v4. Es decisión de Patrick, y pidió explícitamente que quedara escrita **con lo que se pierde**, no sólo con lo que queda: *"sin `db_denydatawriter` no queda un `DENY` explícito, así que un `GRANT` de escritura concedido por error en el futuro no tendría nada que lo anule."*
+   - La tabla "Garantías por motor" vuelve a **una sola garantía** en SQL Server, y esta vez la afirmación *"el rol es la única barrera"* es cierta y no una omisión.
+   - El enum de `garantias` conserva el valor `deny-escritura` —el concepto sigue siendo válido para una conexión futura— pero **ninguna entrada del catálogo lo usa**.
+   - **`AC42` cambia de propiedad**: ya no afirma que el `DENY` le gane a un `GRANT`. Redacción y mutación nuevas abajo.
+
+**3. El inverso deja de leer la lista: revoca por enumeración.** Patrick rechazó el procedimiento de baja que R1 documentó —correr el inverso con la lista completa y editarla después— porque *"depende de que alguien recuerde el orden"*. La regla que pone en su lugar:
+
+> **Se concede desde una lista explícita, se revoca por enumeración.**
+
+El inverso recorre `sys.databases` buscando dónde existe el user en `sys.database_principals` y lo saca de donde lo encuentre. Dos direcciones, dos fuentes de verdad: para conceder manda la lista, porque una base que nadie pidió no debe entrar; para revocar hay que encontrar el user **hasta donde nadie lo anotó**. Y cubre el caso que ni el procedimiento de R1 ni el de Patrick alcanzaban: **un user que quedó de antes de que la lista existiera**.
+
+**4. `qa` revocada** (`REVOKE CONNECT ON DATABASE qa FROM PUBLIC`, ejecutado el 21-sep). El cluster `sistemas-costruplaza-db` queda con seis bases cerradas a PUBLIC: `portalrh_dev`, `portalrh_qa`, `construplaza`, `qa`, más `marksync_dev` y `marksync_qa` que ya venían. Las otras 20 siguen abiertas — la deuda `D45` no se cierra, pero se achica.
+
+**5. La pregunta que R1 no pudo contestar tiene respuesta, y es medida.** Patrick verificó que su `REVOKE` del 18-sep **no rompió nada**: el delta de transacciones de tres días dio idéntico en las cuatro bases (96.375), y la serie de `portalrh.log` por día muestra que **las escrituras pararon el 17-sep** — un día antes del revoke, que fue el 18 a las 16:50. Descartó además la hipótesis del fin de semana (los sábados de agosto y septiembre sí tienen filas). Siete días clavados en 36 filas no es gente: es una tarea automática, y el 17-sep es la fecha del pase de Hermes dev → Nexa prod. **`portalrh_dev` y `portalrh_qa` siguen fuera del catálogo igual** — la decisión de v8 no se revierte; lo que cambia es que ahora se sabe que no había nada conectado.
+
+**6. Hallazgo de Platform, no de este ciclo, pero acota una afirmación de este contract.** `sistemas-costruplaza-db` **no exporta logs a CloudWatch** (`EnabledCloudwatchLogsExports` en `null`, sin grupo de logs). Sobre ninguna de sus bases se puede contestar después *"quién se conectó"*. El bloque `observability` de este contract dice que `application_name` permite que `pg_stat_activity` atribuya del lado del motor — eso sigue siendo cierto **en el instante**, pero no queda registro persistente: `pg_stat_activity` sólo ve lo que está corriendo ahora. La bitácora local del servidor MCP es el único registro durable, y es del lado del cliente. Va a Platform (Moreno), no a este ciclo.
 
 ### Cambios v8 → v9 (regla de Patrick Ocampo, Slack 21-sep-2026 10:31; lista de Ian Vargas, 21-sep-2026)
 
@@ -299,9 +320,9 @@ Arreglo con `nombre`, `dialecto`, `ambiente`, `base` y `garantias` de cada entra
 
 | | Postgres (`dev`/`qa`) | SQL Server (`Dev SQL`) |
 |---|---|---|
-| Rol de solo lectura | sí | sí |
+| Rol de solo lectura | sí | sí — **y es la única barrera**, literalmente, desde v10 |
 | Sesión abierta en solo lectura | sí, `default_transaction_read_only=on` | **no existe equivalente** |
-| `DENY` de escritura sobre el rol | no aplica | sí, `db_denydatawriter` — el `DENY` le gana a cualquier `GRANT` (v4) |
+| `DENY` de escritura sobre el rol | no aplica | **no** — `db_denydatawriter` se quitó en v10 por decisión de Patrick Ocampo. Sin él no hay `DENY` explícito, así que un `GRANT` de escritura concedido por error no tendría nada que lo anule |
 | Motor que rechaza escrituras | sí, endpoint `cluster-ro-` de Aurora | **no hay réplica** |
 | Alcance del permiso | `pg_read_all_data`, de cluster | `db_datareader`, **por base**: una base nueva no queda cubierta sola |
 
@@ -444,9 +465,9 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 `manual-only: requiere un cluster Postgres real; ningún harness de este repo levanta uno.`
 **Mutación declarada**: cambiar la condición de aborto de `_prod` a `_stg`; corrida contra el cluster de dev/qa (que contiene `controlactivos_stg` y ninguna `_prod`), la Parte 0 tiene que abortar — o sea, la comprobación de que continúa se pone roja; restaurar la condición.
 
-**AC42** — Tras correr la parte B de SQL Server, el user tiene en **cada base de la lista explícita** **las dos** membresías: `db_datareader` y `db_denydatawriter`. Un `INSERT` falla con `DENY` aunque alguien le conceda `INSERT` explícitamente después.
+**AC42** — Tras correr la parte B de SQL Server, el user tiene en **cada base de la lista explícita** la membresía `db_datareader` **y ninguna otra**: ni `db_denydatawriter` (quitada en v10), ni `db_datawriter`, ni `db_owner`. Un `INSERT` falla por **ausencia de permiso**, no por `DENY`.
 `manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
-**Mutación declarada**: quitar `db_denydatawriter` del loop y conceder `INSERT` directo al user sobre una tabla de scratch; el `INSERT` tiene que pasar — o sea, la comprobación de que falla se pone roja. Restaurar el loop y revocar el `INSERT`: el `DENY` vuelve a ganar.
+**Mutación declarada**: agregar el user a `db_datawriter` en una base de scratch de la lista; el `INSERT` tiene que pasar — o sea, la comprobación de que falla se pone roja. Quitarlo de `db_datawriter`: el `INSERT` vuelve a fallar por ausencia de permiso. **Ojo**: sin `db_denydatawriter` ya no hay `DENY` que anule un `GRANT`, así que esta mutación mide exactamente lo que v10 dejó — que la única capacidad del login es leer.
 
 ## Checklist del arquetipo
 

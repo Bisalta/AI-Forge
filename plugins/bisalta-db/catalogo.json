@@ -99,8 +99,7 @@
     "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura",
-      "deny-escritura"
+      "rol-solo-lectura"
     ]
   },
   {
@@ -113,8 +112,7 @@
     "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura",
-      "deny-escritura"
+      "rol-solo-lectura"
     ]
   },
   {
@@ -127,8 +125,7 @@
     "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura",
-      "deny-escritura"
+      "rol-solo-lectura"
     ]
   },
   {
@@ -141,8 +138,7 @@
     "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura",
-      "deny-escritura"
+      "rol-solo-lectura"
     ]
   },
   {
@@ -155,8 +151,7 @@
     "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura",
-      "deny-escritura"
+      "rol-solo-lectura"
     ]
   },
   {
@@ -169,8 +164,7 @@
     "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura",
-      "deny-escritura"
+      "rol-solo-lectura"
     ]
   }
 ]
