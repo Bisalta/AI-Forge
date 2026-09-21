@@ -25,6 +25,18 @@
 -- la única fricción que la regla de Patrick permite: nombrar la base acá
 -- y en APROBACIONES.md, nada más — no exige aprobación adicional.
 --
+-- CÓMO DAR DE BAJA UNA BASE (orden inverso al de agregar): revertir esa
+-- base PRIMERO con una copia de trabajo de sqlserver-inverso.sql (lista
+-- recortada a esa única base; además hay que quitarle el DROP LOGIN
+-- final si otras bases siguen activas — el DROP LOGIN de ese script es
+-- incondicional, ver su propio comentario de cabecera), y RECIÉN DESPUÉS
+-- sacar la fila de este INSERT y del INSERT equivalente de
+-- sqlserver-inverso.sql — procedimiento completo en RUNBOOK.md, sección
+-- "Inverso" → "Procedimiento de baja". Sacar la fila primero, sin haber
+-- revertido antes, deja a bisalta_lectura como user en esa base para
+-- siempre: ninguno de los dos scripts vuelve a nombrarla una vez que sale
+-- de las dos listas.
+--
 -- El historial de qué se pidió, cuándo y quién lo solicitó vive en
 -- APROBACIONES.md, sección "Bases pedidas" — no se retranscribe acá para
 -- no mantener el mismo dato en dos lugares que puedan desincronizarse:
@@ -75,7 +87,9 @@ DECLARE @bases_permitidas TABLE (nombre SYSNAME PRIMARY KEY);
 
 -- Lista explícita de bases con acceso concedido. ÚNICO lugar del script
 -- que se edita para agregar o quitar una base — ver comentario de
--- cabecera "CÓMO AGREGAR UNA BASE NUEVA".
+-- cabecera "CÓMO AGREGAR UNA BASE NUEVA" y, para el caso de baja, "CÓMO
+-- DAR DE BAJA UNA BASE" (el inverso corre ANTES de sacar la fila, no
+-- después).
 INSERT INTO @bases_permitidas (nombre) VALUES
   (N'COMPRAS'),
   (N'COMPRAS_STG'),

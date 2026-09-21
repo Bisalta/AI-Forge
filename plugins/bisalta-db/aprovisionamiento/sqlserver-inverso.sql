@@ -4,11 +4,30 @@
 -- user, incluida su membresía en db_denydatawriter — contract v5, AC42)
 -- y sqlserver-parte-a.sql (DROP LOGIN). Recorre la MISMA lista explícita
 -- que sqlserver-parte-b.sql (contract v9, "Cambios v8 → v9") — nunca
--- sys.databases entero: si la parte B sólo tocó las bases nombradas, el
--- inverso sólo tiene que revisar esas mismas bases para deshacerlo. Si la
--- lista de abajo alguna vez difiere de la de sqlserver-parte-b.sql, ese
--- desvío es exactamente lo que hay que corregir primero — las dos listas
--- se editan juntas.
+-- sys.databases entero: esta lista tiene que ser la que la parte B tenía
+-- AL MOMENTO EN QUE CORRIÓ, no la que tenga hoy. Las dos listas se editan
+-- juntas mientras se AGREGA una base (ese caso es correcto: la base nueva
+-- entra a las dos listas y el inverso ya sabe revertirla).
+--
+-- Cuando se DA DE BAJA una sola base y OTRAS quedan activas, este archivo
+-- TAL COMO ESTÁ no sirve corrido directo, ni con la lista completa ni con
+-- una copia recortada a esa única base: el `DROP LOGIN` final es
+-- INCONDICIONAL, corre siempre que el login exista, sin mirar cuántas
+-- bases quedaron en la lista. Correrlo con la lista completa revertiría
+-- las bases que se querían mantener; correrlo con una copia que sólo
+-- nombre la base a dar de baja sí limita el `DROP USER`/`ALTER ROLE` a
+-- esa base, pero el `DROP LOGIN` de más abajo se ejecuta igual y borra
+-- el login del servidor — dejando sin acceso a bisalta_lectura en TODAS
+-- las demás bases que seguían activas. Ver "Procedimiento de baja" en
+-- RUNBOOK.md, sección "Inverso", para la copia de trabajo correcta (lista
+-- recortada a la única base + bloque final de `DROP LOGIN` quitado,
+-- salvo que la base a dar de baja sea la última que quede en la lista).
+--
+-- Editar las dos listas ANTES de correr algún inverso, en cualquier caso,
+-- deja a `bisalta_lectura` como user en la base dada de baja para
+-- siempre: ninguno de los dos scripts vuelve a nombrarla una vez que sale
+-- de las dos listas, y AC7 se pone rojo (`tiene_user = 1` fuera de la
+-- lista) sin que ningún documento explique la causa ni el remedio.
 --
 -- La membresía en db_denydatawriter se quita explícitamente (ALTER ROLE
 -- ... DROP MEMBER) ANTES de DROP USER, en vez de asumir que borrar el

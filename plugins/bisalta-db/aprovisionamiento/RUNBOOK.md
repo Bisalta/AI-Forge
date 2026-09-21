@@ -80,7 +80,11 @@ runbook no reemplaza ni resume.
 6. `sqlserver-parte-a.sql` contra la instancia `Dev SQL`.
 7. `sqlserver-parte-b.sql` contra la misma instancia (recorre la lista
    explícita declarada al principio del script, otorgando `db_datareader`
-   y `db_denydatawriter` a cada base nombrada ahí).
+   y `db_denydatawriter` a cada base nombrada ahí). El script sale `0`
+   aunque alguna base nombrada no se haya podido cubrir — **revisar la
+   salida por líneas `AUSENTE:` / `NO ONLINE:` / `RECHAZADA` antes de
+   seguir**: cada una nombra una base de la lista que quedó sin el user
+   en esta corrida.
 8. **Verificar AC5** contra `EXACTUS` y **AC42** (ver abajo).
 9. Crear los tres secretos en Secrets Manager (ver "Forma del secreto" y
    "Política IAM" abajo) y verificar AC8.
@@ -405,11 +409,17 @@ misma sesión). `@db_name` va como parámetro de `sp_executesql`, no
 concatenado crudo dentro del literal de cadena: una base con un apóstrofo
 en el nombre rompería el batch si se concatenara.
 
-El cursor de esta comprobación recorre `sys.databases` **completo**
-(`state = 0`, sin filtrar por `database_id` ni por lista), a propósito:
-es la única forma de ver el universo negativo entero — todo lo que no
-está en la lista, más `SSISDB` y las cuatro de sistema — en la misma
-corrida que el universo positivo.
+El cursor de esta comprobación filtra `state = 0` (`ONLINE`): al momento
+de esta ronda eso alcanza para ver el universo negativo entero (todo lo
+que no está en la lista, más `SSISDB` y las cuatro de sistema) en la
+misma corrida que el universo positivo, porque **las 32 bases de la
+instancia están `ONLINE`** (`INVENTARIO.md:146`) — no hay ninguna
+`OFFLINE`/`RESTORING` que el filtro deje afuera hoy. Si en el futuro
+existiera una base fuera de la lista que no esté `ONLINE`, este filtro
+no la mide: listarla aparte (con el mismo `SELECT name, state FROM
+sys.databases WHERE state <> 0`) y declararla explícitamente **no
+medida** por esta comprobación, en vez de asumir que su ausencia de la
+tabla `##ac7_check` es un verde.
 
 ```
 sqlcmd -S <instancia> -E -b -Q "
@@ -449,9 +459,14 @@ cualquier otra fila — incluidas `SSISDB`, `master`, `model`, `msdb`,
 
 **Lista vacía, parte del mismo AC** (contract v9: *"con la lista vacía, el
 script no crea ningún user y sale 0"*): sobre una instancia de prueba, en
-una copia de trabajo `sqlserver-parte-b-lista-vacia.sql`, dejar el
-`INSERT INTO @bases_permitidas` sin ninguna fila (la declaración de la
-tabla queda, sólo se le quitan los `VALUES`). Correrla:
+una copia de trabajo `sqlserver-parte-b-lista-vacia.sql`, borrar el
+statement `INSERT INTO @bases_permitidas (nombre) VALUES (...);`
+**completo**, dejando sólo el `DECLARE @bases_permitidas TABLE (nombre
+SYSNAME PRIMARY KEY);` — un `INSERT ... VALUES` sin ninguna fila (ya sea
+`VALUES;` o `VALUES` seguido de nada) **no es T-SQL válido**: `sqlcmd`
+sale con `Msg 102, Level 15` (error de sintaxis) antes de llegar siquiera
+a abrir el cursor, que es lo contrario del `exit 0` que este paso espera.
+Correrla:
 
 ```
 sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-parte-b-lista-vacia.sql
@@ -738,6 +753,65 @@ tampoco al catálogo de la aplicación (`plugins/bisalta-db/catalogo.json`)
 - AWS: los tres secretos se borran a mano desde la cuenta de dev/qa (no
   hay script: crear/borrar secretos está fuera del scope de este runbook,
   igual que crearlos).
+
+### Procedimiento de baja (sacar una base de la lista de SQL Server)
+
+Agregar una base es simétrico (se agrega la misma fila a las dos listas
+en el mismo cambio), pero **quitar una base no lo es**: `sqlserver-parte-b.sql`
+sólo procesa lo que está en su lista *hoy* — nunca revisa ni revierte lo
+que procesó en una corrida anterior con una lista distinta. Si se edita
+la lista antes de revertir, ninguno de los dos scripts vuelve a nombrar
+esa base nunca más, y `bisalta_lectura` queda como user ahí (con su
+`db_denydatawriter`) para siempre — y el bloque `##ac7_check` de la
+sección "AC7" de arriba se pone rojo (`tiene_user = 1` fuera de la lista)
+sin que ningún documento explique la causa.
+
+**El `DROP LOGIN` final de `sqlserver-inverso.sql` es incondicional**: no
+mira cuántas bases quedan en la lista, corre siempre que el login exista.
+Correr el archivo real (con la lista completa) para dar de baja una sola
+base revertiría **todas** las bases, no sólo esa — y correr una copia
+recortada a sólo la base a dar de baja evita eso en el `DROP
+USER`/`ALTER ROLE`, pero el `DROP LOGIN` de más abajo se ejecuta igual y
+deja **sin login** a `bisalta_lectura` para las demás bases que seguían
+activas. Por eso, si queda al menos otra base activa, la copia de trabajo
+tiene que recortar la lista **y** quitar el bloque final de `DROP LOGIN`.
+
+Orden correcto para dar de baja una base que **no** es la última de la
+lista (por ejemplo, `Ecommerce_qa`, con `COMPRAS`, `COMPRAS_STG`,
+`Ecommerce`, `EXACTUS` y `BI` quedando activas):
+
+1. **Antes de tocar ninguna de las dos listas**, hacer una copia de
+   trabajo `sqlserver-inverso-baja-ecommerce_qa.sql` a partir de
+   `sqlserver-inverso.sql` con dos cambios: (a) `INSERT INTO
+   @bases_permitidas` con **sólo** la fila `(N'Ecommerce_qa')`, y (b) el
+   bloque final `IF EXISTS (... sys.server_principals ...) DROP LOGIN
+   bisalta_lectura; GO` **quitado por completo** (las demás bases todavía
+   necesitan ese login). Correrla:
+   ```
+   sqlcmd -S 10.24.40.137 -E -b -i sqlserver-inverso-baja-ecommerce_qa.sql
+   ```
+   Esto le quita a `bisalta_lectura` las dos membresías y el user en
+   `Ecommerce_qa` únicamente, sin tocar el login ni las demás bases.
+2. Recién ahora, sacar la fila `(N'Ecommerce_qa')` del `INSERT` de
+   `sqlserver-parte-b.sql` **y** de `sqlserver-inverso.sql`, en el mismo
+   cambio (mismo criterio que agregar: las dos listas se editan juntas).
+3. Registrar la baja en `APROBACIONES.md` (fecha y quién la pidió), igual
+   que un alta.
+4. Confirmar con el bloque `##ac7_check`: `tiene_user = 0` para
+   `Ecommerce_qa`, y `tiene_user = 1` sin cambios en las cinco bases que
+   siguen en la lista.
+5. Descartar la copia de trabajo (`sqlserver-inverso-baja-ecommerce_qa.sql`):
+   no se commitea.
+
+**Caso distinto — la base a dar de baja es la última que queda en la
+lista** (decomiso completo, ninguna otra base sigue activa): ahí sí
+corresponde correr `sqlserver-inverso.sql` real, sin modificar, porque el
+`DROP LOGIN` final es exactamente lo que corresponde cuando no queda
+ninguna base que siga necesitando el login.
+
+Invertir el orden (editar las listas primero, revertir después) no tiene
+remedio con estos dos scripts: ya ninguno de los dos nombra la base
+dada de baja, así que no hay forma de que el inverso la vuelva a tocar.
 
 Ningún script de R1 se corrió contra una base real: no hay estado externo
 pendiente de revertir además de lo que este runbook ya describe.
