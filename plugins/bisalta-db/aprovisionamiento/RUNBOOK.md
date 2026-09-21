@@ -482,10 +482,35 @@ Esperado en este paso: aparecen filas con `tiene_user = 1` en bases de
 usuario de esa instancia que **no** están en `@bases_permitidas` — es la
 comprobación de "en ninguna otra" poniéndose roja, porque el cursor
 mutado concede a todo salvo las exclusiones (`database_id > 4`, no
-`SSISDB`), exactamente la forma que v9 dejó atrás. Restaurar el cursor
-por lista (descartar la copia mutada, usar `sqlserver-parte-b.sql` real)
-y volver a correr la corrida esperada contra la instancia de prueba para
-confirmar el verde de cierre antes de tocar `Dev SQL` con el archivo real.
+`SSISDB`), exactamente la forma que v9 dejó atrás.
+
+**Limpiar antes de dar por cerrado el rojo**: correr de nuevo
+`sqlserver-parte-b.sql` real (el que usa la lista) sobre esa instancia
+**no alcanza** para volver al verde — es aditivo e idempotente sobre las
+bases de su propia lista, pero nunca toca ni revierte una base que la
+corrida mutada haya tocado fuera de la lista (mismo motivo de fondo que
+`SDD/debt.md` D40, ya registrado para el AC7 de versiones anteriores: un
+script que sólo agrega no limpia lo que otro agregó de más). Por eso el
+cierre real necesita un paso de reversión explícito: en una copia de
+trabajo `sqlserver-inverso-mutada-v8.sql`, aplicar al inverso el mismo
+cursor de exclusión que se usó para la mutación (`database_id > 4 AND
+name <> 'SSISDB' AND state = 0`) y correrla contra la instancia de
+prueba — esto quita `bisalta_lectura` (y su `db_denydatawriter`) de
+**todas** las bases de usuario que la corrida mutada tocó, incluidas las
+de la lista real:
+
+```
+sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-inverso-mutada-v8.sql
+```
+
+Recién ahora correr `sqlserver-parte-b.sql` real (por lista) para dejar
+la instancia de prueba en el estado que el script real produce, y volver
+a correr el bloque `##ac7_check` para confirmar el verde de cierre —
+`tiene_user = 1` sólo en las bases de `@bases_permitidas`, `0` en todo lo
+demás — antes de tocar `Dev SQL` con el archivo real. Descartar las tres
+copias de trabajo (`sqlserver-parte-b-lista-vacia.sql`,
+`sqlserver-parte-b-mutada-v8.sql`, `sqlserver-inverso-mutada-v8.sql`):
+ninguna se commitea.
 
 `SSISDB` sigue sin ser una decisión pendiente (contract v6, "Cambios v5 →
 v6", punto 1, decisión de Patrick Ocampo): en v9 queda fuera porque nunca
