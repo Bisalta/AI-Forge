@@ -394,6 +394,21 @@ sqlcmd -S 10.24.40.137 -E -Q "DROP DATABASE zz_scratch_ac6;"
 
 ### AC7 — el user existe exactamente en las bases de la lista y en ninguna otra
 
+**Estado de arranque de la instancia de prueba** (aplica a los dos pasos
+de abajo, "Lista vacía" y "Mutación declarada"): el paso de lista vacía
+sólo mide lo que declara si la instancia de prueba **nunca fue
+aprovisionada antes** con `bisalta_lectura` (si el user ya existiera en
+alguna base de una corrida previa, `tiene_user` seguiría en `1` ahí y no
+en `0` en absolutamente todas las filas, sin que la copia recién corrida
+tenga nada que ver). El paso de mutación, al revés, sólo llega a correr
+si el **login** `bisalta_lectura` **ya existe** en esa instancia antes de
+la corrida — `sqlserver-parte-b-mutada-v8.sql`, igual que el real, sólo
+hace `CREATE USER ... FOR LOGIN bisalta_lectura` dentro de cada base y
+nunca crea el login del servidor; sin él, `sqlcmd` falla con `Msg 15007`
+antes de tocar ninguna base y el rojo esperado no aparece. Aprovisionar
+el login con `sqlserver-parte-a.sql` real contra esa instancia de prueba
+antes de arrancar la secuencia de este AC.
+
 `AC7` (contract v9) ya no habla de "todas las bases de usuario en línea
 salvo `SSISDB`": habla de la lista explícita que declara
 `sqlserver-parte-b.sql` (`@bases_permitidas`). La comprobación real tiene
@@ -507,12 +522,22 @@ corrida mutada haya tocado fuera de la lista (mismo motivo de fondo que
 `SDD/debt.md` D40, ya registrado para el AC7 de versiones anteriores: un
 script que sólo agrega no limpia lo que otro agregó de más). Por eso el
 cierre real necesita un paso de reversión explícito: en una copia de
-trabajo `sqlserver-inverso-mutada-v8.sql`, aplicar al inverso el mismo
-cursor de exclusión que se usó para la mutación (`database_id > 4 AND
-name <> 'SSISDB' AND state = 0`) y correrla contra la instancia de
-prueba — esto quita `bisalta_lectura` (y su `db_denydatawriter`) de
-**todas** las bases de usuario que la corrida mutada tocó, incluidas las
-de la lista real:
+trabajo `sqlserver-inverso-mutada-v8.sql`, con **dos** cambios — (a)
+aplicar al inverso el mismo cursor de exclusión que se usó para la
+mutación (`database_id > 4 AND name <> 'SSISDB' AND state = 0`), y (b)
+quitar por completo el bloque final `IF EXISTS (... sys.server_principals
+...) DROP LOGIN bisalta_lectura; GO` (mismo segundo cambio que ya lleva
+la copia de baja de "Procedimiento de baja", más abajo, y por el mismo
+motivo: el `DROP LOGIN` de `sqlserver-inverso.sql` es incondicional —
+ver su comentario de cabecera —, y el paso siguiente de esta misma
+limpieza vuelve a correr `sqlserver-parte-b.sql` real, que hace `CREATE
+USER bisalta_lectura FOR LOGIN bisalta_lectura`; si esta copia dejara el
+`DROP LOGIN`, esa corrida siguiente fallaría con `Msg 15007` (login
+inexistente) y el `##ac7_check` de cierre saldría en `0` en todas las
+filas, no en el verde que este paso declara) — y correrla contra la
+instancia de prueba: esto quita `bisalta_lectura` (y su
+`db_denydatawriter`) de **todas** las bases de usuario que la corrida
+mutada tocó, incluidas las de la lista real, sin tocar el login:
 
 ```
 sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-inverso-mutada-v8.sql
@@ -780,6 +805,13 @@ Orden correcto para dar de baja una base que **no** es la última de la
 lista (por ejemplo, `Ecommerce_qa`, con `COMPRAS`, `COMPRAS_STG`,
 `Ecommerce`, `EXACTUS` y `BI` quedando activas):
 
+0. **Antes de revocar nada**, sacar la entrada correspondiente de
+   `plugins/bisalta-db/catalogo.json` (para `Ecommerce_qa`, la entrada
+   `"nombre": "ecommerce-qa"`) — documentar el paso acá, **no editar el
+   archivo** como parte de este runbook. Seguido en cualquier otro orden,
+   la entrada queda apuntando a una base donde `bisalta_lectura` ya no
+   tiene user, y el MCP falla en runtime con error de login la próxima
+   vez que alguien la consulte.
 1. **Antes de tocar ninguna de las dos listas**, hacer una copia de
    trabajo `sqlserver-inverso-baja-ecommerce_qa.sql` a partir de
    `sqlserver-inverso.sql` con dos cambios: (a) `INSERT INTO
