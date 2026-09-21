@@ -6,7 +6,7 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ### 0.1.0 — 2026-09-18
 
-Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v8).
+Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v11).
 Consulta de solo lectura a las bases de dev/qa de Bisalta desde Claude Code y NEO, **sin que
 ninguna credencial entre en el contexto de la sesión**. La credencial no desaparece: pasa de un
 archivo que hoy hay que leerle al modelo —y que queda archivado en el transcript— a un secreto de
@@ -43,9 +43,11 @@ AWS que el proceso resuelve, usa y tira.
 - **Bitácora** de una línea JSON por invocación, con la consulta **por hash y nunca en claro**. No
   rota; registrado como deuda.
 - **Dos estrategias de aprovisionamiento, no una.** `pg_read_all_data` donde el cluster es un lugar
-  de trabajo; `GRANT SELECT` por base donde es un archivo de clones fechados. Y en SQL Server,
-  `db_denydatawriter` junto a `db_datareader`: el `DENY` le gana a cualquier `GRANT`, así que el rol
-  deja de ser la única barrera de ese motor.
+  de trabajo; `GRANT SELECT` por base donde es un archivo de clones fechados. En SQL Server, **`db_datareader` y nada más**: cada
+  base concedida lleva esa membresía y ninguna otra. `db_denydatawriter` se evaluó y se descartó
+  (decisión de Patrick Ocampo, 21-sep-2026), y lo que se pierde queda dicho porque él pidió que
+  quedara dicho: **sin `DENY` explícito, un `GRANT` de escritura concedido por error no tendría nada
+  que lo anule.** En ese motor el rol es la única barrera — ahora por decisión, no por omisión.
 - **`SSISDB` fuera del loop**, por nombre y no sólo por `database_id > 4`: es el catálogo de
   Integration Services, donde viven parámetros y connection managers. Un servidor cuyo propósito es
   que ninguna credencial pase por el contexto no puede alcanzar el lugar donde viven las cadenas de

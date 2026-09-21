@@ -15,10 +15,10 @@ Tu trabajo anterior está bien y **no se tira**. Lo que cambió es que Patrick m
 
 1. **`pg_read_all_data` alcanza TODO el cluster desde que el rol existe.** Postgres concede `CONNECT` a PUBLIC por omisión, y `pg_read_all_data` es membresía de cluster. **La Parte B no es una barrera**: para cuando corre, el acceso ya existe. Medido: son **29 bases** en dev/qa, no las 2 del catálogo. Corregí la prosa de `postgres-parte-b.sql` y del runbook que la presenta como si concediera el acceso — hoy dice algo falso.
 2. **Nace la Parte 0** (`postgres-parte-0.sql`, archivo nuevo): corre **antes** de crear nada, lista las bases del cluster y **aborta si el cluster contiene alguna base `_prod`**. El discriminante **no es el nombre `stg`** — está medido que falla en las dos direcciones. Imprime además a qué bases llega cada rol de verdad, que es la única forma de ver el `CONNECT` heredado de PUBLIC. Es **AC41**.
-3. **`db_denydatawriter` va junto con `db_datareader`** en el mismo loop de `sqlserver-parte-b.sql`. El `DENY` le gana a cualquier `GRANT`. Es **AC42**, y obliga a corregir la tabla "Garantías por motor" del runbook, que hoy dice que el rol es la única barrera.
+3. ~~**`db_denydatawriter` va junto con `db_datareader`**~~ — **derogado en el contract v10** (decisión de Patrick Ocampo, 21-sep-2026): cada base lleva `db_datareader` y nada más, y lo que se pierde queda escrito. `AC42` cambió de propiedad y de mutación — leelas en el contract vigente, no acá.
 4. **Cifras corregidas contra `plugins/bisalta-db/aprovisionamiento/INVENTARIO.md`** (medido, en el árbol): Dev SQL tiene **32** bases, no "~35"; 1383 GB; las 32 `ONLINE` y ninguna en solo lectura. Grepeá "~35" y "35 bases" sobre todo el árbol antes de cerrar.
 5. **`SSISDB` (id 36) no la excluye `database_id > 4`** y no es una base de negocio. Dejala **dentro** del loop por ahora y **anotá en el runbook que es una decisión pendiente de Patrick**, no un efecto colateral del filtro.
-6. El catálogo suma la garantía `deny-escritura` para `sqlserver`: `plugins/bisalta-db/catalogo.json`, entrada `dev-sql`. Lo verifica `AC14`, que ya existe.
+6. ~~El catálogo suma la garantía `deny-escritura` para `sqlserver`~~ — **derogado en v10**: ninguna entrada la usa. El enum conserva el valor para una conexión futura.
 
 ## Problema
 

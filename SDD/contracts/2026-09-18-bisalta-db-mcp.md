@@ -1,6 +1,18 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v10
+- **Versión**: v11
+
+### Cambios v10 → v11 (enmienda del planner, 21-sep-2026)
+
+Tres defectos **del contract**, señalados como `ADVISORY` por el reviewer en la ronda 1 de v10. Ninguno es del implementador.
+
+**1. La decisión central de v10 no tenía AC.** La revocación por enumeración —*"se concede desde una lista explícita, se revoca por enumeración"*— es lo que v10 cambió, y su única cobertura era **incidental**: el verde de cierre de la mutación de `AC7` sería imposible si el inverso leyera sólo `@bases_permitidas`. Eso no es un AC, es un efecto colateral. **Es el mismo defecto que causó el `ESCALATE` de v6 → v7**: cambiar el diseño sin reconciliar los ACs que lo verifican, y la disciplina está escrita dos veces en este mismo contract. Nace `AC43`.
+
+**2. Dos líneas de la sección "Cambios v8 → v9" leen como vigentes** — *"cada base concedida lleva las dos membresías"* — cuando v10 las derogó. Están dentro de un changelog de versión, así que describen lo que era cierto entonces; pero sin marca, alguien que las lea de paso concluye lo contrario de lo que el contract manda hoy. Quedan marcadas.
+
+**3. El brief de R1 seguía fijado en el contract v6** y describía `db_denydatawriter` como vigente en sus puntos 3 y 6. Corregido a v10.
+
+Y un defecto de `CHANGELOG.md` que el reviewer clasificó como del agente pero es **prosa del planner**: la entrada `0.1.0` de `bisalta-db` presentaba `db_denydatawriter` como garantía vigente —*"el rol deja de ser la única barrera de ese motor"*—, el inverso exacto de lo que v10 decide. Corregido acá, no en el brief del agente.
 
 ### Cambios v9 → v10 (decisiones de Patrick Ocampo, Slack 21-sep-2026 12:22 y 12:44)
 
@@ -47,7 +59,7 @@ Cerrarla de verdad exigiría una de dos cosas, y ninguna se toma en este ciclo: 
 
 **5. La aprobación de Dev SQL se reemplaza entera** por el texto del 21-sep-2026, que anula el del 18-sep. El anterior omitía `CONSTRUPLAZA_EFLOW` y además **declaraba un alcance más amplio del que va a existir**. El nuevo lleva siete puntos y una tabla `BASES CONCEDIDAS` con fecha y solicitante, más fecha de revisión al cierre del corte (17-oct-2026).
 
-**6. Sin cambios**: `SSISDB` fuera de forma permanente, más `master`, `model`, `msdb` y `tempdb`. Cada base concedida lleva las dos membresías. La credencial la genera y la carga Patrick.
+**6. Sin cambios**: `SSISDB` fuera de forma permanente, más `master`, `model`, `msdb` y `tempdb`. ~~Cada base concedida lleva las dos membresías.~~ **Derogado en v10**: lleva `db_datareader` y nada más. La credencial la genera y la carga Patrick.
 
 ### Cambios v7 → v8 (mediciones de Patrick Ocampo, Slack 18-sep-2026 16:58 y 17:15; decisiones de Ian Vargas 21-sep-2026)
 
@@ -468,6 +480,10 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 **AC42** — Tras correr la parte B de SQL Server, el user tiene en **cada base de la lista explícita** la membresía `db_datareader` **y ninguna otra**: ni `db_denydatawriter` (quitada en v10), ni `db_datawriter`, ni `db_owner`. Un `INSERT` falla por **ausencia de permiso**, no por `DENY`.
 `manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
 **Mutación declarada**: agregar el user a `db_datawriter` en una base de scratch de la lista; el `INSERT` tiene que pasar — o sea, la comprobación de que falla se pone roja. Quitarlo de `db_datawriter`: el `INSERT` vuelve a fallar por ausencia de permiso. **Ojo**: sin `db_denydatawriter` ya no hay `DENY` que anule un `GRANT`, así que esta mutación mide exactamente lo que v10 dejó — que la única capacidad del login es leer.
+
+**AC43** — `sqlserver-inverso.sql` saca a `bisalta_lectura` de **toda base `ONLINE` donde el user exista**, incluidas las que no están en `@bases_permitidas` y las cuatro de sistema, y **no lee `@bases_permitidas` en ningún punto**. Una base que no esté `ONLINE` no se puede tocar: el script lo reporta y el procedimiento declara la consecuencia.
+`manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
+**Mutación declarada**: crear a mano el user `bisalta_lectura` en una base de usuario que **no** esté en `@bases_permitidas`, y correr el inverso — tiene que sacarlo de ahí también. Después, reemplazar el cursor del inverso por uno que recorra `@bases_permitidas` (la forma que el script tenía hasta v9): la comprobación tiene que ponerse roja, porque el user sobreviviría en esa base. Restaurar la enumeración.
 
 ## Checklist del arquetipo
 
