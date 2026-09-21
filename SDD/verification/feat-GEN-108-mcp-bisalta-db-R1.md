@@ -227,8 +227,21 @@ sellado de esta ronda (`f728033`, ver escalera de arriba).
 
 Este mismo archivo de verification queda fuera del árbol que el runner selló
 (el `Tree:` de la cabecera es anterior a este addendum). Corrida sobre el
-árbol final, **después** de commitear este addendum, con árbol limpio
-confirmado antes de correr — hash y salida abajo se completan en el commit
-de cierre de esta ronda, mismo patrón en cascada que `D34`/`D35` describen
-para este runner (el propio archivo de evidencia no puede citar el hash del
-commit que lo contiene sin haberse commiteado primero).
+árbol final, **después** de commitear el addendum de arriba (commit
+`dc348b1`, árbol limpio confirmado con `git status --short` antes de
+correr):
+
+```
+$ git status --short
+$ git rev-parse HEAD
+dc348b10ec44a762fb60b61fcbfd7e7ce54af522
+$ bash SDD/tests/secret-scan.sh
+secret-scan: sin hallazgos sobre 164 archivos versionados (1 excluido: self)
+$ echo $?
+0
+```
+
+Este párrafo final se agrega en un commit posterior a `dc348b1`, ya que el
+propio archivo de evidencia no puede documentar su propio hash de commit sin
+haberse commiteado primero — mismo patrón en cascada que `D34`/`D35`
+describen para este runner.
