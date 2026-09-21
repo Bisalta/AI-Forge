@@ -411,18 +411,18 @@ selló (el `Tree:` de la cabecera es anterior a este addendum). Corrida
 sobre el árbol final, **después** de commitear este addendum:
 
 ```
-$ git add SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md
-$ git commit -m "..."
 $ git status --short
 $ git rev-parse HEAD
-<hash del commit de este addendum>
+37fd716a1fff42ce519321b115d8cb555864fe3f
 $ bash SDD/tests/secret-scan.sh
-secret-scan: sin hallazgos sobre <N> archivos versionados (1 excluido: self)
+secret-scan: sin hallazgos sobre 164 archivos versionados (1 excluido: self)
 $ echo $?
 0
 ```
 
-(Comando y salida reales, con el hash real del commit, pegados en la
-sección siguiente después de commitear — mismo patrón en cascada que
-`D34`/`D35` describen: el archivo de evidencia no puede documentar su
-propio hash de commit sin haberse commiteado primero.)
+Árbol limpio confirmado (`git status --short` sin salida) antes de correr,
+sobre el commit `37fd716` — el que contiene este mismo addendum ya
+commiteado. Este párrafo final se agrega en un commit posterior a
+`37fd716`, por el mismo motivo en cascada que `D34`/`D35` describen: el
+archivo de evidencia no puede documentar su propio hash de commit sin
+haberse commiteado primero.
