@@ -1,7 +1,7 @@
 # Feature Ready — `bisalta-db` v0.1.0 · consulta de solo lectura sin credencial en contexto
 
-**Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v8** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
-**Agentes**: `AGENT_r1` (infra, 5 rondas) · `AGENT_r2` (third-party-integration, 2 rondas)
+**Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v9** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
+**Agentes**: `AGENT_r1` (infra, 8 rondas en tres alcances) · `AGENT_r2` (third-party-integration, 2 rondas)
 **Gates**: suite 17/17 · secret-scan exit 0 · shellcheck exit 0 · linter de closure exit 0
 
 ---
@@ -40,8 +40,9 @@ Un plugin que le da a Claude Code y a NEO consulta de solo lectura contra las ba
 | | |
 |---|---|
 | **R2 — el plugin** | `APPROVED` por el reviewer. 30 ACs, 17 triples `verde → rojo → verde` re-corridos por él |
-| **R1 — el aprovisionamiento** | Cerrado por **ratificación del planner tras `ESCALATE`**, no por un `APPROVED`. El cap de 3 rondas se agotó y el defecto que quedaba era del contract, no del implementador |
+| **R1 — el aprovisionamiento** | `APPROVED` por el reviewer sobre el alcance de **v9** (la lista explícita), tras auditarle el barrido de clase receta por receta. Antes hubo un `ESCALATE` sobre el alcance de v7, resuelto por ratificación del planner: el defecto que quedaba era del contract, no del implementador |
 | **10 de los 12 ACs de R1** | `manual-only` con razón escrita, en estado **`pendiente-de-ejecución`**. Ningún harness de este repo puede crear un rol de Postgres |
+| **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep (`COMPRAS`, `COMPRAS_STG`, `Ecommerce`, `Ecommerce_qa`, `EXACTUS`, `BI` — 861 GB de 1383), **iniciales para probar la herramienta**, no definitivas |
 | **Ejecución del aprovisionamiento** | **Frenada por Patrick** hasta que defina alcance |
 | **Deuda** | `D32`–`D44`. Dos son del propio `sdd-flow` (`D34`/`D35`: el verification report queda fuera del gate que valida el árbol) |
 

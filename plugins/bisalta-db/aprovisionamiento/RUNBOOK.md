@@ -397,7 +397,9 @@ sqlcmd -S 10.24.40.137 -E -Q "DROP DATABASE zz_scratch_ac6;"
 **Estado de arranque de la instancia de prueba** (aplica a los dos pasos
 de abajo, "Lista vacía" y "Mutación declarada"): el paso de lista vacía
 sólo mide lo que declara si la instancia de prueba **nunca fue
-aprovisionada antes** con `bisalta_lectura` (si el user ya existiera en
+aprovisionada antes con el user `bisalta_lectura` en ninguna base** — el
+**login** sí tiene que existir, y este mismo bloque manda crearlo abajo
+(si el user ya existiera en
 alguna base de una corrida previa, `tiene_user` seguiría en `1` ahí y no
 en `0` en absolutamente todas las filas, sin que la copia recién corrida
 tenga nada que ver). El paso de mutación, al revés, sólo llega a correr
