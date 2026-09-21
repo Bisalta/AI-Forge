@@ -1,6 +1,6 @@
 # Runbook — aprovisionamiento de solo lectura para `bisalta-db`
 
-Contract: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v10, requerimiento R1 (`infra`), AC1–AC10, AC41, AC42.
+Contract: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v11, requerimiento R1 (`infra`), AC1–AC10, AC41, AC42, AC43.
 
 Este runbook lo ejecuta **una persona con privilegios de administración** en
 cada motor y en la cuenta de AWS de dev/qa. Ningún script de este directorio
@@ -76,6 +76,44 @@ rechazo del trabajo — las dos revierten decisiones puntuales.
    trabajo recortada, y el `DROP LOGIN` incondicional del final deja de
    ser un caso especial a vigilar, porque después de una enumeración
    completa es exactamente lo que corresponde.
+
+**v11 (ronda 2 de review sobre v10, dos MAJOR y dos MINOR)**: la decisión
+central del punto 2 de v10 tiene AC propio recién ahora — `AC43`, nuevo,
+sección propia más abajo — porque su única cobertura hasta acá era
+incidental (mismo defecto que el `ESCALATE` de v6 → v7). Además:
+
+1. **MAJOR 1 — la comprobación de "ninguna otra membresía" de `AC42`
+   filtraba por una lista cerrada de nombres de rol** (`r.name IN
+   ('db_datareader','db_denydatawriter','db_datawriter','db_owner')`), que
+   mide "ninguna de estas tres" y no "ninguna otra": una membresía en
+   `db_ddladmin`, `db_securityadmin`, `db_accessadmin`,
+   `db_backupoperator`, `db_denydatareader` o un rol de base a mano
+   pasaba con el mismo verde falso. Corregido quitando el filtro por
+   nombre — ver sección "AC42" más abajo.
+2. **MAJOR 2 — el inverso saca al user de "TODAS" las bases era más de lo
+   que el script sostiene**: una base `NO ONLINE` con el user no se toca
+   (el `PRINT` ya lo decía, sección "SIN SALTOS SILENCIOSOS" del
+   comentario de cabecera de `sqlserver-inverso.sql`), pero el `DROP
+   LOGIN` incondicional del final corre igual — dejando un **huérfano**
+   real si eso pasa. Acotado a "toda base **ONLINE**" en el comentario de
+   cabecera de `sqlserver-inverso.sql` y en `sqlserver-parte-b.sql`, y
+   agregado a la viñeta "Inverso" y al "Procedimiento de baja" (pasos 2 y
+   4) el mandato de revisar las líneas `NO ONLINE:`/el listado de
+   `sys.databases` antes de dar el inverso por completo.
+3. **MINOR — `@estado IS NULL`** en `sqlserver-inverso.sql`: una base
+   borrada entre el `SELECT` del cursor y la re-consulta de `state` caía
+   por `UNKNOWN` al `ELSE` y ejecutaba `USE` sobre una base inexistente.
+   Corregido: el cursor trae `name` y `state` en una sola pasada, sin
+   re-consulta y sin `NULL` posible.
+4. **MINOR — la mutación de `AC42` concede `db_datawriter` sobre todo
+   `EXACTUS`** (395 GB, copia de producción) al login compartido; una
+   interrupción entre conceder y revocar dejaría esa concesión en pie sin
+   que el runbook lo dijera. Declarado en la sección "AC42" más abajo.
+
+Barrido de clase de esta ronda (impact set, no directorio): el mismo
+sobreclamado de "TODAS las bases" para el inverso también vivía en el
+comentario "CÓMO DAR DE BAJA UNA BASE" de `sqlserver-parte-b.sql` —
+corregido ahí también.
 
 ## Prerequisitos
 
@@ -188,11 +226,11 @@ se documenta partida, el valor real se arma al usarlo).
   se crea con una CMK propia, esa policy necesita además `kms:Decrypt`
   sobre esa clave — no aplica a los tres secretos de este runbook.
 
-## Verificación de AC1–AC8, AC41 y AC42
+## Verificación de AC1–AC8, AC41, AC42 y AC43
 
 Cada verificación es `manual-only`: ningún harness de este repo puede crear
 un rol de Postgres, alcanzar la VPC de dev/qa, o alcanzar `10.24.40.137`.
-Estado tras esta ronda: **pendiente-de-ejecucion** para las diez.
+Estado tras esta ronda: **pendiente-de-ejecucion** para las once.
 
 ### AC41 — la Parte 0 aborta por lo que el cluster CONTIENE, no por el nombre de la base
 
@@ -608,22 +646,33 @@ Comprobación real, sobre `EXACTUS` en `Dev SQL` — una de las bases
 nombradas en `@bases_permitidas`, ya aprovisionada por
 `sqlserver-parte-b.sql` real:
 
+**Sin filtro de nombres de rol** (ronda 2 de review, MAJOR 1): `AC42`
+afirma `db_datareader` **y ninguna otra** — no "ninguna de una lista
+cerrada de tres". Filtrar `r.name IN (...)` mide sólo esas tres y deja
+pasar cualquier otra membresía de base (`db_ddladmin`, `db_securityadmin`,
+`db_accessadmin`, `db_backupoperator`, `db_denydatareader`, o un rol de
+base definido a mano) con el mismo verde falso: la fila que la consulta
+devolvería seguiría siendo una sola (`db_datareader`), sin que la
+propiedad que `AC42` afirma fuera cierta. La consulta sin filtro es el
+enunciado literal del AC: `public` es implícito y **no** aparece en
+`sys.database_role_members`, así que no hace falta excluirlo a mano.
+
 ```
 sqlcmd -S 10.24.40.137 -E -d EXACTUS -Q "
 SELECT r.name AS rol
 FROM sys.database_role_members drm
 JOIN sys.database_principals r ON drm.role_principal_id = r.principal_id
 JOIN sys.database_principals m ON drm.member_principal_id = m.principal_id
-WHERE m.name = 'bisalta_lectura' AND r.name IN ('db_datareader','db_denydatawriter','db_datawriter','db_owner')
+WHERE m.name = 'bisalta_lectura'
 ORDER BY r.name;
 "
 ```
 
-Esperado: **una sola fila**, `db_datareader` — ninguna de las otras tres.
-Repetir la misma consulta cambiando `-d EXACTUS` por cada una de las
-demás bases que declare `@bases_permitidas` en `sqlserver-parte-b.sql`
-vigente (abrir el script para ver cuáles son, no retranscribirlas acá):
-una sola fila en cada una.
+Esperado: **una sola fila**, `db_datareader` — ninguna otra, sin importar
+su nombre. Repetir la misma consulta cambiando `-d EXACTUS` por cada una
+de las demás bases que declare `@bases_permitidas` en
+`sqlserver-parte-b.sql` vigente (abrir el script para ver cuáles son, no
+retranscribirlas acá): una sola fila en cada una.
 
 **Con la lista explícita (v9), y desde v10 sin necesidad de ninguna copia
 de trabajo del script**: a diferencia de la ronda anterior, la mutación
@@ -650,7 +699,18 @@ Esperado: falla con `The INSERT permission was denied` — ausencia de
 permiso, sin que nada lo deniegue explícitamente.
 
 **Mutación declarada** (contract v10, AC42): otorgar `db_datawriter` al
-user sobre esta misma base de scratch:
+user sobre esta misma base de scratch. **Ojo (ronda 2 de review,
+MINOR)**: `ALTER ROLE db_datawriter ADD MEMBER` no acota el permiso a
+`zz_scratch_ac42` — concede escritura sobre **todo `EXACTUS`**, la copia
+de producción completa (395 GB), al login vivo compartido
+(`bisalta_lectura`), no sólo sobre la tabla de scratch. El camino feliz de
+este procedimiento revoca esa membresía dos pasos más abajo y nadie
+escribe nada en el medio, pero si algo interrumpe la corrida entre estos
+dos comandos (la sesión se corta, alguien más usa la misma instancia), la
+concesión sobre toda la base queda en pie sin que este runbook lo declare
+en ningún lado hasta ese momento — quien retome tiene que revisar
+`sys.database_role_members` en `EXACTUS` antes de asumir el estado
+esperado:
 
 ```
 sqlcmd -S 10.24.40.137 -E -d EXACTUS -Q "ALTER ROLE db_datawriter ADD MEMBER bisalta_lectura;"
@@ -680,6 +740,76 @@ corrido, limpiar:
 ```
 sqlcmd -S 10.24.40.137 -E -d EXACTUS -Q "DROP TABLE zz_scratch_ac42;"
 ```
+
+### AC43 — el inverso revoca por enumeración, no lee `@bases_permitidas`
+
+`AC43` (contract v11) es el AC propio que le faltaba a la decisión central
+de v10: hasta ahora, que `sqlserver-inverso.sql` revoca por enumeración en
+vez de leer la lista sólo tenía cobertura **incidental** (el verde de
+cierre de la mutación de `AC7`, sección de arriba, sería imposible si el
+inverso leyera únicamente `@bases_permitidas` — pero ningún AC lo afirmaba
+por sí mismo, y eso es exactamente el defecto que causó el `ESCALATE` de
+v6 → v7 de este mismo contract). Afirma dos cosas: (a) el inverso saca al
+user de toda base **ONLINE** donde exista, estén o no en la lista,
+incluidas las cuatro de sistema; (b) el script **no lee
+`@bases_permitidas` en ningún punto** de su cuerpo — confirmable con
+`grep -n "bases_permitidas" sqlserver-inverso.sql`, que no tiene que
+devolver nada.
+
+**Comprobación real (verde), sobre una instancia de prueba** (no `Dev
+SQL` directamente): crear a mano el user `bisalta_lectura` en una base
+que **no** esté en `@bases_permitidas` de `sqlserver-parte-b.sql`
+vigente — `CONSTRUPLAZA_EFLOW` (`INVENTARIO.md`, 266.92 GB) sirve de
+ejemplo porque es una base real de `Dev SQL` que la lista nunca nombra;
+requiere que el login `bisalta_lectura` ya exista en esa instancia
+(aprovisionarlo con `sqlserver-parte-a.sql` real si hace falta, igual que
+en AC7):
+
+```
+sqlcmd -S <instancia-de-prueba> -E -d CONSTRUPLAZA_EFLOW -Q "CREATE USER bisalta_lectura FOR LOGIN bisalta_lectura;"
+```
+
+Correr el inverso real, sin modificar:
+
+```
+sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-inverso.sql
+```
+
+Esperado: el `DROP USER bisalta_lectura` corre también dentro de
+`CONSTRUPLAZA_EFLOW` — confirmar con
+
+```
+sqlcmd -S <instancia-de-prueba> -E -d CONSTRUPLAZA_EFLOW -Q "SELECT 1 FROM sys.database_principals WHERE name = 'bisalta_lectura';"
+```
+
+que tiene que devolver **cero filas**. Es la comprobación de que el
+inverso saca al user de una base que nunca estuvo en la lista y que nadie
+tuvo que nombrar.
+
+**Mutación declarada** (contract v11, AC43): en una copia de trabajo
+`sqlserver-inverso-mutado.sql`, reemplazar el cursor `SELECT name, state
+FROM sys.databases` por uno que recorra `@bases_permitidas` — la forma
+que el script tenía hasta v9 (mismo patrón de cursor sobre la variable de
+tabla que usa hoy `sqlserver-parte-b.sql`, declarando la misma lista de
+bases con `INSERT INTO @bases_permitidas`, y sin filtro `state` porque
+esa forma vieja no lo necesitaba para revocar por lista). Repetir el paso
+de crear a mano al user en `CONSTRUPLAZA_EFLOW` (si ya se limpió en el
+paso anterior) y correr la copia mutada:
+
+```
+sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-inverso-mutado.sql
+```
+
+Esperado en este paso: la comprobación se pone **roja** —
+`bisalta_lectura` **sobrevive** en `CONSTRUPLAZA_EFLOW` (la consulta de
+`sys.database_principals` de arriba devuelve una fila), porque el cursor
+mutado sólo recorre las bases de `@bases_permitidas` y esa base nunca
+estuvo ahí. Restaurar la enumeración real (descartar la copia mutada, no
+commitearla nunca) y volver a correr `sqlserver-inverso.sql` real contra
+la instancia de prueba para confirmar el verde de cierre —
+`bisalta_lectura` fuera de `CONSTRUPLAZA_EFLOW` otra vez.
+
+`manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
 
 ### AC8 — cada secreto existe, tiene los dos campos, y es legible con la política IAM
 
@@ -777,12 +907,26 @@ tampoco al catálogo de la aplicación (`plugins/bisalta-db/catalogo.json`)
 - SQL Server: `sqlserver-inverso.sql`, una sola corrida contra la
   instancia. **Desde v10 no lee ninguna lista** (decisión de Patrick
   Ocampo: "se concede desde una lista explícita, se revoca por
-  enumeración") — recorre `sys.databases` entero, busca en cada base si
-  `sys.database_principals` tiene a `bisalta_lectura`, y lo saca de ahí;
-  al final borra el login, siempre. No hace falta agregar ni quitar nada
-  de `sqlserver-inverso.sql` cuando se edita la lista de
-  `sqlserver-parte-b.sql`: no tiene lista propia que mantener en
-  sincronía (ver comentario de cabecera de ese archivo).
+  enumeración") — recorre `sys.databases` entero, busca en cada base
+  **ONLINE** si `sys.database_principals` tiene a `bisalta_lectura`, y lo
+  saca de ahí; al final borra el login, siempre, incondicionalmente. No
+  hace falta agregar ni quitar nada de `sqlserver-inverso.sql` cuando se
+  edita la lista de `sqlserver-parte-b.sql`: no tiene lista propia que
+  mantener en sincronía (ver comentario de cabecera de ese archivo).
+  **Antes de correrlo** (ronda 2 de review, MAJOR 2), revisar si alguna
+  base relevante está `NO ONLINE` — `SELECT name, state FROM
+  sys.databases WHERE state <> 0` (misma consulta que la sección "AC7"
+  prescribe para lo que su cursor no puede ver): una base así **no** se
+  toca en esta corrida — el script la reporta por `PRINT` y sigue, pero
+  el `DROP LOGIN` incondicional del final corre igual. El resultado es un
+  **user huérfano**: `bisalta_lectura` sigue existiendo en esa base sin
+  ningún login de servidor detrás, hasta que alguien la vuelva a poner
+  `ONLINE` y reintente el inverso contra ella. Si en cambio alguien repara
+  ese huérfano con la rutina estándar (`ALTER USER ... WITH LOGIN` contra
+  el login nuevo que `sqlserver-parte-a.sql` cree después), esa base
+  recupera `db_datareader` sin haber estado nunca en `@bases_permitidas`
+  ni haber sido pedida de nuevo — dejarla anotada como reintento
+  pendiente evita ese resultado.
 - AWS: los tres secretos se borran a mano desde la cuenta de dev/qa (no
   hay script: crear/borrar secretos está fuera del scope de este runbook,
   igual que crearlos).
@@ -813,14 +957,24 @@ Orden para dar de baja una base (por ejemplo, `Ecommerce_qa`, con
    de `sqlserver-parte-b.sql` (única lista que existe: `sqlserver-
    inverso.sql` no tiene una propia) y registrar la baja en
    `APROBACIONES.md` (fecha y quién la pidió), igual que un alta.
-2. Correr `sqlserver-inverso.sql` **real, sin modificar**, contra la
+2. **Antes de correr**, revisar si alguna base está `NO ONLINE` (`SELECT
+   name, state FROM sys.databases WHERE state <> 0` — la misma consulta
+   de la sección "AC7"): si `COMPRAS`, `COMPRAS_STG`, `Ecommerce`,
+   `EXACTUS` o `BI` aparecen ahí, este paso **no** las va a limpiar de
+   verdad — el script las reporta por `PRINT` y las salta, pero el `DROP
+   LOGIN` del final corre igual — y quedarían con un `bisalta_lectura`
+   huérfano hasta reintentar el inverso contra ellas cuando vuelvan a
+   estar `ONLINE`. Anotar cualquier base así como reintento pendiente
+   antes de seguir.
+
+   Correr `sqlserver-inverso.sql` **real, sin modificar**, contra la
    instancia:
    ```
    sqlcmd -S 10.24.40.137 -E -b -i sqlserver-inverso.sql
    ```
-   Esto revoca a `bisalta_lectura` de **todas** las bases donde exista
-   hoy —incluidas `COMPRAS`, `COMPRAS_STG`, `Ecommerce`, `EXACTUS` y `BI`,
-   que se querían mantener— y borra el login. Es a propósito: la
+   Esto revoca a `bisalta_lectura` de **todas las bases ONLINE** donde
+   exista hoy —incluidas `COMPRAS`, `COMPRAS_STG`, `Ecommerce`, `EXACTUS`
+   y `BI`, que se querían mantener— y borra el login. Es a propósito: la
    enumeración no distingue "esta base sale" de "estas otras se quedan".
 3. Correr `sqlserver-parte-a.sql` real (recrea el login — con una
    contraseña nueva, que hay que cargar de nuevo en el secreto
@@ -833,7 +987,12 @@ Orden para dar de baja una base (por ejemplo, `Ecommerce_qa`, con
    (idempotente, ver su comentario "Idempotente").
 4. Confirmar con el bloque `##ac7_check` (sección "AC7" de arriba):
    `tiene_user = 0` para `Ecommerce_qa`, y `tiene_user = 1` en las cinco
-   bases que siguen en la lista.
+   bases que siguen en la lista. Correr también `SELECT name, state FROM
+   sys.databases WHERE state <> 0` (misma consulta que la sección "AC7"
+   prescribe para lo que el cursor de `##ac7_check` no puede ver, y la
+   misma del paso 2): cualquier base que aparezca ahí no quedó cubierta
+   por esta confirmación y queda pendiente de reintentar cuando vuelva a
+   `ONLINE`.
 
 **Decomiso completo** (ninguna base sigue activa): son los mismos cuatro
 pasos, salvo que el paso 1 deja la lista de `sqlserver-parte-b.sql`

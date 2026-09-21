@@ -41,8 +41,10 @@
 -- fila de este INSERT (y registrar la baja en APROBACIONES.md), correr
 -- `sqlserver-inverso.sql` REAL sin modificar (revoca por ENUMERACIÓN —
 -- recorre sys.databases entero, no lee esta lista — así que encuentra y
--- saca a bisalta_lectura de TODAS las bases donde exista hoy, incluidas
--- las que siguen en esta lista, y borra el login), y RECIÉN DESPUÉS
+-- saca a bisalta_lectura de TODAS LAS BASES ONLINE donde exista hoy,
+-- incluidas las que siguen en esta lista, y borra el login; una base NO
+-- ONLINE con el user no se toca y queda huérfana, ver comentario de
+-- cabecera de sqlserver-inverso.sql), y RECIÉN DESPUÉS
 -- volver a correr `sqlserver-parte-a.sql` (recrea el login) y este mismo
 -- script (por la lista ya actualizada, sin la base dada de baja) para
 -- dejar la instancia con exactamente lo que la lista declara ahora.

@@ -23,14 +23,20 @@
 -- por su cuenta. Un inverso que sólo leyera @bases_permitidas nunca vería
 -- ninguno de esos tres casos. Dos direcciones, dos fuentes de verdad.
 --
--- ES UNA REVOCACIÓN TOTAL, A PROPÓSITO: correr este archivo saca a
--- bisalta_lectura de TODAS las bases donde exista hoy —incluidas las que
--- siguen vigentes en la lista de sqlserver-parte-b.sql— y al final borra
--- el login incondicionalmente. Como la enumeración ya barrió el
--- universo entero antes de llegar a esa línea, al terminar el bucle el
--- login no le hace falta a ninguna base: el DROP LOGIN incondicional ya
--- no es una carrera contra "¿queda alguien que todavía lo necesite?",
--- es la consecuencia directa de haber revisado dónde estaba.
+-- ES UNA REVOCACIÓN TOTAL SOBRE TODA BASE ONLINE, A PROPÓSITO (ronda 2 de
+-- review, MAJOR 2 — "TODAS las bases" sin más era más de lo que este
+-- script puede sostener): correr este archivo saca a bisalta_lectura de
+-- TODAS LAS BASES ONLINE donde exista hoy —incluidas las que siguen
+-- vigentes en la lista de sqlserver-parte-b.sql— y al final borra el
+-- login incondicionalmente. Una base NO ONLINE (state <> 0) que todavía
+-- tenga a bisalta_lectura NO se toca (ver más abajo, "SIN SALTOS
+-- SILENCIOSOS"): la enumeración sólo barre el universo ONLINE antes de
+-- llegar a esa línea, no el universo entero. Por eso el DROP LOGIN
+-- incondicional del final SÍ puede dejar un huérfano real: un
+-- sys.database_principals con bisalta_lectura en una base que quedó
+-- afuera de la pasada por no estar ONLINE, y sin login de servidor
+-- detrás. RUNBOOK.md, sección "Inverso", manda revisar las líneas "NO
+-- ONLINE:" de la corrida antes de asumir que la revocación fue completa.
 --
 -- PARA DAR DE BAJA UNA SOLA BASE, MANTENIENDO LAS DEMÁS ACTIVAS: no se usa
 -- este archivo solo, ni una copia recortada de él (eso es exactamente lo
@@ -61,17 +67,23 @@ DECLARE @db_name SYSNAME;
 DECLARE @sql NVARCHAR(MAX);
 DECLARE @estado TINYINT;
 
+-- Ronda 2 de review, MINOR: el cursor trae `name` Y `state` en la misma
+-- pasada sobre sys.databases, en vez de traer sólo `name` y re-consultar
+-- `state` por nombre en cada vuelta del bucle. La re-consulta podía
+-- devolver NULL si la base se borraba entre el SELECT del cursor y esa
+-- segunda consulta: `IF @estado <> 0` con NULL evalúa UNKNOWN y cae al
+-- ELSE, ejecutando `USE` sobre una base que ya no existe y abortando la
+-- revocación a mitad bajo `-b`. Con una sola pasada, `@estado` nunca es
+-- NULL (viene del mismo snapshot que `@db_name`) y ese caso no puede
+-- ocurrir.
 DECLARE db_cursor CURSOR LOCAL FAST_FORWARD FOR
-  SELECT name FROM sys.databases;
+  SELECT name, state FROM sys.databases;
 
 OPEN db_cursor;
-FETCH NEXT FROM db_cursor INTO @db_name;
+FETCH NEXT FROM db_cursor INTO @db_name, @estado;
 
 WHILE @@FETCH_STATUS = 0
 BEGIN
-  SET @estado = NULL;
-  SELECT @estado = state FROM sys.databases WHERE name = @db_name;
-
   IF @estado <> 0
   BEGIN
     PRINT N'NO ONLINE: ' + @db_name
@@ -90,7 +102,7 @@ BEGIN
     EXEC sp_executesql @sql;
   END
 
-  FETCH NEXT FROM db_cursor INTO @db_name;
+  FETCH NEXT FROM db_cursor INTO @db_name, @estado;
 END
 
 CLOSE db_cursor;
