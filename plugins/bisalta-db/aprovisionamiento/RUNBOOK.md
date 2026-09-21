@@ -752,21 +752,32 @@ por sí mismo, y eso es exactamente el defecto que causó el `ESCALATE` de
 v6 → v7 de este mismo contract). Afirma dos cosas: (a) el inverso saca al
 user de toda base **ONLINE** donde exista, estén o no en la lista,
 incluidas las cuatro de sistema; (b) el script **no lee
-`@bases_permitidas` en ningún punto** de su cuerpo — confirmable con
-`grep -n "bases_permitidas" sqlserver-inverso.sql`, que no tiene que
-devolver nada.
+`@bases_permitidas` en su cuerpo ejecutable** — el string sólo aparece en
+el comentario de cabecera que documenta justamente que no se lee (líneas
+6 y 23 de `sqlserver-inverso.sql`), y ese comentario no cuenta como
+lectura. Confirmable acotando el grep a lo que no es comentario:
+`grep -n "bases_permitidas" sqlserver-inverso.sql | grep -v '^[0-9]*:--'`,
+que **no tiene que devolver nada** (el `grep -v` filtra cualquier línea
+cuyo contenido, después de los dos puntos del número de línea, empiece
+con `--`).
 
 **Comprobación real (verde), sobre una instancia de prueba** (no `Dev
 SQL` directamente): crear a mano el user `bisalta_lectura` en una base
 que **no** esté en `@bases_permitidas` de `sqlserver-parte-b.sql`
 vigente — `CONSTRUPLAZA_EFLOW` (`INVENTARIO.md`, 266.92 GB) sirve de
-ejemplo porque es una base real de `Dev SQL` que la lista nunca nombra;
-requiere que el login `bisalta_lectura` ya exista en esa instancia
-(aprovisionarlo con `sqlserver-parte-a.sql` real si hace falta, igual que
-en AC7):
+ejemplo porque es una base real de `Dev SQL` que la lista nunca nombra —
+y también en `msdb`, una de las cuatro bases de sistema que (a) nombra
+explícitamente: sin este segundo user, esa mitad de (a) sólo se sostiene
+por inspección del cursor sin filtro (`SELECT name, state FROM
+sys.databases`, sin condición sobre `database_id` ni sobre el nombre),
+nunca por una corrida real (ronda 3 de review, MINOR — `D40` se cerró
+apoyándose en esa afirmación sin ejercitarla). Requiere que el login
+`bisalta_lectura` ya exista en esa instancia (aprovisionarlo con
+`sqlserver-parte-a.sql` real si hace falta, igual que en AC7):
 
 ```
 sqlcmd -S <instancia-de-prueba> -E -d CONSTRUPLAZA_EFLOW -Q "CREATE USER bisalta_lectura FOR LOGIN bisalta_lectura;"
+sqlcmd -S <instancia-de-prueba> -E -d msdb -Q "CREATE USER bisalta_lectura FOR LOGIN bisalta_lectura;"
 ```
 
 Correr el inverso real, sin modificar:
@@ -776,15 +787,19 @@ sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-inverso.sql
 ```
 
 Esperado: el `DROP USER bisalta_lectura` corre también dentro de
-`CONSTRUPLAZA_EFLOW` — confirmar con
+`CONSTRUPLAZA_EFLOW` y dentro de `msdb` — confirmar con
 
 ```
 sqlcmd -S <instancia-de-prueba> -E -d CONSTRUPLAZA_EFLOW -Q "SELECT 1 FROM sys.database_principals WHERE name = 'bisalta_lectura';"
+sqlcmd -S <instancia-de-prueba> -E -d msdb -Q "SELECT 1 FROM sys.database_principals WHERE name = 'bisalta_lectura';"
 ```
 
-que tiene que devolver **cero filas**. Es la comprobación de que el
-inverso saca al user de una base que nunca estuvo en la lista y que nadie
-tuvo que nombrar.
+que tienen que devolver **cero filas** las dos. La primera es la
+comprobación de que el inverso saca al user de una base que nunca estuvo
+en la lista y que nadie tuvo que nombrar; la segunda es la comprobación
+de que también lo saca de una base **de sistema**, ejercitando de verdad
+la mitad de (a) que hasta esta ronda sólo se afirmaba por lectura del
+script.
 
 **Mutación declarada** (contract v11, AC43): en una copia de trabajo
 `sqlserver-inverso-mutado.sql`, reemplazar el cursor `SELECT name, state
@@ -921,12 +936,26 @@ tampoco al catálogo de la aplicación (`plugins/bisalta-db/catalogo.json`)
   el `DROP LOGIN` incondicional del final corre igual. El resultado es un
   **user huérfano**: `bisalta_lectura` sigue existiendo en esa base sin
   ningún login de servidor detrás, hasta que alguien la vuelva a poner
-  `ONLINE` y reintente el inverso contra ella. Si en cambio alguien repara
-  ese huérfano con la rutina estándar (`ALTER USER ... WITH LOGIN` contra
-  el login nuevo que `sqlserver-parte-a.sql` cree después), esa base
-  recupera `db_datareader` sin haber estado nunca en `@bases_permitidas`
-  ni haber sido pedida de nuevo — dejarla anotada como reintento
-  pendiente evita ese resultado.
+  `ONLINE`. La limpieza de ese huérfano **no es volver a correr
+  `sqlserver-inverso.sql` completo** contra la instancia: para entonces el
+  script ya borró el login y ya revocó al user de todas las demás bases
+  que estaban `ONLINE` en esa corrida, así que una segunda corrida
+  completa no tiene nada más que hacer sobre esas otras bases — y si
+  alguna de ellas fue re-concedida después (por ejemplo, con
+  `sqlserver-parte-a.sql` + `sqlserver-parte-b.sql`, como en un alta o en
+  el "Procedimiento de baja" más abajo), esa segunda corrida se la
+  revoca otra vez y vuelve a borrar el login, deshaciendo trabajo ya
+  hecho. La limpieza correcta es dirigida, contra la base huérfana sola:
+
+  ```
+  sqlcmd -S <instancia> -E -d <base> -Q "IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'bisalta_lectura') DROP USER bisalta_lectura;"
+  ```
+
+  Si en cambio alguien repara ese huérfano con la rutina estándar
+  (`ALTER USER ... WITH LOGIN` contra el login vivo), esa base recupera
+  `db_datareader` sin haber estado nunca en `@bases_permitidas` ni haber
+  sido pedida de nuevo — dejarla anotada como pendiente de limpieza
+  dirigida (no de "reintentar el inverso") evita ese resultado.
 - AWS: los tres secretos se borran a mano desde la cuenta de dev/qa (no
   hay script: crear/borrar secretos está fuera del scope de este runbook,
   igual que crearlos).
@@ -963,9 +992,17 @@ Orden para dar de baja una base (por ejemplo, `Ecommerce_qa`, con
    `EXACTUS` o `BI` aparecen ahí, este paso **no** las va a limpiar de
    verdad — el script las reporta por `PRINT` y las salta, pero el `DROP
    LOGIN` del final corre igual — y quedarían con un `bisalta_lectura`
-   huérfano hasta reintentar el inverso contra ellas cuando vuelvan a
-   estar `ONLINE`. Anotar cualquier base así como reintento pendiente
-   antes de seguir.
+   huérfano hasta que vuelvan a estar `ONLINE`. **No** queda pendiente de
+   "reintentar el inverso": para cuando se note esto ya pasó el paso 3,
+   que re-concede desde cero a `COMPRAS`, `COMPRAS_STG`, `Ecommerce`,
+   `EXACTUS` y `BI` — correr `sqlserver-inverso.sql` completo otra vez
+   revocaría a esas cinco de nuevo y borraría el login que el paso 3
+   acaba de recrear. Anotar cualquier base así como pendiente de limpieza
+   **dirigida**, con:
+   ```
+   sqlcmd -S 10.24.40.137 -E -d <base> -Q "IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'bisalta_lectura') DROP USER bisalta_lectura;"
+   ```
+   cuando esa base vuelva a estar `ONLINE`, antes de seguir.
 
    Correr `sqlserver-inverso.sql` **real, sin modificar**, contra la
    instancia:
@@ -991,8 +1028,13 @@ Orden para dar de baja una base (por ejemplo, `Ecommerce_qa`, con
    sys.databases WHERE state <> 0` (misma consulta que la sección "AC7"
    prescribe para lo que el cursor de `##ac7_check` no puede ver, y la
    misma del paso 2): cualquier base que aparezca ahí no quedó cubierta
-   por esta confirmación y queda pendiente de reintentar cuando vuelva a
-   `ONLINE`.
+   por esta confirmación. Para este punto el paso 3 ya recreó el login y
+   ya re-concedió las cinco bases activas, así que la pendiente **no** se
+   resuelve reintentando `sqlserver-inverso.sql` completo — eso repetiría
+   la revocación total sobre las cinco que este mismo paso acaba de
+   confirmar en `ONLINE` y volvería a borrar el login recién recreado.
+   Queda pendiente de limpieza **dirigida** (mismo comando `DROP USER`
+   del paso 2, contra esa base sola) para cuando vuelva a estar `ONLINE`.
 
 **Decomiso completo** (ninguna base sigue activa): son los mismos cuatro
 pasos, salvo que el paso 1 deja la lista de `sqlserver-parte-b.sql`
