@@ -146,4 +146,5 @@ exacto de `sys.databases`, no uno recordado.
 - **SQL Server**: las 32 están `ONLINE`, así que hoy el filtro `state = 0` no saltea
   ninguna — el hueco de las bases OFFLINE/RESTORING sigue siendo real a futuro, no ahora.
   Ninguna está en solo lectura, así que el motor no aporta ninguna barrera: se confirma
-  que el rol es la única, con `db_denydatawriter` como segunda red.
+  que el rol (`db_datareader`) es la única — desde v10 (decisión de Patrick Ocampo,
+  `db_denydatawriter` se quitó) literalmente la única, sin una segunda red de `DENY`.

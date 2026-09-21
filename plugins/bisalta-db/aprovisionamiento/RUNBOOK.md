@@ -1,6 +1,6 @@
 # Runbook — aprovisionamiento de solo lectura para `bisalta-db`
 
-Contract: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v9, requerimiento R1 (`infra`), AC1–AC10, AC41, AC42.
+Contract: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v10, requerimiento R1 (`infra`), AC1–AC10, AC41, AC42.
 
 Este runbook lo ejecuta **una persona con privilegios de administración** en
 cada motor y en la cuenta de AWS de dev/qa. Ningún script de este directorio
@@ -15,8 +15,10 @@ del cluster de dev/qa desde que existe, no las 2 del catálogo de la
 aplicación. `postgres-parte-b.sql` **nunca fue la barrera de acceso**; la
 barrera real es qué cluster es (`postgres-parte-0.sql`, nuevo, corre
 primero — ver "Orden de ejecución" y AC41 abajo). Del lado de SQL Server,
-`db_denydatawriter` se suma a `db_datareader` como segunda red (AC42): el
-`DENY` le gana a cualquier `GRANT` posterior.
+`db_denydatawriter` se sumó a `db_datareader` como segunda red (AC42): el
+`DENY` le ganaba a cualquier `GRANT` posterior. **Revertido en v10** (ver
+sección "v10" abajo): `db_denydatawriter` sale del loop, y `db_datareader`
+pasa a ser la única garantía.
 
 **v6 (respuestas de Patrick Ocampo, Slack 2026-09-18 15:52 CST)**: `SSISDB`
 queda **fuera** del loop de SQL Server, por nombre — ver sección "`SSISDB`
@@ -44,6 +46,36 @@ en profundidad**, no como el criterio de alcance: si alguien las escribe
 en la lista por error, el script las rechaza igual y avisa por qué (ver
 `AC7` abajo). La aprobación completa está en `APROBACIONES.md`, que este
 runbook no reemplaza ni resume.
+
+**v10 (decisiones de Patrick Ocampo, Slack 21-sep-2026 12:22 y 12:44)**:
+dos reversiones sobre lo que R1 había dejado `APPROVED`, ninguna un
+rechazo del trabajo — las dos revierten decisiones puntuales.
+
+1. **Sale `db_denydatawriter`.** Cada base concedida lleva `db_datareader`
+   y nada más. Revierte el punto 4 de v4. Patrick pidió explícitamente que
+   quedara escrito con lo que se pierde, no sólo con lo que queda —
+   textual, ya en `APROBACIONES.md` punto 6: *"sin `db_denydatawriter` no
+   queda un `DENY` explícito, así que un `GRANT` de escritura concedido por
+   error en el futuro no tendría nada que lo anule."* La tabla "Garantías
+   por motor" (arriba en el contract, y en `README.md`) vuelve a **una
+   sola garantía** en SQL Server, y la afirmación *"el rol es la única
+   barrera"* pasa de ser una omisión a ser una decisión cierta. `AC42`
+   cambia de propiedad: ya no afirma que el `DENY` le gane a un `GRANT`,
+   afirma que el user no tiene NINGUNA otra membresía además de
+   `db_datareader` — ver sección "AC42" más abajo, reescrita entera.
+2. **El inverso deja de leer la lista: revoca por enumeración.** Patrick
+   rechazó el Procedimiento de baja que R1 había documentado —correr el
+   inverso con la lista completa y editarla después— porque "depende de
+   que alguien recuerde el orden". Su regla, textual: *"Se concede desde
+   una lista explícita, se revoca por enumeración."* `sqlserver-inverso.sql`
+   ahora recorre `sys.databases` entero buscando dónde existe
+   `bisalta_lectura` en `sys.database_principals`, y lo saca de ahí, sin
+   leer `@bases_permitidas` en absoluto — ver comentario de cabecera de ese
+   archivo. Esto **simplifica del todo** el Procedimiento de baja (sección
+   "Inverso" más abajo, reescrita): ya no hace falta ninguna copia de
+   trabajo recortada, y el `DROP LOGIN` incondicional del final deja de
+   ser un caso especial a vigilar, porque después de una enumeración
+   completa es exactamente lo que corresponde.
 
 ## Prerequisitos
 
@@ -80,7 +112,7 @@ runbook no reemplaza ni resume.
 6. `sqlserver-parte-a.sql` contra la instancia `Dev SQL`.
 7. `sqlserver-parte-b.sql` contra la misma instancia (recorre la lista
    explícita declarada al principio del script, otorgando `db_datareader`
-   y `db_denydatawriter` a cada base nombrada ahí). El script sale `0`
+   —y nada más, desde v10— a cada base nombrada ahí). El script sale `0`
    aunque alguna base nombrada no se haya podido cubrir — **revisar la
    salida por líneas `AUSENTE:` / `NO ONLINE:` / `RECHAZADA` antes de
    seguir**: cada una nombra una base de la lista que quedó sin el user
@@ -523,36 +555,39 @@ bases de su propia lista, pero nunca toca ni revierte una base que la
 corrida mutada haya tocado fuera de la lista (mismo motivo de fondo que
 `SDD/debt.md` D40, ya registrado para el AC7 de versiones anteriores: un
 script que sólo agrega no limpia lo que otro agregó de más). Por eso el
-cierre real necesita un paso de reversión explícito: en una copia de
-trabajo `sqlserver-inverso-mutada-v8.sql`, con **dos** cambios — (a)
-aplicar al inverso el mismo cursor de exclusión que se usó para la
-mutación (`database_id > 4 AND name <> 'SSISDB' AND state = 0`), y (b)
-quitar por completo el bloque final `IF EXISTS (... sys.server_principals
-...) DROP LOGIN bisalta_lectura; GO` (mismo segundo cambio que ya lleva
-la copia de baja de "Procedimiento de baja", más abajo, y por el mismo
-motivo: el `DROP LOGIN` de `sqlserver-inverso.sql` es incondicional —
-ver su comentario de cabecera —, y el paso siguiente de esta misma
-limpieza vuelve a correr `sqlserver-parte-b.sql` real, que hace `CREATE
-USER bisalta_lectura FOR LOGIN bisalta_lectura`; si esta copia dejara el
-`DROP LOGIN`, esa corrida siguiente fallaría con `Msg 15007` (login
-inexistente) y el `##ac7_check` de cierre saldría en `0` en todas las
-filas, no en el verde que este paso declara) — y correrla contra la
-instancia de prueba: esto quita `bisalta_lectura` (y su
-`db_denydatawriter`) de **todas** las bases de usuario que la corrida
-mutada tocó, incluidas las de la lista real, sin tocar el login:
+cierre real necesita un paso de reversión explícito — pero desde v10 ya
+**no hace falta ninguna copia de trabajo del inverso**: `sqlserver-
+inverso.sql` real revoca por enumeración (recorre `sys.databases` entero
+buscando `bisalta_lectura` en `sys.database_principals`, sin leer
+`@bases_permitidas`), así que encuentra y saca al user de **cualquier**
+base donde la corrida mutada lo haya dejado, esté o no esté en la lista
+real, sin necesitar saber cuál fue el filtro de la mutación. Correrlo tal
+cual, sin modificar, contra la instancia de prueba:
 
 ```
-sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-inverso-mutada-v8.sql
+sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-inverso.sql
 ```
 
-Recién ahora correr `sqlserver-parte-b.sql` real (por lista) para dejar
-la instancia de prueba en el estado que el script real produce, y volver
-a correr el bloque `##ac7_check` para confirmar el verde de cierre —
-`tiene_user = 1` sólo en las bases de `@bases_permitidas`, `0` en todo lo
-demás — antes de tocar `Dev SQL` con el archivo real. Descartar las tres
-copias de trabajo (`sqlserver-parte-b-lista-vacia.sql`,
-`sqlserver-parte-b-mutada-v8.sql`, `sqlserver-inverso-mutada-v8.sql`):
-ninguna se commitea.
+Esto deja la instancia de prueba **sin ningún** `bisalta_lectura` en
+ninguna base, y **sin el login** (el inverso real termina con `DROP
+LOGIN` incondicional — ver su comentario de cabecera: tras una
+enumeración completa, esa incondicionalidad es correcta, no un caso
+especial a vigilar). Por eso el cierre del rojo tiene dos pasos más, no
+uno: recrear el login y volver a conceder por lista, **en ese orden**:
+
+```
+sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-parte-a.sql
+sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-parte-b.sql
+```
+
+(la sustitución del placeholder de contraseña de `sqlserver-parte-a.sql`
+aplica igual que en cualquier otra corrida — ver su comentario de
+cabecera). Recién ahora volver a correr el bloque `##ac7_check` para
+confirmar el verde de cierre — `tiene_user = 1` sólo en las bases de
+`@bases_permitidas`, `0` en todo lo demás — antes de tocar `Dev SQL` con
+los archivos reales. Descartar las dos copias de trabajo que sí siguen
+haciendo falta (`sqlserver-parte-b-lista-vacia.sql`,
+`sqlserver-parte-b-mutada-v8.sql`): ninguna se commitea.
 
 `SSISDB` sigue sin ser una decisión pendiente (contract v6, "Cambios v5 →
 v6", punto 1, decisión de Patrick Ocampo): en v9 queda fuera porque nunca
@@ -561,12 +596,17 @@ está en `@bases_permitidas`, y si alguien la agregara por error,
 `sqlserver-parte-b.sql` y sección "`SSISDB` queda fuera del loop" más
 abajo).
 
-### AC42 — el user tiene las dos membresías en cada base de la lista, y el `DENY` gana
+### AC42 — el user tiene `db_datareader` y ninguna otra membresía en cada base de la lista
 
-`AC42` (contract v9) verifica las dos membresías **en cada base de la
-lista explícita** de `sqlserver-parte-b.sql`. Comprobación real, sobre
-`EXACTUS` en `Dev SQL` — una de las bases nombradas en `@bases_permitidas`,
-ya aprovisionada por `sqlserver-parte-b.sql` real con las dos membresías:
+`AC42` cambió de propiedad en v10 (decisión de Patrick Ocampo): ya no
+afirma que un `DENY` le gane a un `GRANT` — afirma que el user **no tiene
+ninguna otra membresía** además de `db_datareader`: ni `db_denydatawriter`
+(que ya no existe en el loop), ni `db_datawriter`, ni `db_owner`. Un
+`INSERT` falla por **ausencia de permiso**, nunca por `DENY`.
+
+Comprobación real, sobre `EXACTUS` en `Dev SQL` — una de las bases
+nombradas en `@bases_permitidas`, ya aprovisionada por
+`sqlserver-parte-b.sql` real:
 
 ```
 sqlcmd -S 10.24.40.137 -E -d EXACTUS -Q "
@@ -574,107 +614,71 @@ SELECT r.name AS rol
 FROM sys.database_role_members drm
 JOIN sys.database_principals r ON drm.role_principal_id = r.principal_id
 JOIN sys.database_principals m ON drm.member_principal_id = m.principal_id
-WHERE m.name = 'bisalta_lectura' AND r.name IN ('db_datareader','db_denydatawriter')
+WHERE m.name = 'bisalta_lectura' AND r.name IN ('db_datareader','db_denydatawriter','db_datawriter','db_owner')
 ORDER BY r.name;
 "
 ```
 
-Esperado: dos filas, `db_datareader` y `db_denydatawriter`. Repetir la
-misma consulta cambiando `-d EXACTUS` por cada una de las demás bases que
-declare `@bases_permitidas` en `sqlserver-parte-b.sql` vigente (abrir el
-script para ver cuáles son, no retranscribirlas acá): dos filas en cada
-una.
+Esperado: **una sola fila**, `db_datareader` — ninguna de las otras tres.
+Repetir la misma consulta cambiando `-d EXACTUS` por cada una de las
+demás bases que declare `@bases_permitidas` en `sqlserver-parte-b.sql`
+vigente (abrir el script para ver cuáles son, no retranscribirlas acá):
+una sola fila en cada una.
 
-**La segunda mitad del AC no se corrobora sobre `zz_scratch_ac6`** (hallazgo
-de la ronda 5 de review, BLOCKER, sigue vigente en v9): esa base la arma el
-procedimiento de AC6 (sección de arriba) con `CREATE USER` + `ALTER ROLE
-db_datareader ADD MEMBER` únicamente — nunca corre `sqlserver-parte-b.sql`,
-así que `bisalta_lectura` ahí **nunca tiene** `db_denydatawriter`. Un
-`GRANT INSERT` sobre esa base pasaría igual con o sin el `DENY` real, así
-que no prueba nada sobre el `DENY`.
-
-**Con la lista explícita (v9), una base de scratch no queda cubierta
-sólo por correr `sqlserver-parte-b.sql` real** — a diferencia de hasta v8,
-donde el cursor recorría `sys.databases` entero y una base nueva entraba
-sola. Para corroborar sobre una base de scratch hace falta agregarla,
-igual que se agregaría una base real: en una **copia de trabajo**
-`sqlserver-parte-b-mas-scratch.sql` (nunca el archivo real, que sólo
-declara las bases con pedido y fecha registrados en `APROBACIONES.md`),
-agregar una fila más al `INSERT INTO @bases_permitidas` con
-`(N'zz_scratch_ac42')`, sin tocar nada más del script:
+**Con la lista explícita (v9), y desde v10 sin necesidad de ninguna copia
+de trabajo del script**: a diferencia de la ronda anterior, la mutación
+de AC42 ya no necesita una base de scratch nueva agregada a una copia de
+`sqlserver-parte-b.sql` — usa directamente una de las bases **ya
+concedidas de verdad** (`EXACTUS`), con una tabla de scratch adentro, y
+**sin ningún `GRANT` de objeto**: el acceso de escritura tiene que venir
+únicamente de la membresía de rol (`db_datawriter`), igual que AC6 — un
+`GRANT INSERT` puntual sobre la tabla dejaría pasar el `INSERT` con o sin
+esa membresía, y no probaría nada sobre lo que AC42 afirma.
 
 ```
-sqlcmd -S 10.24.40.137 -E -Q "CREATE DATABASE zz_scratch_ac42;"
-sqlcmd -S 10.24.40.137 -E -b -i sqlserver-parte-b-mas-scratch.sql
+sqlcmd -S 10.24.40.137 -E -d EXACTUS -Q "CREATE TABLE zz_scratch_ac42 (id int);"
 ```
 
-Esta corrida re-procesa también las bases reales de la lista — idempotente ahí
-(comentario "Idempotente" del script, `IF NOT EXISTS` antes de cada
-`ALTER ROLE ADD MEMBER`, ninguna fila cambia) — y de paso agrega a
-`bisalta_lectura`, con **las dos** membresías, en `zz_scratch_ac42`, que
-es nueva y todavía no lo tenía. Confirmar con la misma consulta de
-arriba, cambiando `-d EXACTUS` por `-d zz_scratch_ac42`: dos filas.
-
-Ahora sí, sobre esa base con las dos membresías reales:
+**Comprobación real (verde), sobre la tabla recién creada**, con el user
+tal como lo deja `sqlserver-parte-b.sql` real (sólo `db_datareader`):
 
 ```
-sqlcmd -S 10.24.40.137 -E -d zz_scratch_ac42 -Q "CREATE TABLE t (id int); GRANT INSERT ON t TO bisalta_lectura;"
-SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d zz_scratch_ac42 -Q "INSERT INTO t VALUES (1);"
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d EXACTUS -Q "INSERT INTO zz_scratch_ac42 VALUES (1);"
 ```
 
-Esperado: el `INSERT` falla con `The INSERT permission was denied`, a
-pesar del `GRANT` explícito — ahora sí es la comprobación de que
-`db_denydatawriter` es lo que lo bloquea, porque el estado de la base
-contra la que corre lo tiene de verdad.
+Esperado: falla con `The INSERT permission was denied` — ausencia de
+permiso, sin que nada lo deniegue explícitamente.
 
-**Mutación declarada** (contract v5/v9, AC42): partiendo de
-`sqlserver-parte-b-mas-scratch.sql`, hacer una segunda copia
-`sqlserver-parte-b-sin-denydatawriter-mas-scratch.sql` quitando el bloque
-que agrega `db_denydatawriter` (dejar sólo `db_datareader`), con la fila
-de `zz_scratch_ac42` todavía en la lista. Para el rojo hace falta una
-base sin ninguna de las dos membresías todavía — `zz_scratch_ac42` ya las
-tiene las dos por el paso de arriba, y `ALTER ROLE ... ADD MEMBER` es
-aditivo: volver a correr un script sobre ella no las quita. Recrearla
-fresca:
+**Mutación declarada** (contract v10, AC42): otorgar `db_datawriter` al
+user sobre esta misma base de scratch:
 
 ```
-sqlcmd -S 10.24.40.137 -E -Q "DROP DATABASE zz_scratch_ac42;"
-sqlcmd -S 10.24.40.137 -E -Q "CREATE DATABASE zz_scratch_ac42;"
-sqlcmd -S 10.24.40.137 -E -b -i sqlserver-parte-b-sin-denydatawriter-mas-scratch.sql
-sqlcmd -S 10.24.40.137 -E -d zz_scratch_ac42 -Q "CREATE TABLE t (id int); GRANT INSERT ON t TO bisalta_lectura;"
-SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d zz_scratch_ac42 -Q "INSERT INTO t VALUES (1);"
+sqlcmd -S 10.24.40.137 -E -d EXACTUS -Q "ALTER ROLE db_datawriter ADD MEMBER bisalta_lectura;"
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d EXACTUS -Q "INSERT INTO zz_scratch_ac42 VALUES (1);"
 ```
 
 Esperado en este paso: el `INSERT` **pasa** — es la comprobación de que
-"falla" se pone roja sin `db_denydatawriter` en el loop, sobre una base
-que nunca tuvo esa membresía.
+"falla" se pone roja con `db_datawriter` de más en el rol, sobre una base
+que la parte B real nunca le da.
 
-Restaurar el loop confirmando el **verde de cierre** —el contract exige
-literalmente que "el `DENY` vuelve a ganar", no sólo que se limpie—
-corriendo `sqlserver-parte-b-mas-scratch.sql` (la copia **con** DENY, no
-el archivo real): el archivo real nunca declaró `zz_scratch_ac42` en su
-lista y no debería — agregar ahí una base de scratch sería agregar una
-base a la lista de producción sin pedido ni fecha registrados, que es
-justo lo que la regla de Patrick prohíbe (contract v9, "Cambios v8 →
-v9", punto 1). El mismo `INSERT` corre sobre la misma tabla y el mismo
-`GRANT` que acaban de dejarlo pasar, sin borrar nada todavía:
+Restaurar quitando **sólo** `db_datawriter` — `db_datareader` sigue
+asignada, la tabla de scratch sigue viva, la comprobación real tiene que
+correr sobre la misma tabla:
 
 ```
-sqlcmd -S 10.24.40.137 -E -b -i sqlserver-parte-b-mas-scratch.sql
-SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d zz_scratch_ac42 -Q "INSERT INTO t VALUES (1);"
+sqlcmd -S 10.24.40.137 -E -d EXACTUS -Q "ALTER ROLE db_datawriter DROP MEMBER bisalta_lectura;"
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d EXACTUS -Q "INSERT INTO zz_scratch_ac42 VALUES (1);"
 ```
 
-Esperado: el `INSERT` **vuelve a fallar** con `The INSERT permission was
-denied` — la copia con DENY intacto lo agrega de nuevo (que la corrida
-mutada nunca agregó) y el `DENY` gana sobre el mismo `GRANT` que sigue
-vivo. Recién ahora, con el triple completo (verde real → rojo de
-mutación → verde de cierre) corrido, limpiar — incluidas las dos copias
-de trabajo, que nunca se commitean:
+Esperado: el `INSERT` **vuelve a fallar**, con `The INSERT permission was
+denied` — otra vez por **ausencia de permiso** (sin `db_datawriter` y sin
+ningún `DENY` que lo bloquee expresamente): es exactamente lo que v10
+dejó — que la única capacidad del login es leer. Recién ahora, con el
+triple completo (verde real → rojo de mutación → verde de cierre)
+corrido, limpiar:
 
 ```
-sqlcmd -S 10.24.40.137 -E -d zz_scratch_ac42 -Q "REVOKE INSERT ON t FROM bisalta_lectura;"
-sqlcmd -S 10.24.40.137 -E -Q "DROP DATABASE zz_scratch_ac42;"
-rm -f sqlserver-parte-b-mas-scratch.sql sqlserver-parte-b-sin-denydatawriter-mas-scratch.sql
+sqlcmd -S 10.24.40.137 -E -d EXACTUS -Q "DROP TABLE zz_scratch_ac42;"
 ```
 
 ### AC8 — cada secreto existe, tiene los dos campos, y es legible con la política IAM
@@ -701,20 +705,19 @@ corre y se pega con comando y exit code en
 
 ## AC10 — el hueco de una base nueva (o recién disponible) en SQL Server
 
-`db_datareader` y `db_denydatawriter` son permisos **por base** en SQL
-Server, a diferencia de `pg_read_all_data` en Postgres, que es un permiso
-de **cluster**. Con la lista explícita de v9 esto se vuelve doblemente
-cierto: **una base agregada a `Dev SQL`, o pedida por nombre pero
-todavía no escrita en `@bases_permitidas`, NO queda cubierta
-automáticamente**: `bisalta_lectura` no tendrá `CREATE USER` ni ninguna
-de las dos membresías ahí hasta que alguien (a) agregue esa base al
-`INSERT INTO @bases_permitidas` de `sqlserver-parte-b.sql` y (b) vuelva a
-correr el script completo — y mientras tanto esa base nueva no tiene ni
-la lectura ni la segunda red del `DENY`. No hay manera de evitar esto en
-SQL Server sin un trigger de servidor sobre `CREATE DATABASE` — fuera del
-scope de este runbook — así que la asimetría se documenta acá en vez de
-compensarse con código nuevo (contract v5, sección "Garantías por motor
-(asimetría declarada, no disimulada)").
+`db_datareader` es permiso **por base** en SQL Server, a diferencia de
+`pg_read_all_data` en Postgres, que es un permiso de **cluster**. Con la
+lista explícita de v9 esto se vuelve doblemente cierto: **una base
+agregada a `Dev SQL`, o pedida por nombre pero todavía no escrita en
+`@bases_permitidas`, NO queda cubierta automáticamente**: `bisalta_lectura`
+no tendrá `CREATE USER` ni `db_datareader` ahí hasta que alguien (a)
+agregue esa base al `INSERT INTO @bases_permitidas` de
+`sqlserver-parte-b.sql` y (b) vuelva a correr el script completo — y
+mientras tanto esa base nueva no tiene ninguna lectura. No hay manera de
+evitar esto en SQL Server sin un trigger de servidor sobre `CREATE
+DATABASE` — fuera del scope de este runbook — así que la asimetría se
+documenta acá en vez de compensarse con código nuevo (contract v10,
+sección "Garantías por motor (asimetría declarada, no disimulada)").
 
 El mismo hueco existe, por el mismo motivo, para una base que **ya está
 en la lista pero estaba `OFFLINE` o `RESTORING`** al momento de correr
@@ -725,10 +728,11 @@ descubierta como una base recién pedida. **Acción operativa**: cada vez
 que se pida una base nueva, o que una base ya listada pase a estar
 `ONLINE` después de haber estado en otro estado durante la última
 corrida, (a) agregarla (si no estaba) al `INSERT` de
-`sqlserver-parte-b.sql` y a `sqlserver-inverso.sql` en el mismo cambio,
-(b) registrar el pedido con fecha y solicitante en `APROBACIONES.md`, y
-(c) re-correr `sqlserver-parte-b.sql` — en ese orden, antes de agregar
-esa base al catálogo de `bisalta-db`.
+`sqlserver-parte-b.sql` (desde v10, `sqlserver-inverso.sql` **no tiene
+ninguna lista que actualizar en paralelo** — enumera `sys.databases`
+solo, ver su comentario de cabecera), (b) registrar el pedido con fecha
+y solicitante en `APROBACIONES.md`, y (c) re-correr `sqlserver-parte-b.sql`
+— en ese orden, antes de agregar esa base al catálogo de `bisalta-db`.
 
 ## `SSISDB` queda fuera del loop
 
@@ -770,42 +774,33 @@ tampoco al catálogo de la aplicación (`plugins/bisalta-db/catalogo.json`)
 - Postgres: `postgres-inverso.sql`, conectado a cada base donde se corrió
   la parte B, en orden (ver comentario del archivo sobre por qué el `DROP
   ROLE` requiere limpiar todas las bases primero).
-- SQL Server: `sqlserver-inverso.sql`, una sola corrida contra la instancia
-  (recorre la misma lista explícita que la parte B, quitando
-  `bisalta_lectura` de `db_denydatawriter` explícitamente antes de borrar
-  el user en cada una — contract v5, AC42 — y al final borra el login).
-  Si se agrega una base a `sqlserver-parte-b.sql`, se agrega la misma fila
-  a `sqlserver-inverso.sql` en el mismo cambio (ver comentario de
-  cabecera de ese archivo).
+- SQL Server: `sqlserver-inverso.sql`, una sola corrida contra la
+  instancia. **Desde v10 no lee ninguna lista** (decisión de Patrick
+  Ocampo: "se concede desde una lista explícita, se revoca por
+  enumeración") — recorre `sys.databases` entero, busca en cada base si
+  `sys.database_principals` tiene a `bisalta_lectura`, y lo saca de ahí;
+  al final borra el login, siempre. No hace falta agregar ni quitar nada
+  de `sqlserver-inverso.sql` cuando se edita la lista de
+  `sqlserver-parte-b.sql`: no tiene lista propia que mantener en
+  sincronía (ver comentario de cabecera de ese archivo).
 - AWS: los tres secretos se borran a mano desde la cuenta de dev/qa (no
   hay script: crear/borrar secretos está fuera del scope de este runbook,
   igual que crearlos).
 
 ### Procedimiento de baja (sacar una base de la lista de SQL Server)
 
-Agregar una base es simétrico (se agrega la misma fila a las dos listas
-en el mismo cambio), pero **quitar una base no lo es**: `sqlserver-parte-b.sql`
-sólo procesa lo que está en su lista *hoy* — nunca revisa ni revierte lo
-que procesó en una corrida anterior con una lista distinta. Si se edita
-la lista antes de revertir, ninguno de los dos scripts vuelve a nombrar
-esa base nunca más, y `bisalta_lectura` queda como user ahí (con su
-`db_denydatawriter`) para siempre — y el bloque `##ac7_check` de la
-sección "AC7" de arriba se pone rojo (`tiene_user = 1` fuera de la lista)
-sin que ningún documento explique la causa.
+Desde v10 esto se simplifica del todo: ya no hace falta ninguna copia de
+trabajo recortada, ni cuidar en qué orden se editan dos listas, porque
+`sqlserver-inverso.sql` ya no tiene una lista propia — encuentra
+`bisalta_lectura` donde sea que esté por enumeración. El costo de esa
+simplicidad es que el inverso, corrido tal cual, es una revocación
+**total**: saca al user de **todas** las bases donde exista, no sólo de
+la que se quiere dar de baja, y borra el login. El procedimiento por eso
+tiene tres pasos donde antes había una copia de trabajo cuidadosamente
+recortada:
 
-**El `DROP LOGIN` final de `sqlserver-inverso.sql` es incondicional**: no
-mira cuántas bases quedan en la lista, corre siempre que el login exista.
-Correr el archivo real (con la lista completa) para dar de baja una sola
-base revertiría **todas** las bases, no sólo esa — y correr una copia
-recortada a sólo la base a dar de baja evita eso en el `DROP
-USER`/`ALTER ROLE`, pero el `DROP LOGIN` de más abajo se ejecuta igual y
-deja **sin login** a `bisalta_lectura` para las demás bases que seguían
-activas. Por eso, si queda al menos otra base activa, la copia de trabajo
-tiene que recortar la lista **y** quitar el bloque final de `DROP LOGIN`.
-
-Orden correcto para dar de baja una base que **no** es la última de la
-lista (por ejemplo, `Ecommerce_qa`, con `COMPRAS`, `COMPRAS_STG`,
-`Ecommerce`, `EXACTUS` y `BI` quedando activas):
+Orden para dar de baja una base (por ejemplo, `Ecommerce_qa`, con
+`COMPRAS`, `COMPRAS_STG`, `Ecommerce`, `EXACTUS` y `BI` quedando activas):
 
 0. **Antes de revocar nada**, sacar la entrada correspondiente de
    `plugins/bisalta-db/catalogo.json` (para `Ecommerce_qa`, la entrada
@@ -814,38 +809,40 @@ lista (por ejemplo, `Ecommerce_qa`, con `COMPRAS`, `COMPRAS_STG`,
    la entrada queda apuntando a una base donde `bisalta_lectura` ya no
    tiene user, y el MCP falla en runtime con error de login la próxima
    vez que alguien la consulte.
-1. **Antes de tocar ninguna de las dos listas**, hacer una copia de
-   trabajo `sqlserver-inverso-baja-ecommerce_qa.sql` a partir de
-   `sqlserver-inverso.sql` con dos cambios: (a) `INSERT INTO
-   @bases_permitidas` con **sólo** la fila `(N'Ecommerce_qa')`, y (b) el
-   bloque final `IF EXISTS (... sys.server_principals ...) DROP LOGIN
-   bisalta_lectura; GO` **quitado por completo** (las demás bases todavía
-   necesitan ese login). Correrla:
+1. Sacar la fila `(N'Ecommerce_qa')` del `INSERT INTO @bases_permitidas`
+   de `sqlserver-parte-b.sql` (única lista que existe: `sqlserver-
+   inverso.sql` no tiene una propia) y registrar la baja en
+   `APROBACIONES.md` (fecha y quién la pidió), igual que un alta.
+2. Correr `sqlserver-inverso.sql` **real, sin modificar**, contra la
+   instancia:
    ```
-   sqlcmd -S 10.24.40.137 -E -b -i sqlserver-inverso-baja-ecommerce_qa.sql
+   sqlcmd -S 10.24.40.137 -E -b -i sqlserver-inverso.sql
    ```
-   Esto le quita a `bisalta_lectura` las dos membresías y el user en
-   `Ecommerce_qa` únicamente, sin tocar el login ni las demás bases.
-2. Recién ahora, sacar la fila `(N'Ecommerce_qa')` del `INSERT` de
-   `sqlserver-parte-b.sql` **y** de `sqlserver-inverso.sql`, en el mismo
-   cambio (mismo criterio que agregar: las dos listas se editan juntas).
-3. Registrar la baja en `APROBACIONES.md` (fecha y quién la pidió), igual
-   que un alta.
-4. Confirmar con el bloque `##ac7_check`: `tiene_user = 0` para
-   `Ecommerce_qa`, y `tiene_user = 1` sin cambios en las cinco bases que
-   siguen en la lista.
-5. Descartar la copia de trabajo (`sqlserver-inverso-baja-ecommerce_qa.sql`):
-   no se commitea.
+   Esto revoca a `bisalta_lectura` de **todas** las bases donde exista
+   hoy —incluidas `COMPRAS`, `COMPRAS_STG`, `Ecommerce`, `EXACTUS` y `BI`,
+   que se querían mantener— y borra el login. Es a propósito: la
+   enumeración no distingue "esta base sale" de "estas otras se quedan".
+3. Correr `sqlserver-parte-a.sql` real (recrea el login — con una
+   contraseña nueva, que hay que cargar de nuevo en el secreto
+   `bisalta-db/sqlserver/bisalta_lectura`) y `sqlserver-parte-b.sql` real
+   (recorre la lista, ya sin `Ecommerce_qa` desde el paso 1, y re-concede
+   exactamente esas cinco). El mecanismo para conservar las bases que se
+   quedan no es "no tocarlas": es volver a concederlas desde la
+   declaración — que es lo único que `sqlserver-parte-b.sql` sabe hacer
+   bien, y ya está pensado para correrse las veces que haga falta
+   (idempotente, ver su comentario "Idempotente").
+4. Confirmar con el bloque `##ac7_check` (sección "AC7" de arriba):
+   `tiene_user = 0` para `Ecommerce_qa`, y `tiene_user = 1` en las cinco
+   bases que siguen en la lista.
 
-**Caso distinto — la base a dar de baja es la última que queda en la
-lista** (decomiso completo, ninguna otra base sigue activa): ahí sí
-corresponde correr `sqlserver-inverso.sql` real, sin modificar, porque el
-`DROP LOGIN` final es exactamente lo que corresponde cuando no queda
-ninguna base que siga necesitando el login.
-
-Invertir el orden (editar las listas primero, revertir después) no tiene
-remedio con estos dos scripts: ya ninguno de los dos nombra la base
-dada de baja, así que no hay forma de que el inverso la vuelva a tocar.
+**Decomiso completo** (ninguna base sigue activa): son los mismos cuatro
+pasos, salvo que el paso 1 deja la lista de `sqlserver-parte-b.sql`
+**vacía**, y el paso 3 se reduce a correr sólo `sqlserver-parte-a.sql`
+(para dejar el login existente, si se quiere conservar para un alta
+futura) o directamente omitirse (si no queda ninguna base ni se planea
+ninguna a corto plazo) — ya no es un caso especial del inverso, como lo
+era hasta v9: es la misma revocación total del paso 2, sin nada que
+re-conceder después.
 
 Ningún script de R1 se corrió contra una base real: no hay estado externo
 pendiente de revertir además de lo que este runbook ya describe.

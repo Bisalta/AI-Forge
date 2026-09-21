@@ -1,14 +1,25 @@
 -- sqlserver-parte-b.sql
 --
 -- Aprovisionamiento de solo lectura en `Dev SQL` — PARTE B: user por base
--- y membresía en LAS DOS: db_datareader y db_denydatawriter (contract v5,
--- AC42 — v4 agregó la segunda; cerrada, no reabrir). Un `GRANT` nunca le
--- gana a un `DENY` en SQL Server, así que db_denydatawriter es la segunda
--- red: aunque alguien conceda INSERT/UPDATE/DELETE explícito al user más
--- adelante, el DENY de rol sigue ganando. Las dos son permisos POR BASE (a
--- diferencia de pg_read_all_data, que es de cluster): una base nueva NO
--- queda cubierta hasta que se agregue a la lista de abajo Y este script
--- se corra otra vez (AC10, declarado también en RUNBOOK.md).
+-- y membresía en `db_datareader`, Y NADA MÁS (contract v10, AC42 —
+-- decisión de Patrick Ocampo que revierte el punto 4 de v4: `db_datareader`
+-- es la ÚNICA garantía en SQL Server, no la primera de dos). `db_datareader`
+-- es permiso POR BASE (a diferencia de `pg_read_all_data`, que es de
+-- cluster): una base nueva NO queda cubierta hasta que se agregue a la
+-- lista de abajo Y este script se corra otra vez (AC10, declarado también
+-- en RUNBOOK.md).
+--
+-- SALE `db_denydatawriter` (contract v10; hasta v9 este script la
+-- otorgaba junto con `db_datareader`, con el `DENY` ganándole a cualquier
+-- `GRANT` posterior). Se escribe acá lo que se pierde, con las palabras de
+-- quien lo decidió (Patrick Ocampo, Slack 21-sep-2026 12:22, textual en
+-- `APROBACIONES.md` punto 6): *"sin `db_denydatawriter` no queda un
+-- `DENY` explícito, así que un `GRANT` de escritura concedido por error en
+-- el futuro no tendría nada que lo anule."* Con esto, el rol
+-- (`db_datareader`, y ninguna otra membresía) pasa a ser la única barrera
+-- del lado de SQL Server — literalmente, no por omisión. Un `INSERT`
+-- falla porque el login no tiene permiso para escribir, no porque algo lo
+-- deniegue explícitamente.
 --
 -- ALCANCE POR PEDIDO NOMBRADO (contract v9, "Cambios v8 → v9", regla de
 -- Patrick Ocampo, Slack 21-sep-2026 10:31): el login arranca en CERO y
@@ -25,17 +36,19 @@
 -- la única fricción que la regla de Patrick permite: nombrar la base acá
 -- y en APROBACIONES.md, nada más — no exige aprobación adicional.
 --
--- CÓMO DAR DE BAJA UNA BASE (orden inverso al de agregar): revertir esa
--- base PRIMERO con una copia de trabajo de sqlserver-inverso.sql (lista
--- recortada a esa única base; además hay que quitarle el DROP LOGIN
--- final si otras bases siguen activas — el DROP LOGIN de ese script es
--- incondicional, ver su propio comentario de cabecera), y RECIÉN DESPUÉS
--- sacar la fila de este INSERT y del INSERT equivalente de
--- sqlserver-inverso.sql — procedimiento completo en RUNBOOK.md, sección
--- "Inverso" → "Procedimiento de baja". Sacar la fila primero, sin haber
--- revertido antes, deja a bisalta_lectura como user en esa base para
--- siempre: ninguno de los dos scripts vuelve a nombrarla una vez que sale
--- de las dos listas.
+-- CÓMO DAR DE BAJA UNA BASE (contract v10 — el orden cambió: ya NO es
+-- "revertir con una copia recortada, después sacar la fila"): sacar la
+-- fila de este INSERT (y registrar la baja en APROBACIONES.md), correr
+-- `sqlserver-inverso.sql` REAL sin modificar (revoca por ENUMERACIÓN —
+-- recorre sys.databases entero, no lee esta lista — así que encuentra y
+-- saca a bisalta_lectura de TODAS las bases donde exista hoy, incluidas
+-- las que siguen en esta lista, y borra el login), y RECIÉN DESPUÉS
+-- volver a correr `sqlserver-parte-a.sql` (recrea el login) y este mismo
+-- script (por la lista ya actualizada, sin la base dada de baja) para
+-- dejar la instancia con exactamente lo que la lista declara ahora.
+-- Procedimiento completo en RUNBOOK.md, sección "Inverso" → "Procedimiento
+-- de baja". Ya no hace falta ninguna copia de trabajo: el inverso real
+-- sirve igual sea cual sea la base que se dé de baja.
 --
 -- El historial de qué se pidió, cuándo y quién lo solicitó vive en
 -- APROBACIONES.md, sección "Bases pedidas" — no se retranscribe acá para
@@ -71,25 +84,28 @@
 -- base imprime por qué.
 --
 -- Recorre la lista con un CURSOR EXPLÍCITO sobre una variable de tabla
--- (contract v9, AC7/AC42, sección "Garantías por motor (asimetría
+-- (contract v10, AC7/AC42, sección "Garantías por motor (asimetría
 -- declarada, no disimulada)", cerrada, no reabrir) — mismo patrón de
 -- cursor local que el script ya usaba hasta v8 para sys.databases, ahora
--- apuntado a @bases_permitidas en vez de al catálogo del servidor.
+-- apuntado a @bases_permitidas en vez de al catálogo del servidor. Esta
+-- lista sigue siendo la fuente de verdad para CONCEDER (`sqlserver-
+-- inverso.sql`, en cambio, ya no lee ninguna lista para REVOCAR — ver su
+-- propio comentario de cabecera): dos direcciones, dos fuentes de verdad.
 --
 -- Corre con un login con privilegio de sysadmin en la instancia — nunca
 -- con el propio bisalta_lectura que este script crea.
 --
--- Idempotente: IF NOT EXISTS antes de CREATE USER y antes de cada ALTER
--- ROLE ADD MEMBER, así que correrlo dos veces no falla y no duplica
--- membresías.
+-- Idempotente: IF NOT EXISTS antes de CREATE USER y antes de ALTER ROLE
+-- ADD MEMBER, así que correrlo dos veces no falla y no duplica membresías.
 
 DECLARE @bases_permitidas TABLE (nombre SYSNAME PRIMARY KEY);
 
 -- Lista explícita de bases con acceso concedido. ÚNICO lugar del script
 -- que se edita para agregar o quitar una base — ver comentario de
 -- cabecera "CÓMO AGREGAR UNA BASE NUEVA" y, para el caso de baja, "CÓMO
--- DAR DE BAJA UNA BASE" (el inverso corre ANTES de sacar la fila, no
--- después).
+-- DAR DE BAJA UNA BASE" (desde v10: se saca la fila primero, DESPUÉS
+-- corre el inverso — el inverso ya no necesita la lista para encontrar
+-- lo que hay que revocar).
 INSERT INTO @bases_permitidas (nombre) VALUES
   (N'COMPRAS'),
   (N'COMPRAS_STG'),
@@ -160,16 +176,6 @@ BEGIN
         )
         BEGIN
           ALTER ROLE db_datareader ADD MEMBER bisalta_lectura;
-        END
-        IF NOT EXISTS (
-          SELECT 1
-          FROM sys.database_role_members drm
-          JOIN sys.database_principals r ON drm.role_principal_id = r.principal_id
-          JOIN sys.database_principals m ON drm.member_principal_id = m.principal_id
-          WHERE r.name = ''db_denydatawriter'' AND m.name = ''bisalta_lectura''
-        )
-        BEGIN
-          ALTER ROLE db_denydatawriter ADD MEMBER bisalta_lectura;
         END';
 
       EXEC sp_executesql @sql;

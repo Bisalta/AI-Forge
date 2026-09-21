@@ -1,130 +1,93 @@
 -- sqlserver-inverso.sql
 --
--- Revierte sqlserver-parte-b.sql (quita bisalta_lectura de cada base como
--- user, incluida su membresía en db_denydatawriter — contract v5, AC42)
--- y sqlserver-parte-a.sql (DROP LOGIN). Recorre la MISMA lista explícita
--- que sqlserver-parte-b.sql (contract v9, "Cambios v8 → v9") — nunca
--- sys.databases entero: esta lista tiene que ser la que la parte B tenía
--- AL MOMENTO EN QUE CORRIÓ, no la que tenga hoy. Las dos listas se editan
--- juntas mientras se AGREGA una base (ese caso es correcto: la base nueva
--- entra a las dos listas y el inverso ya sabe revertirla).
+-- Revierte sqlserver-parte-b.sql (quita a bisalta_lectura como user de
+-- cada base donde exista) y sqlserver-parte-a.sql (DROP LOGIN).
 --
--- Cuando se DA DE BAJA una sola base y OTRAS quedan activas, este archivo
--- TAL COMO ESTÁ no sirve corrido directo, ni con la lista completa ni con
--- una copia recortada a esa única base: el `DROP LOGIN` final es
--- INCONDICIONAL, corre siempre que el login exista, sin mirar cuántas
--- bases quedaron en la lista. Correrlo con la lista completa revertiría
--- las bases que se querían mantener; correrlo con una copia que sólo
--- nombre la base a dar de baja sí limita el `DROP USER`/`ALTER ROLE` a
--- esa base, pero el `DROP LOGIN` de más abajo se ejecuta igual y borra
--- el login del servidor — dejando sin acceso a bisalta_lectura en TODAS
--- las demás bases que seguían activas. Ver "Procedimiento de baja" en
--- RUNBOOK.md, sección "Inverso", para la copia de trabajo correcta (lista
--- recortada a la única base + bloque final de `DROP LOGIN` quitado,
--- salvo que la base a dar de baja sea la última que quede en la lista).
+-- REVOCA POR ENUMERACIÓN, NO LEE @bases_permitidas (contract v10, decisión
+-- de Patrick Ocampo, Slack 21-sep-2026 12:44): rechazó el procedimiento de
+-- baja de la ronda anterior —correr este archivo con la lista completa y
+-- editarla después— porque "depende de que alguien recuerde el orden". Su
+-- regla, textual: "Se concede desde una lista explícita, se revoca por
+-- enumeración." Este script recorre `sys.databases` ENTERO, sin ningún
+-- filtro por nombre ni por lista, buscando en cada base si
+-- `sys.database_principals` tiene a `bisalta_lectura`, y lo saca de donde
+-- lo encuentre.
 --
--- Editar las dos listas ANTES de correr algún inverso, en cualquier caso,
--- deja a `bisalta_lectura` como user en la base dada de baja para
--- siempre: ninguno de los dos scripts vuelve a nombrarla una vez que sale
--- de las dos listas, y AC7 se pone rojo (`tiene_user = 1` fuera de la
--- lista) sin que ningún documento explique la causa ni el remedio.
+-- POR QUÉ DOS MECANISMOS DISTINTOS PARA CONCEDER Y PARA REVOCAR: para
+-- CONCEDER (sqlserver-parte-b.sql) hace falta que mande la DECLARACIÓN —
+-- una base que nadie pidió no debe entrar, así que el criterio tiene que
+-- ser una lista explícita, nunca "todo lo que haya". Para REVOCAR hace
+-- falta que mande la REALIDAD — hay que encontrar el user hasta donde
+-- nadie lo anotó: lo que quedó de una corrida vieja, de una lista que ya
+-- cambió, o de alguien que lo creó a mano, editando la lista de la parte B
+-- por su cuenta. Un inverso que sólo leyera @bases_permitidas nunca vería
+-- ninguno de esos tres casos. Dos direcciones, dos fuentes de verdad.
 --
--- La membresía en db_denydatawriter se quita explícitamente (ALTER ROLE
--- ... DROP MEMBER) ANTES de DROP USER, en vez de asumir que borrar el
--- user alcanza para esa red en particular — el DENY es lo que más importa
--- dejar registrado como revertido a propósito, no como efecto colateral.
--- db_datareader, en cambio, no lleva su propio DROP MEMBER: desaparece
--- implícitamente cuando DROP USER borra el principal, que es suficiente
--- para esa membresía (no hay un DENY ahí cuyo estado haga falta narrar
--- aparte). No es la misma explicitud para las dos — sólo la del DENY
--- necesita decirse.
+-- ES UNA REVOCACIÓN TOTAL, A PROPÓSITO: correr este archivo saca a
+-- bisalta_lectura de TODAS las bases donde exista hoy —incluidas las que
+-- siguen vigentes en la lista de sqlserver-parte-b.sql— y al final borra
+-- el login incondicionalmente. Como la enumeración ya barrió el
+-- universo entero antes de llegar a esa línea, al terminar el bucle el
+-- login no le hace falta a ninguna base: el DROP LOGIN incondicional ya
+-- no es una carrera contra "¿queda alguien que todavía lo necesite?",
+-- es la consecuencia directa de haber revisado dónde estaba.
+--
+-- PARA DAR DE BAJA UNA SOLA BASE, MANTENIENDO LAS DEMÁS ACTIVAS: no se usa
+-- este archivo solo, ni una copia recortada de él (eso es exactamente lo
+-- que Patrick rechazó). El procedimiento (RUNBOOK.md, sección "Inverso" →
+-- "Procedimiento de baja") es: (1) sacar esa base del INSERT de
+-- sqlserver-parte-b.sql y registrar la baja en APROBACIONES.md; (2) correr
+-- ESTE archivo real, sin modificar — revoca todo, login incluido; (3)
+-- volver a correr sqlserver-parte-a.sql (recrea el login, con una
+-- contraseña nueva que hay que cargar de nuevo en Secrets Manager) y
+-- sqlserver-parte-b.sql real (re-concede exactamente lo que la lista, ya
+-- actualizada, declara). El mecanismo para conservar las bases que se
+-- quedan no es "no tocarlas": es volver a concederlas desde la
+-- declaración, que es justamente lo único que sqlserver-parte-b.sql sabe
+-- hacer bien.
 --
 -- SIN SALTOS SILENCIOSOS (mismo criterio que sqlserver-parte-b.sql): si
--- un nombre de la lista no existe en esta instancia, o existe pero no
--- está ONLINE, este script lo dice por PRINT y sigue con el resto — nunca
--- lo saltea sin avisar. `SSISDB`, `master`, `model`, `msdb` y `tempdb`
--- nunca deberían estar en la lista de abajo (la parte B nunca les crea el
--- user), pero si aparecieran por error el bucle las salta igual, con el
--- mismo aviso que la parte B.
+-- una base no está ONLINE (state <> 0), el script lo dice por PRINT y
+-- sigue con el resto — nunca la saltea sin avisar. No hay guarda de
+-- "bases prohibidas": a diferencia de conceder, donde SSISDB y las cuatro
+-- de sistema nunca deben recibir el user, acá el objetivo es exactamente
+-- encontrarlo en cualquier lado si llegó a estar — incluida cualquier base
+-- donde nunca debería haber estado.
 --
 -- Tolerante a que el user o el login no existan: correrlo sobre una
 -- instancia ya revertida, o dos veces seguidas, sale sin error.
-
-DECLARE @bases_permitidas TABLE (nombre SYSNAME PRIMARY KEY);
-
--- MISMA lista que sqlserver-parte-b.sql (contract v9). Si se edita una,
--- se edita la otra en el mismo cambio.
-INSERT INTO @bases_permitidas (nombre) VALUES
-  (N'COMPRAS'),
-  (N'COMPRAS_STG'),
-  (N'Ecommerce'),
-  (N'Ecommerce_qa'),
-  (N'EXACTUS'),
-  (N'BI');
-
-DECLARE @bases_prohibidas TABLE (nombre SYSNAME PRIMARY KEY);
-
-INSERT INTO @bases_prohibidas (nombre) VALUES
-  (N'SSISDB'),
-  (N'master'),
-  (N'model'),
-  (N'msdb'),
-  (N'tempdb');
 
 DECLARE @db_name SYSNAME;
 DECLARE @sql NVARCHAR(MAX);
 DECLARE @estado TINYINT;
 
 DECLARE db_cursor CURSOR LOCAL FAST_FORWARD FOR
-  SELECT nombre FROM @bases_permitidas;
+  SELECT name FROM sys.databases;
 
 OPEN db_cursor;
 FETCH NEXT FROM db_cursor INTO @db_name;
 
 WHILE @@FETCH_STATUS = 0
 BEGIN
-  IF EXISTS (SELECT 1 FROM @bases_prohibidas WHERE nombre = @db_name)
+  SET @estado = NULL;
+  SELECT @estado = state FROM sys.databases WHERE name = @db_name;
+
+  IF @estado <> 0
   BEGIN
-    PRINT N'RECHAZADA (defensa en profundidad): ' + @db_name
-      + N' está en la lista de bases que nunca reciben el user. Nada que revertir ahí.';
+    PRINT N'NO ONLINE: ' + @db_name
+      + N' existe pero sys.databases.state = ' + CAST(@estado AS NVARCHAR(10))
+      + N' (0 = ONLINE). No se puede USE sobre ella en este estado — reintentar cuando esté ONLINE.';
   END
   ELSE
   BEGIN
-    SET @estado = NULL;
-    SELECT @estado = state FROM sys.databases WHERE name = @db_name;
+    SET @sql = N'
+      USE ' + QUOTENAME(@db_name) + N';
+      IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = ''bisalta_lectura'')
+      BEGIN
+        DROP USER bisalta_lectura;
+      END';
 
-    IF @estado IS NULL
-    BEGIN
-      PRINT N'AUSENTE: ' + @db_name
-        + N' no existe en sys.databases de esta instancia. Nada que revertir ahí en esta corrida.';
-    END
-    ELSE IF @estado <> 0
-    BEGIN
-      PRINT N'NO ONLINE: ' + @db_name
-        + N' existe pero sys.databases.state = ' + CAST(@estado AS NVARCHAR(10))
-        + N' (0 = ONLINE). No se puede USE sobre ella en este estado — reintentar cuando esté ONLINE.';
-    END
-    ELSE
-    BEGIN
-      SET @sql = N'
-        USE ' + QUOTENAME(@db_name) + N';
-        IF EXISTS (
-          SELECT 1
-          FROM sys.database_role_members drm
-          JOIN sys.database_principals r ON drm.role_principal_id = r.principal_id
-          JOIN sys.database_principals m ON drm.member_principal_id = m.principal_id
-          WHERE r.name = ''db_denydatawriter'' AND m.name = ''bisalta_lectura''
-        )
-        BEGIN
-          ALTER ROLE db_denydatawriter DROP MEMBER bisalta_lectura;
-        END
-        IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = ''bisalta_lectura'')
-        BEGIN
-          DROP USER bisalta_lectura;
-        END';
-
-      EXEC sp_executesql @sql;
-    END
+    EXEC sp_executesql @sql;
   END
 
   FETCH NEXT FROM db_cursor INTO @db_name;

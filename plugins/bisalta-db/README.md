@@ -132,11 +132,11 @@ la barrera es el texto.
 
 | | Postgres (`dev`/`qa`) | SQL Server (`Dev SQL`) |
 |---|---|---|
-| Rol de solo lectura | sí | sí |
+| Rol de solo lectura | sí | sí — **y es la única barrera**, literalmente, desde v10 |
 | Sesión abierta en solo lectura | sí, `default_transaction_read_only=on` | **no existe equivalente** |
-| `DENY` de escritura sobre el rol | no aplica | sí, `db_denydatawriter` — el `DENY` le gana a cualquier `GRANT` |
+| `DENY` de escritura sobre el rol | no aplica | **no** — `db_denydatawriter` se quitó en v10 por decisión de Patrick Ocampo. Sin él no queda un `DENY` explícito, así que un `GRANT` de escritura concedido por error no tendría nada que lo anule |
 | Motor que rechaza escrituras | sí (endpoint `cluster-ro-`) | **no hay réplica** |
-| Alcance del permiso | `pg_read_all_data`, de cluster — alcanza las 29 bases del cluster de dev/qa desde que el rol existe, no sólo las del catálogo | `db_datareader` + `db_denydatawriter`, **por base**: una base nueva no queda cubierta sola |
+| Alcance del permiso | `pg_read_all_data`, de cluster — alcanza las 29 bases del cluster de dev/qa desde que el rol existe, no sólo las del catálogo | `db_datareader`, **por base**: una base nueva no queda cubierta sola |
 
 Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que
 evita que alguien asuma que todas las conexiones son igual de seguras.
@@ -310,8 +310,11 @@ con fecha y solicitante en `aprovisionamiento/APROBACIONES.md`. La parte B
 del runbook recorre una **lista explícita** declarada en el propio
 script, no todas las bases de la instancia: **una base nueva, o una
 pedida pero todavía no agregada a esa lista, no queda cubierta** hasta
-que alguien la sume ahí y re-corra la parte B — `db_datareader` y
-`db_denydatawriter` son por base.
+que alguien la sume ahí y re-corra la parte B — `db_datareader` es por
+base. Se concede desde esa lista; se revoca por **enumeración**: el
+inverso (`sqlserver-inverso.sql`) recorre las bases de la instancia
+buscando dónde existe el user y lo saca de ahí, sin leer ninguna lista —
+dos direcciones, dos fuentes de verdad.
 
 ## Tests
 
