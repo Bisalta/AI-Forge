@@ -246,8 +246,21 @@ commit de esta ronda (`fa86bc8`) hasta el commit sellado (`b9f203b`).
 
 Este mismo archivo de verificación queda fuera del árbol que el runner
 selló (el `Tree:` de la cabecera es anterior a este addendum). Corrida
-sobre el árbol final, después de commitear este addendum — ver
-"Corrida final de secret-scan, post-commit" al pie, agregada después de
-que el commit de este addendum ya existe (D34/D35: el runner trunca este
-archivo, así que esa corrida final se pega acá después, no antes).
+sobre el árbol final, **después** de commitear el addendum de arriba
+(commit `299091f`, árbol limpio confirmado con `git status --short` antes
+de correr):
+
+```
+$ git rev-parse HEAD
+299091fcf069a1d53c90cde533d5fee6f18eff23
+$ bash SDD/tests/secret-scan.sh
+secret-scan: sin hallazgos sobre 164 archivos versionados (1 excluido: self)
+$ echo $?
+0
+```
+
+Este párrafo final se agrega en un commit posterior a `299091f`, ya que
+el propio archivo de evidencia no puede documentar su propio hash de
+commit sin haberse commiteado primero — el mismo patrón en cascada que
+`D34`/`D35` describen para este runner.
 
