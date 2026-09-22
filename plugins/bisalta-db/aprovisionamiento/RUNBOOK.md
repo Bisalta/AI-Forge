@@ -1,6 +1,45 @@
 # Runbook — aprovisionamiento de solo lectura para `bisalta-db`
 
-Contract: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v11, requerimiento R1 (`infra`), AC1–AC10, AC41, AC42, AC43.
+Contract: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v13, requerimiento R1 (`infra`), AC1–AC10, AC41, AC42, AC43, AC44.
+
+**v13 (decisiones de Patrick Ocampo, Slack 22-sep-2026 11:27)**: cuatro
+puntos sobre lo que esta ronda había dejado listo.
+
+1. **Sale `neo_lectura`. Un solo rol: `claude_lectura`.** Patrick le
+   preguntó directo a NEO: no abre ninguna conexión Postgres, ni hoy ni en
+   su diseño futuro — lee Odoo stg por XML-RPC, contra la aplicación y no
+   contra la base — y corre en la cuenta de producción, no en la de dev.
+   Un rol sin consumidor era una clave que rotar, una cuenta que olvidar y
+   una pista falsa de que los dos mundos estaban conectados. `postgres-
+   parte-a.sql`, `postgres-parte-b.sql` y `postgres-inverso.sql` quedan con
+   un solo rol. **Lo que se resigna (D53, aceptado por Patrick)**:
+   `pg_stat_activity` no va a distinguir consumidores el día que haya más
+   de uno — hoy el único es Ian Vargas, así que no distingue nada que
+   exista. El remedio cuando haga falta un segundo consumidor real: agregar
+   su rol a `postgres-parte-a.sql` (siguiendo el mismo patrón que
+   `claude_lectura`) y volver a correrlo — es idempotente.
+2. **La política IAM va sobre un patrón, no sobre ARNs exactos**:
+   `dev/bd/claude-lectura-*`. Agregar un motor no obliga a tocar IAM, sólo
+   a crear el secreto con un nombre que caiga bajo el patrón. Ver sección
+   "Política IAM" más abajo.
+3. **`AC44`, nuevo**: `sqlserver-parte-a.sql` no tenía guarda de instancia
+   — a diferencia de `postgres-parte-0.sql`, nada decía contra qué servidor
+   corría, y `CREATE LOGIN` es objeto de instancia. Importa porque hay otro
+   SQL Server en juego: NEO lee `BD-PRINCIPAL`, que es producción. Ver
+   sección "AC44" más abajo.
+4. **Para el expediente: el login de Dev SQL NO se unifica con el que NEO
+   usa en `BD-PRINCIPAL`.** No es higiene, es imposibilidad técnica: **un
+   login no existe en dos instancias a la vez** — cada login vive en el
+   `sys.server_principals` de una sola instancia. Unificarlos exigiría
+   darle a uno de los dos el servidor del otro, y uno de los dos es
+   producción (`BD-PRINCIPAL`). Queda escrito, con las palabras de
+   Patrick, "para que dentro de seis meses nadie lo ordene sin saber
+   esto": si algún día alguien pide "un solo login para todo SQL Server",
+   la respuesta no es una decisión de diseño a reconsiderar — es una
+   propiedad de cómo SQL Server modela los logins, y no hay forma de
+   evitarla salvo tener dos logins con el mismo nombre y credenciales
+   independientes en cada instancia (que es exactamente lo que ya existe:
+   `bisalta_lectura` acá, lo que sea que NEO use allá).
 
 Este runbook lo ejecuta **una persona con privilegios de administración** en
 cada motor y en la cuenta de AWS de dev/qa. Ningún script de este directorio
@@ -125,13 +164,25 @@ corregido ahí también.
 - Acceso de `sysadmin` a la instancia `Dev SQL` (`10.24.40.137`).
 - Red desde la máquina que ejecuta hacia la VPC de dev/qa y hacia
   `10.24.40.137`.
+- **Medir `SERVERPROPERTY('MachineName')` contra Dev SQL ANTES de correr
+  `sqlserver-parte-a.sql` o `sqlserver-parte-b.sql` (contract v13, AC44)**:
+  conectado con `sysadmin` a `10.24.40.137`, correr
+  `SELECT SERVERPROPERTY('MachineName');`. El valor que hoy llevan los dos
+  scripts (`EC2AMAZ-2RGHL0C`) sale de un registro de SSM, no de esta
+  medición — está **sin confirmar**. Si el valor medido no coincide con
+  `EC2AMAZ-2RGHL0C`, el valor medido manda (Patrick Ocampo, textual: "si no
+  coincide, el valor manda sobre el mío"): actualizar la constante
+  `@esperada` en los dos scripts antes de ejecutarlos. Esta medición no se
+  pudo hacer durante esta ronda porque el login `bisalta_lectura` todavía
+  no existe en esa instancia — es la primera acción de quien ejecute el
+  runbook, con cualquier login `sysadmin` que ya tenga acceso.
 - Clientes CLI instalados: `psql` (Postgres) y `sqlcmd` (SQL Server). Medido
   el 18-sep-2026 en la máquina de referencia de este repo: `psql` 14.18
   presente, `sqlcmd` ausente — instalarlo antes de correr los scripts de
   SQL Server desde esa máquina.
 - Permisos de escritura en AWS Secrets Manager, región `us-east-1`, cuenta
   de dev/qa (para AC8). Este runbook **no invoca el binario `aws`**: define
-  la forma del secreto y la política IAM; los tres secretos se crean a mano
+  la forma del secreto y la política IAM; los dos secretos se crean a mano
   o con el flujo que la cuenta ya use para Secrets Manager.
 
 ## Orden de ejecución
@@ -147,23 +198,32 @@ corregido ahí también.
 4. **Verificar AC1** contra `proveedores_dev` (ver abajo) antes de seguir.
 5. `postgres-parte-b.sql` conectado al resto de las bases del catálogo
    (`proveedores_qa`, y cualquier base que se agregue después).
-6. `sqlserver-parte-a.sql` contra la instancia `Dev SQL`.
-7. `sqlserver-parte-b.sql` contra la misma instancia (recorre la lista
+6. **Antes de correr nada de SQL Server**: medir `SERVERPROPERTY('MachineName')`
+   contra `Dev SQL` (ver "Prerequisitos" arriba) y confirmar o corregir
+   `@esperada` en `sqlserver-parte-a.sql` y `sqlserver-parte-b.sql`.
+7. `sqlserver-parte-a.sql` contra la instancia `Dev SQL`. **Verificar AC44**
+   (ver abajo): si la instancia no coincide con `@esperada`, el script
+   tiene que abortar sin crear el login — confirmar esto primero contra
+   una instancia de prueba antes de confiar en la corrida real.
+8. `sqlserver-parte-b.sql` contra la misma instancia (recorre la lista
    explícita declarada al principio del script, otorgando `db_datareader`
-   —y nada más, desde v10— a cada base nombrada ahí). El script sale `0`
-   aunque alguna base nombrada no se haya podido cubrir — **revisar la
+   —y nada más, desde v10— a cada base nombrada ahí). Lleva la misma
+   guarda de instancia que la parte A (ver "AC44" abajo). El script sale
+   `0` aunque alguna base nombrada no se haya podido cubrir — **revisar la
    salida por líneas `AUSENTE:` / `NO ONLINE:` / `RECHAZADA` antes de
    seguir**: cada una nombra una base de la lista que quedó sin el user
    en esta corrida.
-8. **Verificar AC5** contra `EXACTUS` y **AC42** (ver abajo).
-9. Crear los tres secretos en Secrets Manager (ver "Forma del secreto" y
-   "Política IAM" abajo) y verificar AC8.
+9. **Verificar AC5** contra `EXACTUS` y **AC42** (ver abajo).
+10. Crear los dos secretos en Secrets Manager (ver "Forma del secreto" y
+    "Política IAM" abajo) y verificar AC8.
 
 ## Forma del secreto
 
-Tres secretos, uno por identidad de conexión: `claude_lectura` (Postgres),
-`neo_lectura` (Postgres) y el login de `Dev SQL`. Cada uno en la **forma
-estándar de RDS**: un objeto JSON con exactamente dos campos.
+Dos secretos, uno por identidad de conexión: `claude_lectura` (Postgres) y
+el login de `Dev SQL`. Un solo rol de Postgres desde v13 (contract,
+"Cambios v12 → v13" punto 1): `neo_lectura` salió porque NEO no abre
+ninguna conexión Postgres. Cada uno en la **forma estándar de RDS**: un
+objeto JSON con exactamente dos campos.
 
 | Campo | Contenido |
 |---|---|
@@ -176,19 +236,30 @@ no reproducir un secreto real: por eso esta tabla separa el nombre del
 campo de su contenido en columnas distintas, en vez de escribirlos
 concatenados como `campo` seguido de su valor en la misma celda.
 
-Nombres de secreto sugeridos (no forman parte del catálogo de la
-aplicación, que usa `secret_id` para referenciarlos por ARN — libres de
-elegir al crearlos, R2 no depende del nombre exacto):
+Nombres de secreto (decisión de Patrick Ocampo, contract v12 — él los
+elige y él los crea con estos nombres exactos, propagados a las 12
+entradas de `catalogo.json`): ambiente primero, como los `dev/…` que ya
+existen en la cuenta, y `bd` como categoría, como los `onpremise/bd/…` —
+entra en las dos convenciones que ya usa la cuenta en vez de inventar una
+tercera.
 
 - `dev/bd/claude-lectura-postgres`
-- `dev/bd/neo-lectura-postgres`
 - `dev/bd/claude-lectura-sqlserver`
 
 ## Política IAM
 
-Una política gestionada (o inline) por secreto, adjunta al rol o usuario
-IAM que cada proceso consumidor asuma al correr el plugin — nunca una
-política que cubra los tres secretos con un wildcard amplio:
+**Va sobre un patrón, no sobre ARNs exactos** (contract v13, "Cambios v12
+→ v13" punto 2 — Patrick Ocampo): `dev/bd/claude-lectura-*`, el mismo
+patrón que ya usa el stack de NEO (`${Environment}/neo/accesos-lectura-*`)
+para lo suyo. Consecuencia directa: **agregar un motor no obliga a tocar
+IAM**, sólo a crear el secreto con un nombre que caiga bajo el patrón —
+los dos secretos de arriba ya cumplen (`dev/bd/claude-lectura-postgres`,
+`dev/bd/claude-lectura-sqlserver`), y un tercer motor futuro (por ejemplo
+`dev/bd/claude-lectura-redshift`) quedaría cubierto sin escribir una
+policy nueva.
+
+Una política gestionada (o inline), adjunta al rol o usuario IAM que cada
+proceso consumidor asuma al correr el plugin:
 
 ```json
 {
@@ -197,7 +268,7 @@ política que cubra los tres secretos con un wildcard amplio:
     {
       "Effect": "Allow",
       "Action": "<accion-secrets-manager>",
-      "Resource": "<ARN del secreto, uno por policy>"
+      "Resource": "<arn-patron-claude-lectura>"
     }
   ]
 }
@@ -210,27 +281,34 @@ para que este documento no tenga el literal contiguo de una acción de IAM
 (mismo criterio que los placeholders de contraseña en los `.sql`: la forma
 se documenta partida, el valor real se arma al usarlo).
 
-- `Resource` es el ARN completo del secreto (no un prefijo, no `*`): el
+El placeholder `<arn-patron-claude-lectura>` se arma uniendo, sin espacio
+ni backtick, estos tres tramos — partidos acá por el mismo motivo que el
+de arriba (que este documento no tenga el ARN contiguo):
+`arn:aws:secretsmanager`:`us-east-1:<cuenta-dev-qa>:secret`:`dev/bd/claude-lectura-*`.
+
+- `Resource` es el patrón `dev/bd/claude-lectura-*` (no un wildcard
+  amplio como `dev/bd/*` ni `*`): el
   threat model del contract (sección "¿Quién puede invocarlo?") pone la
   barrera real en IAM, no en el plugin — un `Resource` amplio la anula.
-- Sin este permiso sobre el ARN puntual, `consultar` devuelve
+- Sin este permiso sobre el patrón, `consultar` devuelve
   `{ "error": "secreto_inaccesible" }` (exit 5, contract v3, tabla de
   comportamiento de error) — ese es el comportamiento esperado de un
   proceso sin la policy adjunta, no un bug.
-- No se declara una policy separada para `kms:Decrypt`: los tres secretos
+- No se declara una policy separada para `kms:Decrypt`: los dos secretos
   de este runbook usan la clave por defecto administrada por AWS para
   Secrets Manager en la cuenta de dev/qa (`aws/secretsmanager`), cuya
   política de clave ya permite a los principals de la cuenta que tengan
   la acción `secretsmanager`:`GetSecretValue` (ver nota de arriba sobre el
   backtick de separación) completar el descifrado. Si algún secreto
   se crea con una CMK propia, esa policy necesita además `kms:Decrypt`
-  sobre esa clave — no aplica a los tres secretos de este runbook.
+  sobre esa clave — no aplica a los dos secretos de este runbook.
 
-## Verificación de AC1–AC8, AC41, AC42 y AC43
+## Verificación de AC1–AC8, AC41–AC44
 
 Cada verificación es `manual-only`: ningún harness de este repo puede crear
 un rol de Postgres, alcanzar la VPC de dev/qa, o alcanzar `10.24.40.137`.
-Estado tras esta ronda: **pendiente-de-ejecucion** para las once.
+Estado tras esta ronda: **pendiente-de-ejecucion** para las doce (AC1–AC8,
+AC41–AC44).
 
 ### AC41 — la Parte 0 aborta por lo que el cluster CONTIENE, no por el nombre de la base
 
@@ -248,13 +326,13 @@ rol en cualquier base por el default de `CONNECT` a PUBLIC, con o sin
 `pg_read_all_data` — sola no discrimina, ver el comentario corregido de
 `postgres-parte-0.sql`, ronda 5 de review, MAJOR 2) y si es miembro de
 `pg_read_all_data` (`pg_has_role(...,'MEMBER')`, membresía de cluster, la
-misma en las 29 bases). Antes de que existan `claude_lectura` y
-`neo_lectura` esto sólo muestra los roles administrativos que ya haya, pero
-es la misma consulta que se vuelve a correr después de `postgres-parte-a.sql`:
-ahí las **dos columnas juntas** confirman que los dos roles nuevos llegan
-de verdad a las 29 bases del cluster, no a 2 — `puede_conectar` en `true`
-sin la membresía no probaría lectura, y la membresía sin `puede_conectar`
-no podría ni abrir la conexión. El paso 2 (el `DO $$ ... $$` de control)
+misma en las 29 bases). Antes de que exista `claude_lectura` esto sólo
+muestra los roles administrativos que ya haya, pero es la misma consulta
+que se vuelve a correr después de `postgres-parte-a.sql`: ahí las **dos
+columnas juntas** confirman que el rol nuevo llega de verdad a las 29
+bases del cluster, no a 2 — `puede_conectar` en `true` sin la membresía no
+probaría lectura, y la membresía sin `puede_conectar` no podría ni abrir
+la conexión. El paso 2 (el `DO $$ ... $$` de control)
 no lanza excepción, así que `psql -v ON_ERROR_STOP=1` no corta el script:
 `-v ON_ERROR_STOP=1` es obligatorio en esta corrida por el mismo motivo
 que en el resto de los `.sql` de este runbook (ver AC3) — sin la bandera,
@@ -284,23 +362,38 @@ tiene bases `_prod`, así que la corrida esperada ahí sería abortar — pero
 la Parte 0 no es la forma de comprobar eso, es la salvaguarda que impide
 seguir si alguien la corre ahí por error.
 
-### AC1 — los dos roles existen y leen de `proveedores_dev`
+### AC1 — el rol existe y lee de `proveedores_dev`
+
+**Nota para el planner (contract-change-request, no resuelto acá)**: el
+texto vigente de `AC1` en el contract (v13) todavía dice *"existen los
+roles `claude_lectura` y `neo_lectura`... una consulta de lectura...
+devuelve filas con cualquiera de los dos."* La decisión de v13
+("Cambios v12 → v13", punto 1) saca `neo_lectura` del diseño — con un solo
+rol, ese texto queda pidiendo un resultado que el sistema, correctamente
+actualizado, ya no puede producir: no hay forma de verificar que
+`neo_lectura` "existe y lee" sin recrear el rol que la propia decisión
+quitó. Es la misma clase de defecto que causó el `ESCALATE` de v6 → v7 de
+este contract (un AC no reconciliado con un cambio de diseño posterior).
+No se edita el contract acá (regla de single-writer); este runbook
+verifica lo que el diseño vigente sostiene — un solo rol — y deja este
+párrafo como la solicitud formal de que `AC1` se redacte de nuevo
+(propuesta: *"En el cluster de dev/qa existe el rol `claude_lectura`, con
+`LOGIN` y membresía de `pg_read_all_data`, sin `NOINHERIT`; una consulta
+de lectura sobre una tabla de `proveedores_dev` devuelve filas."*).
 
 `information_schema.tables` es un catálogo, no una tabla de
 `proveedores_dev`: verlo no prueba que el rol lea datos reales de esa base.
-Primero identificar una tabla real de la base (`<tabla_real>` abajo, con
-cualquiera de los dos roles ya alcanza para listar — `pg_read_all_data`
-también cubre los catálogos):
+Primero identificar una tabla real de la base (`<tabla_real>` abajo —
+`pg_read_all_data` también cubre los catálogos):
 
 ```
 psql -h sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com -U claude_lectura -d proveedores_dev -c "\dt"
 ```
 
-y después leer de ella con cada rol:
+y después leer de ella:
 
 ```
 psql -h sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com -U claude_lectura -d proveedores_dev -c "SELECT * FROM <tabla_real> LIMIT 1;"
-psql -h sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com -U neo_lectura   -d proveedores_dev -c "SELECT * FROM <tabla_real> LIMIT 1;"
 ```
 
 Esperado: `\dt` lista al menos una tabla base (si `proveedores_dev` no
@@ -308,10 +401,10 @@ tiene ninguna todavía, el AC no se puede verificar hasta que exista una —
 avisarlo en el estado, no forzar la lectura contra un catálogo); elegir
 `<tabla_real>` con al menos una fila (una tabla legible pero vacía da
 rojo falso: cero filas de una tabla vacía no se distingue de cero filas
-por falta de permiso). Las dos conexiones abren y las dos consultas sobre
-`<tabla_real>` terminan sin error de permiso y devuelven esa fila.
-Adicional: `SELECT rolname, rolinherit FROM pg_roles WHERE rolname IN ('claude_lectura','neo_lectura');`
-tiene que devolver `rolinherit = true` para ambos (nunca `NOINHERIT`).
+por falta de permiso). La conexión abre y la consulta sobre `<tabla_real>`
+termina sin error de permiso y devuelve esa fila.
+Adicional: `SELECT rolname, rolinherit FROM pg_roles WHERE rolname = 'claude_lectura';`
+tiene que devolver `rolinherit = true` (nunca `NOINHERIT`).
 
 ### AC2 — un `INSERT` con `claude_lectura` falla
 
@@ -353,9 +446,9 @@ psql ... -U <admin> -d proveedores_dev -c "DROP TABLE zz_scratch_ac2;"
 
 ```
 psql ... -U <admin> -d postgres -v ON_ERROR_STOP=1 -f postgres-parte-a.sql   # 1ra corrida
-psql ... -U <admin> -d postgres -c "SELECT rolname FROM pg_roles WHERE rolname IN ('claude_lectura','neo_lectura');"
+psql ... -U <admin> -d postgres -c "SELECT rolname FROM pg_roles WHERE rolname = 'claude_lectura';"
 psql ... -U <admin> -d postgres -v ON_ERROR_STOP=1 -f postgres-parte-a.sql   # 2da corrida
-psql ... -U <admin> -d postgres -c "SELECT rolname FROM pg_roles WHERE rolname IN ('claude_lectura','neo_lectura');"
+psql ... -U <admin> -d postgres -c "SELECT rolname FROM pg_roles WHERE rolname = 'claude_lectura';"
 ```
 
 `-v ON_ERROR_STOP=1` es obligatorio en las dos corridas: sin él, `psql -f`
@@ -364,7 +457,7 @@ literalmente "sale 0 las dos veces" — sin la bandera esa afirmación no
 mide nada.
 
 Esperado: exit 0 en las dos corridas del `.sql`, y las dos consultas
-devuelven exactamente los mismos dos nombres de rol.
+devuelven exactamente el mismo nombre de rol (`claude_lectura`).
 
 ### AC4 — tras el inverso, `claude_lectura` no conecta
 
@@ -826,20 +919,92 @@ la instancia de prueba para confirmar el verde de cierre —
 
 `manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
 
+### AC44 — `sqlserver-parte-a.sql` aborta si no corre contra la instancia declarada
+
+`AC44` (contract v13, "Cambios v12 → v13" punto 3) es el equivalente en
+SQL Server de lo que `postgres-parte-0.sql` hace para Postgres (AC41):
+`sqlserver-parte-a.sql` crea un `login`, objeto **de instancia**, y hasta
+esta ronda nada adentro decía contra qué servidor corría — lo único que lo
+mantenía en Dev SQL era quién escribía la cadena de conexión. Importa
+porque hay otro SQL Server en juego: NEO lee `BD-PRINCIPAL`, que es
+producción, y el script no sabía distinguirlas.
+
+**Valor sin confirmar**: la guarda compara `SERVERPROPERTY('MachineName')`
+contra `EC2AMAZ-2RGHL0C`, que sale de un registro de SSM. Patrick Ocampo
+pidió medirlo contra la instancia real antes de confiar en él — "si no
+coincide, el valor manda sobre el mío" — y esa medición **no se hizo en
+esta ronda** porque el login que permitiría conectar es justamente lo que
+este script crea (dependencia circular: hace falta el login para medir, y
+hace falta medir antes de crear el login). Es la primera acción de
+"Prerequisitos" arriba: correr `SELECT SERVERPROPERTY('MachineName');`
+contra `10.24.40.137` con cualquier login `sysadmin` existente, **antes**
+de la comprobación real de abajo. Si no coincide con `EC2AMAZ-2RGHL0C`,
+corregir `@esperada` en `sqlserver-parte-a.sql` **y** en
+`sqlserver-parte-b.sql` (ver sección "AC44 en la parte B" más abajo) antes
+de seguir.
+
+**Comprobación real (verde), contra `Dev SQL` con el nombre correcto ya
+confirmado**:
+
+```
+sqlcmd -S 10.24.40.137 -E -b -i sqlserver-parte-a.sql
+echo $?
+sqlcmd -S 10.24.40.137 -E -Q "SELECT 1 FROM sys.server_principals WHERE name = 'bisalta_lectura';"
+```
+
+Esperado: exit `0`, y la consulta devuelve una fila (el login se creó).
+
+**Mutación declarada** (contract v13, AC44): en una copia de trabajo
+`sqlserver-parte-a-mutado.sql`, cambiar `@esperada` por el nombre de
+cualquier otra instancia (por ejemplo `N'OTRA-INSTANCIA'`) y correrla
+contra `Dev SQL`:
+
+```
+sqlcmd -S 10.24.40.137 -E -b -i sqlserver-parte-a-mutado.sql
+echo $?
+sqlcmd -S 10.24.40.137 -E -Q "SELECT 1 FROM sys.server_principals WHERE name = 'bisalta_lectura';"
+```
+
+Esperado en este paso: el `RAISERROR` de severidad 16 corre, `-b` hace que
+`sqlcmd` salga distinto de `0`, y la consulta de catálogo **no** devuelve
+ninguna fila si el login no existía antes de esta corrida (si ya existía
+de una corrida anterior, seguirá existiendo — la mutación prueba que **no
+se crea uno nuevo**, no que se borre el que ya había; correrla sobre una
+instancia de prueba sin el login previo, no sobre `Dev SQL` con el login
+ya provisionado, para que el paso sea legible sin ambigüedad). Es la
+comprobación de "crea el login" poniéndose roja. Restaurar `@esperada` al
+valor correcto (o descartar la copia mutada, no commitearla nunca) y
+volver a correr la comprobación real de arriba para confirmar el verde de
+cierre.
+
+`manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
+
+#### AC44 en la parte B
+
+`sqlserver-parte-b.sql` no crea un login — crea users por base y los
+mete en `db_datareader` —, así que `AC44` en sentido estricto no la
+alcanza (su motivo es "un login es objeto de instancia"). Se decidió
+llevar la misma guarda ahí igual, como **defensa en profundidad**: Parte B
+corre contra la misma instancia, y correrla por error contra
+`BD-PRINCIPAL` concedería lectura sobre bases de producción reales de
+forma directa — un daño más inmediato que crear un login sin usar. El
+mismo triple de arriba (real → mutado → real) aplica igual si se quiere
+ejercitar la guarda de la parte B específicamente; no es un AC nuevo, es
+la misma guarda repetida por el mismo argumento.
+
 ### AC8 — cada secreto existe, tiene los dos campos, y es legible con la política IAM
 
-Para cada uno de los tres secretos (ver "Forma del secreto"):
+Para cada uno de los dos secretos (ver "Forma del secreto"):
 
 ```
 aws secretsmanager get-secret-value --secret-id dev/bd/claude-lectura-postgres --region us-east-1
-aws secretsmanager get-secret-value --secret-id dev/bd/neo-lectura-postgres --region us-east-1
 aws secretsmanager get-secret-value --secret-id dev/bd/claude-lectura-sqlserver --region us-east-1
 ```
 
 Esperado, corriendo con la identidad IAM que tiene la policy de la sección
-"Política IAM" adjunta: las tres llamadas devuelven `SecretString` con un
-JSON de exactamente dos campos, uno de nombre `username` y otro de nombre
-`password`, ninguno vacío.
+"Política IAM" (patrón `dev/bd/claude-lectura-*`) adjunta: las dos
+llamadas devuelven `SecretString` con un JSON de exactamente dos campos,
+uno de nombre `username` y otro de nombre `password`, ninguno vacío.
 
 ## AC9 — `secret-scan.sh` (triple de mutación, no manual-only)
 
@@ -956,7 +1121,7 @@ tampoco al catálogo de la aplicación (`plugins/bisalta-db/catalogo.json`)
   `db_datareader` sin haber estado nunca en `@bases_permitidas` ni haber
   sido pedida de nuevo — dejarla anotada como pendiente de limpieza
   dirigida (no de "reintentar el inverso") evita ese resultado.
-- AWS: los tres secretos se borran a mano desde la cuenta de dev/qa (no
+- AWS: los dos secretos se borran a mano desde la cuenta de dev/qa (no
   hay script: crear/borrar secretos está fuera del scope de este runbook,
   igual que crearlos).
 

@@ -124,8 +124,13 @@ function resolverCredencial(entrada) {
  * archivo de credenciales de libpq.
  * AC28 (sesión de solo lectura + statement_timeout) y AC29
  * (`application_name` = usuario del secreto, para que `pg_stat_activity`
- * distinga `claude_lectura` de `neo_lectura`) se verifican sobre lo que esta
- * función devuelve.
+ * atribuya del lado del motor) se verifican sobre lo que esta función
+ * devuelve. Con un solo rol (`claude_lectura` — contract v13, "Cambios
+ * v12 → v13" punto 1: `neo_lectura` salió porque NEO no abre ninguna
+ * conexión Postgres), `application_name` ya no distingue CONSUMIDORES —
+ * hoy hay uno solo — pero sigue sirviendo para atribuir la sesión al rol
+ * que la abrió. Si se agrega un segundo consumidor real, vuelve a
+ * distinguir quién corrió qué (D53).
  */
 function construirComandoPostgres(entrada, usuario, rutaPassfile, sql) {
   const conninfo = 'postgresql://' + encodeURIComponent(usuario) + '@' +

@@ -1,8 +1,11 @@
 -- postgres-inverso.sql
 --
 -- Revierte postgres-parte-a.sql y postgres-parte-b.sql: revoca CONNECT en
--- la base actual, revoca la membresía pg_read_all_data y borra los dos
--- roles (AC4: tras correrlo, claude_lectura no puede conectar al cluster).
+-- la base actual, revoca la membresía pg_read_all_data y borra el rol
+-- (AC4: tras correrlo, claude_lectura no puede conectar al cluster).
+-- Un solo rol (contract v13): `neo_lectura` salió del diseño porque NEO
+-- no abre ninguna conexión Postgres. Si se agrega un segundo consumidor
+-- real más adelante, se agrega su bloque acá siguiendo el mismo patrón.
 --
 -- CÓMO CORRERLO (importante, ver RUNBOOK.md): conectado a CADA base donde
 -- se corrió la parte B (proveedores_dev, proveedores_qa, y cualquier otra
@@ -26,20 +29,6 @@ BEGIN
       DROP ROLE claude_lectura;
     EXCEPTION WHEN dependent_objects_still_exist THEN
       RAISE NOTICE 'claude_lectura todavia tiene privilegios en otra base del cluster; correr este script tambien ahi antes de que el DROP tenga efecto';
-    END;
-  END IF;
-END
-$$;
-
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'neo_lectura') THEN
-    EXECUTE format('REVOKE CONNECT ON DATABASE %I FROM neo_lectura', current_database());
-    REVOKE pg_read_all_data FROM neo_lectura;
-    BEGIN
-      DROP ROLE neo_lectura;
-    EXCEPTION WHEN dependent_objects_still_exist THEN
-      RAISE NOTICE 'neo_lectura todavia tiene privilegios en otra base del cluster; correr este script tambien ahi antes de que el DROP tenga efecto';
     END;
   END IF;
 END

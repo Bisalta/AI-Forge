@@ -99,6 +99,34 @@
 --
 -- Idempotente: IF NOT EXISTS antes de CREATE USER y antes de ALTER ROLE
 -- ADD MEMBER, así que correrlo dos veces no falla y no duplica membresías.
+--
+-- GUARDA DE INSTANCIA (contract v13, AC44 — extendida acá por el mismo
+-- argumento, ver RUNBOOK.md sección "AC44"): AC44 en sentido estricto sólo
+-- exige la guarda en sqlserver-parte-a.sql, porque su motivo es que un
+-- LOGIN es objeto de instancia. Este script no crea un login — crea
+-- users por base y los mete en db_datareader —, pero corre contra la
+-- MISMA instancia, y el mismo hueco aplica: nada acá abajo dice contra
+-- qué servidor corre, y correrlo por error contra BD-PRINCIPAL concedería
+-- lectura sobre bases de producción reales de forma directa (peor,
+-- incluso, que crear un login sin usar: acá el daño es inmediato sobre
+-- datos nombrados). Se decide duplicar la guarda como defensa en
+-- profundidad, con el mismo criterio que `@bases_prohibidas` más abajo:
+-- el criterio real es otro (la lista, o el login existente), pero la
+-- guarda de instancia no cuesta nada repetir y cierra la misma clase de
+-- hueco. Mismo valor sin confirmar que sqlserver-parte-a.sql — ver su
+-- comentario.
+
+SET NOCOUNT ON;
+
+DECLARE @maquina  sysname = CAST(SERVERPROPERTY('MachineName') AS sysname);
+DECLARE @esperada sysname = N'EC2AMAZ-2RGHL0C';   -- Dev SQL, 10.24.40.137 — SIN CONFIRMAR, ver sqlserver-parte-a.sql
+
+IF @maquina <> @esperada
+BEGIN
+    RAISERROR(N'ABORTA: este script solo corre en Dev SQL (%s). Estas en %s.',
+              16, 1, @esperada, @maquina);
+    SET NOEXEC ON;
+END
 
 DECLARE @bases_permitidas TABLE (nombre SYSNAME PRIMARY KEY);
 

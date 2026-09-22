@@ -93,9 +93,10 @@ Las herramientas quedan disponibles como
    lectura de Aurora (`cluster-ro-`), que rechaza las escrituras **en el
    motor**. Es la única capa que no depende de que nada de este repo esté bien
    escrito.
-1. **El rol** de base es de solo lectura (`claude_lectura` / `neo_lectura`,
-   miembros de `pg_read_all_data`). Lo crea el runbook de
-   `aprovisionamiento/`.
+1. **El rol** de base es de solo lectura (`claude_lectura`, miembro de
+   `pg_read_all_data`). Lo crea el runbook de `aprovisionamiento/`. Un solo
+   rol: NEO no abre ninguna conexión Postgres (lee Odoo por XML-RPC), así
+   que no hay un segundo consumidor que necesite el suyo (contract v13).
 2. **La sesión** se abre en `default_transaction_read_only=on`, con
    `statement_timeout=120000`.
 3. **La lista blanca** exige que *cada* sentencia empiece con `SELECT` o
