@@ -1,6 +1,15 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v13
+- **Versión**: v14
+
+### Cambios v13 → v14 (enmienda del planner, 22-sep-2026)
+
+**Defecto del contract, levantado por `AGENT_r1` como `contract-change-request` en vez de trabajarlo alrededor — que es exactamente lo que el protocolo pide.** v13 decidió el rol único y **no reconcilió los ACs que lo verifican**:
+
+- `AC1` seguía exigiendo que *"existen los roles `claude_lectura` **y `neo_lectura`**"* — un resultado que el diseño de v13 ya no puede producir. Quien ejecutara el procedimiento obtendría rojo sobre una propiedad que el contract mismo derogó.
+- `AC29` justificaba el `application_name` con *"para que `pg_stat_activity` distinga `claude_lectura` de `neo_lectura`"*. La propiedad que el AC afirma sigue en pie; la **razón** ya no.
+
+**Es la tercera vez en este ciclo que ocurre lo mismo**: `v6 → v7` terminó en `ESCALATE` por esto, `RT30` lo registró con el mecanismo propuesto, `RT36` lo registró **otra vez** como reincidencia — y v13 volvió a caer. La regla está escrita dos veces en este mismo contract y no bastó ni para quien la escribió. Lo que falta no es más prosa: es el bloque `acs-afectados:` que `sdd-lint-contract.sh` debería exigir por sección de cambios.
 
 ### Cambios v12 → v13 (decisiones de Patrick Ocampo, Slack 22-sep-2026 11:27)
 
@@ -378,7 +387,7 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 
 ### R1 — aprovisionamiento (`infra`)
 
-**AC1** — En el cluster de dev/qa existen los roles `claude_lectura` y `neo_lectura`, ambos con `LOGIN` y membresía de `pg_read_all_data`, ninguno con `NOINHERIT`; una consulta de lectura sobre una tabla de `proveedores_dev` devuelve filas con cualquiera de los dos.
+**AC1** — En el cluster de dev/qa existe el rol `claude_lectura` —**y ningún otro rol de lectura creado por estos scripts**— con `LOGIN` y membresía de `pg_read_all_data`, sin `NOINHERIT`; una consulta de lectura sobre una tabla de `proveedores_dev` devuelve filas. (`neo_lectura` salió en v13: NEO no abre ninguna conexión Postgres.)
 `manual-only: requiere privilegios de administración en el cluster y red a la VPC de dev/qa; ningún harness de este repo puede crear un rol de Postgres.`
 
 **AC2** — Un `INSERT` ejecutado por `claude_lectura` sobre `proveedores_dev` falla con error de permiso.
@@ -467,7 +476,7 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 
 **AC28** — El comando que el servidor construye para una conexión `postgres` incluye `default_transaction_read_only=on` y `statement_timeout=120000`.
 
-**AC29** — El comando que el servidor construye lleva un `application_name` igual al `username` del secreto, para que `pg_stat_activity` distinga `claude_lectura` de `neo_lectura`.
+**AC29** — El comando que el servidor construye lleva un `application_name` igual al `username` del secreto, para que `pg_stat_activity` atribuya del lado del motor. (Hasta v12 la razón era distinguir `claude_lectura` de `neo_lectura`; con el rol único de v13 **ya no distingue consumidores** —`D53`, aceptado— pero la atribución al rol sigue siendo útil y el AC no cambia de propiedad.)
 
 **AC30** — La bitácora escribe una línea JSON por invocación con conexión, dialecto, hash de la consulta, filas devueltas, si truncó, duración y exit code.
 
