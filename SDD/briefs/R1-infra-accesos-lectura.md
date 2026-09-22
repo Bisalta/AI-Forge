@@ -1,7 +1,7 @@
 # Task brief — R1 · infra: accesos de solo lectura en Postgres dev/qa y Dev SQL
 
 - **Agente**: `AGENT_r1` · **Modelo**: `sonnet`
-- **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v6**, ACs **AC1–AC10 + AC41 + AC42**
+- **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v14**, ACs **AC1–AC10 + AC41 + AC42 + AC43 + AC44**
 - **Arquetipo**: `infra`
 - **Repo**: `.` · **Branch**: `feat-GEN-108-mcp-bisalta-db` (ya creada; **NO crear otra, NO commitear a `prod`**)
 - **Proxima subtask**: `GEN-108.1`, id `cd0ed6b7-fde8-4381-9a69-e4e684498813` (informativo — **vos no tocás Proxima**)
@@ -30,11 +30,11 @@ El aprovisionamiento no es un detalle de operación: es donde vive la garantía.
 
 > **Cómo citar esta lista**: los puntos numerados de abajo son de **este brief**, no del contract. Los archivos de `plugins/bisalta-db/` son distribuibles y los va a leer alguien que no tiene el brief a mano: citá la sección del contract por su **nombre** (ej. "Entrega de la credencial al cliente"), nunca "punto N del contract".
 
-1. **Dos roles de Postgres, no uno**: `claude_lectura` y `neo_lectura`. `pg_stat_activity` distingue quién corrió qué, y se puede revocar a uno sin el otro.
+1. ~~**Dos roles de Postgres, no uno**: `claude_lectura` y `neo_lectura`.~~ **DEROGADO en el contract v13**: un solo rol, `claude_lectura`. NEO no abre ninguna conexión Postgres —lee Odoo por XML-RPC— y corre en la cuenta de producción. Lo que se resigna (`pg_stat_activity` deja de poder distinguir consumidores) está en `SDD/debt.md` D53, con su remedio.
 2. **`GRANT pg_read_all_data`, y SIN `NOINHERIT`.** Con `NOINHERIT` el rol **no vería una sola tabla**: `pg_read_all_data` es una membresía, y las membresías no aplican sin `SET ROLE`. Esto ya está decidido; si lo escribís con `NOINHERIT` el rol queda inútil y el AC1 falla.
 3. **Script en dos partes.** Parte A una vez **por cluster** (los roles son objetos de cluster). Parte B una vez **por base** (los `GRANT` son por base).
 4. **Sólo en el cluster de dev/qa** (`sistemas-costruplaza-db.cluster-cfrl3owqzwof`). Nada toca `cluster-cr4rbgr7qlr6`: ahí viven los cinco pares `_prod`/`_stg` de la empresa, y un rol de login creado en cualquier `_stg` queda al lado de producción.
-5. **SQL Server recorre `sys.databases` con un cursor explícito**, excluyendo `master`, `model`, `msdb` y `tempdb`. `db_datareader` es por base y son **32** (medido, `INVENTARIO.md` — no "~35"). **No uses `sp_MSforeachdb`**: no está soportado y salta bases en algunos estados.
+5. ~~**SQL Server recorre `sys.databases` con un cursor explícito**, excluyendo `master`, `model`, `msdb` y `tempdb`.~~ **DEROGADO en v9**: recorre una **lista explícita** (`@bases_permitidas`); el alcance arranca en cero y cada base entra por pedido nombrado. Lo que sigue abajo de esta línea sobre el filtro por `database_id` describe el mecanismo viejo — `db_datareader` es por base y son **32** (medido, `INVENTARIO.md` — no "~35"). **No uses `sp_MSforeachdb`**: no está soportado y salta bases en algunos estados.
 6. **La asimetría se documenta, no se compensa.** SQL Server no tiene equivalente de `default_transaction_read_only` ni réplica de lectura: el rol del login, con `db_datareader` y (v4/v5) `db_denydatawriter`, es la única barrera. No inventes un sustituto.
 
 ## Out of scope

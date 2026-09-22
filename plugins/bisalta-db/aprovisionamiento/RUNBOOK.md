@@ -339,6 +339,12 @@ que en el resto de los `.sql` de este runbook (ver AC3) — sin la bandera,
 un `RAISE EXCEPTION` adentro de un `DO` no necesariamente hace que `psql`
 salga distinto de 0.
 
+> 🔴 **Si la guarda disparó en una sesión interactiva (SSMS), esa sesión queda en
+> `NOEXEC`**: el reintento con `@esperada` ya corregido **no ejecuta nada y no avisa**.
+> Abrí una sesión nueva, o corré `SET NOEXEC OFF;` antes de reintentar. El
+> procedimiento de este runbook usa `sqlcmd -i`, que abre un proceso —y por lo
+> tanto una sesión— por invocación, así que no se ve afectado.
+
 **Mutación declarada** (contract v5, AC41): en una copia de trabajo de
 `postgres-parte-0.sql` (nunca el archivo que se corre contra un cluster
 real sin revertir antes), cambiar la condición de aborto de `_prod` a
