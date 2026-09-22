@@ -219,7 +219,11 @@ corregido ahí también.
    en esta corrida.
 9. **Verificar AC5** contra `EXACTUS` y **AC42** (ver abajo).
 10. Crear los dos secretos en Secrets Manager (ver "Forma del secreto" y
-    "Política IAM" abajo) y verificar AC8.
+    "Política IAM" abajo) y verificar AC8. **Este paso no depende de los
+    anteriores**: puede correrse en cualquier momento, incluso primero. Si
+    el secreto ya existe cuando se ejecuta la parte A de ese motor, la
+    contraseña del placeholder **sale del secreto** en vez de generarse —
+    ver "Forma del secreto".
 
 ## Forma del secreto
 
@@ -231,8 +235,32 @@ objeto JSON con exactamente dos campos.
 
 | Campo | Contenido |
 |---|---|
-| `username` | el nombre del rol o login creado por la parte A del motor correspondiente |
-| `password` | la misma contraseña real que se sustituyó en el placeholder de la parte A al ejecutarla |
+| `username` | el nombre del rol o login que crea la parte A del motor correspondiente. **No se elige al crear el secreto**: está fijo como literal dentro del `.sql` (`claude_lectura` en Postgres). |
+| `password` | **el mismo valor** que lleva el placeholder de contraseña de esa misma parte A. Los dos lados guardan el mismo secreto; cuál de los dos se fijó primero no importa. |
+
+**Cualquiera de los dos órdenes es válido, y el segundo obliga a leer esto
+al revés.** El "Orden de ejecución" de más arriba pone la creación de los
+secretos al final (paso 10), pero eso es una secuencia cómoda, no un
+requisito: la propiedad que importa es una **igualdad entre dos valores**,
+no cuál se escribió antes.
+
+- Si la parte A corre primero: se genera una contraseña, se sustituye en
+  el placeholder, y **ese mismo valor** se guarda después en el campo
+  `password` del secreto.
+- Si el secreto se crea primero (es lo que pasó con
+  `dev/bd/claude-lectura-postgres`, creado el 22-sep-2026 antes de la
+  parte A): la contraseña **ya existe**, y hay que **recuperarla del
+  secreto** para sustituirla en el placeholder. No se genera una segunda.
+
+Generar una contraseña nueva teniendo el secreto ya creado deja el motor y
+el secreto con valores distintos, y **el síntoma es indistinguible del de
+un rol que todavía no existe**: Postgres contesta
+`FATAL: password authentication failed` en los dos casos, porque desde la
+versión 10 le responde a un rol inexistente con un desafío SCRAM falso
+(*mock authentication*) para impedir la enumeración de usuarios. Separarlos
+requiere una credencial administrativa y una consulta a `pg_roles` — ver
+"Si la conexión falla con `password authentication failed`" más abajo,
+dentro de la verificación de AC1.
 
 Los dos campos van **en el mismo objeto JSON**, cada uno con su propio
 nombre y su propio valor — el punto de este runbook es describir la forma,
@@ -416,6 +444,42 @@ termina sin error de permiso y devuelve esa fila.
 Adicional: `SELECT rolname, rolinherit FROM pg_roles WHERE rolname = 'claude_lectura';`
 tiene que devolver `rolinherit = true` (nunca `NOINHERIT`).
 
+#### Si la conexión falla con `password authentication failed`
+
+Ese error **no identifica una causa**: significa "el rol no existe" **o**
+"la contraseña del rol no es la del secreto", sin distinguirlas. Postgres
+responde igual a las dos a propósito — desde la versión 10, a un rol
+inexistente le contesta con un desafío SCRAM falso (*mock
+authentication*) para que nadie pueda enumerar usuarios probando nombres.
+
+Nada de lo de arriba sirve para separarlas: todos esos comandos se
+conectan **como** `claude_lectura`, que es justo lo que no funciona. Hace
+falta una credencial **administrativa** (una que ya pueda leer `pg_roles`)
+y una sola consulta:
+
+```
+SELECT rolname, rolcanlogin, rolinherit,
+       pg_has_role(rolname, 'pg_read_all_data', 'member') AS lee_todo,
+       has_database_privilege(rolname, 'proveedores_dev', 'CONNECT') AS conecta
+FROM pg_roles WHERE rolname = 'claude_lectura';
+```
+
+| Resultado | Qué pasó |
+|---|---|
+| cero filas | el rol no existe — falta correr `postgres-parte-a.sql` |
+| `rolcanlogin = f` | existe sin `LOGIN`: el `CREATE ROLE` perdió esa cláusula |
+| `rolinherit = f` | entró `NOINHERIT`: no vería una sola tabla aunque conecte (ver la nota de `pg_read_all_data` en `postgres-parte-a.sql`) |
+| `lee_todo = f` | falta el `GRANT pg_read_all_data` |
+| todo `t`, `conecta = f` | parte A completa; falta `postgres-parte-b.sql` sobre esa base |
+| **todo `t`, `conecta = t`** | el rol está bien: entonces **la contraseña del secreto no es la del rol** — ver "Forma del secreto", los dos órdenes de creación |
+
+Antes de llegar acá conviene descartar lo que no es autenticación: que el
+`secret_id` del catálogo instalado sea el mismo que el del repo (ver
+`README.md`, la nota sobre la copia que deja `/plugin install`), que el
+`username` del secreto sea `claude_lectura`, que la contraseña no traiga
+espacios ni saltos alrededor, y que el puerto del endpoint `cluster-ro-`
+abra. Un fallo en cualquiera de esos da un error distinto, no éste.
+
 ### AC2 — un `INSERT` con `claude_lectura` falla
 
 **Mutación declarada** (contract v3, AC2): antes de verificar el
@@ -487,7 +551,10 @@ devolver **cero filas**. Un intento de conexión con `claude_lectura`
 lo produce lo mismo una contraseña mal tipeada con el rol todavía
 intacto, así que no distingue "el rol no existe" de "el rol existe pero
 tipeé mal la contraseña" — usarlo únicamente como confirmación adicional
-después de que la consulta de catálogo ya dio cero filas.
+después de que la consulta de catálogo ya dio cero filas. (El mecanismo
+por el que no distingue está en "Si la conexión falla con `password
+authentication failed`", dentro de la verificación de AC1: es
+*mock authentication*, deliberado, no una casualidad de este caso.)
 
 ### AC5 — el login de `Dev SQL` lee de `EXACTUS`
 

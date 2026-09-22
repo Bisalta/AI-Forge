@@ -43,9 +43,19 @@
 -- sola tabla y AC1 falla.
 --
 -- Contraseña: NO vive en este archivo. Sustituir el placeholder de abajo
--- (<PASSWORD_CLAUDE_LECTURA>) por la contraseña real al ejecutar — ver
--- RUNBOOK.md, sección "Forma del secreto". El placeholder no es una
--- credencial real.
+-- (<PASSWORD_CLAUDE_LECTURA>) por la contraseña real al ejecutar. El
+-- placeholder no es una credencial real.
+--
+-- DE DÓNDE SALE ESA CONTRASEÑA depende de qué exista ya, y el orden no
+-- está fijado (RUNBOOK.md, sección "Forma del secreto"):
+--   * si el secreto de Secrets Manager NO existe todavía, se genera acá y
+--     ese mismo valor se guarda después en su campo `password`;
+--   * si el secreto YA existe, la contraseña se RECUPERA DE AHÍ. No se
+--     genera una nueva.
+-- Generar una segunda deja el rol y el secreto con valores distintos, y el
+-- síntoma es indistinguible del de un rol inexistente: Postgres contesta
+-- `FATAL: password authentication failed` en los dos casos (mock
+-- authentication, >=10). Sólo lo separa una consulta a pg_roles.
 --
 -- Idempotente (AC3): correr esto dos veces seguidas sale 0 las dos veces y
 -- deja el mismo conjunto de roles. CREATE ROLE no es idempotente por sí

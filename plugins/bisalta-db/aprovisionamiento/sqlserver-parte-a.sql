@@ -22,7 +22,11 @@
 --
 -- Contraseña: NO vive en este archivo. Sustituir el placeholder
 -- <PASSWORD_LECTURA_SQL> por la contraseña real al ejecutar — ver
--- RUNBOOK.md, sección "Forma del secreto".
+-- RUNBOOK.md, sección "Forma del secreto". El orden no está fijado: si el
+-- secreto de Secrets Manager ya existe, la contraseña se RECUPERA DE AHÍ
+-- en vez de generarse; si no existe, se genera acá y ese mismo valor se
+-- guarda después en su campo `password`. Dos valores distintos dan un
+-- fallo de autenticación que no se distingue del de un login inexistente.
 --
 -- Idempotente: no falla si el login ya existe (chequeo contra
 -- sys.server_principals antes del CREATE LOGIN).
