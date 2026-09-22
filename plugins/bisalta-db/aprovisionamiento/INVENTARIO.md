@@ -148,3 +148,23 @@ exacto de `sys.databases`, no uno recordado.
   Ninguna está en solo lectura, así que el motor no aporta ninguna barrera: se confirma
   que el rol (`db_datareader`) es la única — desde v10 (decisión de Patrick Ocampo,
   `db_denydatawriter` se quitó) literalmente la única, sin una segunda red de `DENY`.
+
+
+---
+
+## Cliente de SQL Server — medido el 22-sep-2026
+
+Los procedimientos de este directorio asumen el `sqlcmd` clásico de ODBC. Lo que hay instalado en
+la máquina de referencia es **`sqlcmd` 1.10.0, la reimplementación en Go (`go-sqlcmd`)**, que tiene
+una CLI distinta —subcomandos con `--database`, `--query`— más un **modo de compatibilidad** con las
+banderas de siempre. Todo lo que los procedimientos dan por hecho se verificó ahí, no se supuso:
+
+| Lo que el procedimiento asume | Medido en go-sqlcmd 1.10.0 |
+|---|---|
+| La contraseña va por `SQLCMDPASSWORD`, nunca por `argv` | **Se sostiene.** Sin la variable, intenta pedir la clave por teclado (`liner: function not supported in this terminal`); con ella, va directo al intento de conexión. |
+| `-b` hace que un error salga con código distinto de 0 | **Sí**, exit 1. Y sin `-b`, una conexión rechazada **también** sale 1. |
+| `-Q`, `-d`, `-E`, `-W`, `-s` existen | **Las cinco**, en el modo de compatibilidad (`sqlcmd '-?'`). |
+
+**Ojo con el exit code al medir**: `sqlcmd ... | head` devuelve el código de `head`, no el de `sqlcmd`
+— la primera corrida de esta verificación dio `exit=0` por eso y casi se reporta como hallazgo.
+Medir el exit code de un comando que va a un pipe exige `PIPESTATUS` o no usar el pipe.
