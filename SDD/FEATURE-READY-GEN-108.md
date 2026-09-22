@@ -1,6 +1,6 @@
 # Feature Ready — `bisalta-db` v0.1.0 · consulta de solo lectura sin credencial en contexto
 
-**Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v9** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
+**Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v11** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
 **Agentes**: `AGENT_r1` (infra, 8 rondas en tres alcances) · `AGENT_r2` (third-party-integration, 2 rondas)
 **Gates**: suite 17/17 · secret-scan exit 0 · shellcheck exit 0 · linter de closure exit 0
 
@@ -24,7 +24,7 @@ Un plugin que le da a Claude Code y a NEO consulta de solo lectura contra las ba
 
 🔴 **La aprobación de Esteban Fait o Sebastián sigue pendiente.** Patrick aprobó el login de Dev SQL sabiendo que son copias de producción; la política de uso de IA exige además la suya. **Es precondición de habilitar el plugin al equipo, no de mergearlo.**
 
-🟡 **`AC34` no se probó contra una sesión real de Claude Code.** El handshake corre contra el harness; el `protocolVersion` declarado (`2024-11-05`) no se negoció con el cliente real. Es lo primero que hay que probar al instalar.
+✅ **`AC34` probado contra una sesión real de Claude Code (22-sep-2026).** El plugin se instaló desde el marketplace local, Claude Code negoció `2024-11-05`, descubrió las dos herramientas y las invocó sin ajustes. Con él quedaron verificados en vivo `AC35`, `AC33` y la lista blanca cortando antes de conectar. **Era el riesgo declarado desde v1 y ya no lo es.**
 
 🟡 **La cuenta de producción no está enumerada** (`D43`). Ninguna entrada del catálogo apunta ahí, pero "producción es irrepresentable" descansa en eso, no en un inventario.
 
