@@ -1,6 +1,20 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v12
+- **Versión**: v13
+
+### Cambios v12 → v13 (decisiones de Patrick Ocampo, Slack 22-sep-2026 11:27)
+
+**1. `neo_lectura` sale. Un solo rol: `claude_lectura`.** Cierra el punto 3 de `D51`, y con un dato que invalida el supuesto anterior: **NEO no abre ninguna conexión Postgres** — ni hoy ni en el diseño de NEO QA, que dice explícito *"sin SQL ni Odoo al arrancar"*. Lee Odoo stg **por XML-RPC**, contra la aplicación y no contra la base. Y corrige su propio supuesto: NEO **no corre en la cuenta de dev** sino en la de producción, con su stack y su rol de instancia. Si algún día usara Postgres sería contra `erp-costruplaza-db`, nunca contra `sistemas-costruplaza-db` — ninguna de las 28.
+
+**Lo que se resigna, escrito porque él lo escribió**: `pg_stat_activity` no va a distinguir consumidores el día que haya más de uno. Hoy el único es Ian Vargas, así que no distingue nada que exista. Cuando haga falta, se agrega el rol a la lista de la Parte A y se vuelve a correr — el script es idempotente. Y su razón para sacarlo ahora: *"un rol sin consumidor es una clave que rotar, una cuenta que olvidar, y sobre todo una pista falsa de que los dos mundos están conectados."*
+
+Esto **revierte la decisión de dos roles** que venía del refinement del 18-sep. La razón de aquella —que `pg_stat_activity` distinguiera quién corrió qué— sigue siendo buena; lo que cambió es que se midió que el segundo consumidor no existe.
+
+**2. La política IAM va sobre un patrón, no sobre ARNs exactos.** `dev/bd/claude-lectura-*`, de modo que el secreto de SQL Server queda cubierto sin escribir una política nueva. El patrón se lo copió al stack de NEO, que autoriza sobre `${Environment}/neo/accesos-lectura-*`. Consecuencia para este contract: **agregar un motor no obliga a tocar IAM**, sólo a crear el secreto con un nombre que caiga bajo el patrón.
+
+**3. Al script de SQL Server le falta la guarda que Postgres sí tiene.** `postgres-parte-0.sql` aborta si el cluster contiene producción. **El de SQL Server no tiene equivalente — y crea un `login`, que es objeto de instancia.** Nada adentro del script dice contra qué servidor corre: lo único que lo mantiene en Dev SQL es quién escribe la cadena de conexión. Importa porque **hay otro SQL Server en juego**: NEO lee `BD-PRINCIPAL`, que es producción, y el script no sabe distinguirlas. Nace `AC44`.
+
+**4. Para el expediente: el login de Dev SQL NO se unifica con el que NEO usa en `BD-PRINCIPAL`.** Y la razón no es higiene: **un login no existe en dos instancias a la vez**, así que unificarlos obligaría a darle a uno el servidor del otro — y uno de los dos es producción. Queda escrito para que dentro de seis meses nadie lo "ordene" sin saber eso.
 
 ### Cambios v11 → v12 (respuestas de Patrick Ocampo, Slack 22-sep-2026 11:14)
 
@@ -496,6 +510,11 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 **AC43** — `sqlserver-inverso.sql` saca a `bisalta_lectura` de **toda base `ONLINE` donde el user exista**, incluidas las que no están en `@bases_permitidas` y las cuatro de sistema, y **no lee `@bases_permitidas` en ningún punto**. Una base que no esté `ONLINE` no se puede tocar: el script lo reporta y el procedimiento declara la consecuencia.
 `manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
 **Mutación declarada**: crear a mano el user `bisalta_lectura` en una base de usuario que **no** esté en `@bases_permitidas`, y correr el inverso — tiene que sacarlo de ahí también. Después, reemplazar el cursor del inverso por uno que recorra `@bases_permitidas` (la forma que el script tenía hasta v9): la comprobación tiene que ponerse roja, porque el user sobreviviría en esa base. Restaurar la enumeración.
+
+**AC44** — `sqlserver-parte-a.sql` **aborta si no corre contra la instancia declarada**. Compara `SERVERPROPERTY('MachineName')` contra el nombre esperado de Dev SQL y, si no coincide, emite `RAISERROR` con severidad 16 y activa `SET NOEXEC ON` — o sea que no crea el login. Es el equivalente en SQL Server de lo que `postgres-parte-0.sql` hace para Postgres, y hace falta porque un `login` es objeto **de instancia** y nada más en el script dice contra qué servidor corre.
+`manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
+**Precondición del planner**: el valor esperado que Patrick sacó del registro de SSM es `EC2AMAZ-2RGHL0C`, y él mismo pidió que **se confirme midiendo** — `SELECT SERVERPROPERTY('MachineName')` conectado a Dev SQL — antes de fijarlo en el script. Textual: *"si no coincide, el valor manda sobre el mío."* Hasta que se mida, el script lleva el valor de Patrick con la comprobación pendiente anotada.
+**Mutación declarada**: cambiar el nombre esperado por el de cualquier otra instancia; correr el script contra Dev SQL tiene que **abortar** sin crear el login — o sea, la comprobación de que crea el login se pone roja. Restaurar el nombre correcto.
 
 ## Checklist del arquetipo
 
