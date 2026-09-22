@@ -6,7 +6,7 @@
     "host": "sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com",
     "puerto": 5432,
     "base": "proveedores_dev",
-    "secret_id": "bisalta-db/postgres/claude_lectura",
+    "secret_id": "dev/bd/claude-lectura-postgres",
     "region": "us-east-1",
     "garantias": [
       "rol-solo-lectura",
@@ -21,7 +21,7 @@
     "host": "sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com",
     "puerto": 5432,
     "base": "proveedores_qa",
-    "secret_id": "bisalta-db/postgres/claude_lectura",
+    "secret_id": "dev/bd/claude-lectura-postgres",
     "region": "us-east-1",
     "garantias": [
       "rol-solo-lectura",
@@ -36,7 +36,7 @@
     "host": "sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com",
     "puerto": 5432,
     "base": "smartcheck_dev",
-    "secret_id": "bisalta-db/postgres/claude_lectura",
+    "secret_id": "dev/bd/claude-lectura-postgres",
     "region": "us-east-1",
     "garantias": [
       "rol-solo-lectura",
@@ -51,7 +51,7 @@
     "host": "sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com",
     "puerto": 5432,
     "base": "smartcheck_qa",
-    "secret_id": "bisalta-db/postgres/claude_lectura",
+    "secret_id": "dev/bd/claude-lectura-postgres",
     "region": "us-east-1",
     "garantias": [
       "rol-solo-lectura",
@@ -66,7 +66,7 @@
     "host": "sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com",
     "puerto": 5432,
     "base": "smartfleet_dev",
-    "secret_id": "bisalta-db/postgres/claude_lectura",
+    "secret_id": "dev/bd/claude-lectura-postgres",
     "region": "us-east-1",
     "garantias": [
       "rol-solo-lectura",
@@ -81,7 +81,7 @@
     "host": "sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com",
     "puerto": 5432,
     "base": "smartfleet_qa",
-    "secret_id": "bisalta-db/postgres/claude_lectura",
+    "secret_id": "dev/bd/claude-lectura-postgres",
     "region": "us-east-1",
     "garantias": [
       "rol-solo-lectura",
@@ -96,7 +96,7 @@
     "host": "10.24.40.137",
     "puerto": 1433,
     "base": "COMPRAS",
-    "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
+    "secret_id": "dev/bd/claude-lectura-sqlserver",
     "region": "us-east-1",
     "garantias": [
       "rol-solo-lectura"
@@ -109,7 +109,7 @@
     "host": "10.24.40.137",
     "puerto": 1433,
     "base": "COMPRAS_STG",
-    "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
+    "secret_id": "dev/bd/claude-lectura-sqlserver",
     "region": "us-east-1",
     "garantias": [
       "rol-solo-lectura"
@@ -122,7 +122,7 @@
     "host": "10.24.40.137",
     "puerto": 1433,
     "base": "Ecommerce",
-    "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
+    "secret_id": "dev/bd/claude-lectura-sqlserver",
     "region": "us-east-1",
     "garantias": [
       "rol-solo-lectura"
@@ -135,7 +135,7 @@
     "host": "10.24.40.137",
     "puerto": 1433,
     "base": "Ecommerce_qa",
-    "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
+    "secret_id": "dev/bd/claude-lectura-sqlserver",
     "region": "us-east-1",
     "garantias": [
       "rol-solo-lectura"
@@ -148,7 +148,7 @@
     "host": "10.24.40.137",
     "puerto": 1433,
     "base": "EXACTUS",
-    "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
+    "secret_id": "dev/bd/claude-lectura-sqlserver",
     "region": "us-east-1",
     "garantias": [
       "rol-solo-lectura"
@@ -161,7 +161,7 @@
     "host": "10.24.40.137",
     "puerto": 1433,
     "base": "BI",
-    "secret_id": "bisalta-db/sqlserver/bisalta_lectura",
+    "secret_id": "dev/bd/claude-lectura-sqlserver",
     "region": "us-east-1",
     "garantias": [
       "rol-solo-lectura"

@@ -372,7 +372,21 @@ cuerpo="$(cuerpos "$salida")"
 assert_contains "$cuerpo" '"codigo":5' "AC33 un secreto que no resuelve devuelve el código 5"
 assert_contains "$cuerpo" '"error":"secreto_inaccesible"' "AC33 el error es secreto_inaccesible"
 assert_contains "$cuerpo" 'proveedores-dev' "AC33 el error nombra la conexión"
-assert_contains "$cuerpo" 'bisalta-db/postgres/claude_lectura' "AC33 el error nombra el identificador del secreto"
+# GEN-108: el secret_id se DERIVA del catálogo. Estaba congelado literal y se
+# puso rojo el día que Patrick Ocampo eligió los nombres reales
+# (dev/bd/claude-lectura-*) — un cambio de datos legítimo. Es la TERCERA vez en
+# este ciclo que un test congela un valor que vive en un archivo de datos: antes
+# fueron el total del ledger de escalaciones y el nombre de conexión `dev-sql`.
+# Lo que el AC afirma no es un nombre concreto: es que el error NOMBRE el
+# identificador del secreto de esa conexión, sea cual sea.
+SECRET_ID_ESPERADO="$(node -e "
+  const c = require('$PLUGIN_DIR/catalogo.json');
+  const e = c.find(x => x.nombre === 'proveedores-dev');
+  if (!e) { console.error('el catálogo no tiene proveedores-dev'); process.exitCode = 1; }
+  else { process.stdout.write(e.secret_id); }
+")"
+assert_eq "$([ -n "$SECRET_ID_ESPERADO" ] && echo si || echo no)" "si" "AC33 el catálogo declara el secret_id de proveedores-dev"
+assert_contains "$cuerpo" "$SECRET_ID_ESPERADO" "AC33 el error nombra el identificador del secreto" 
 case "$salida" in
   *"$MARCA_CRUDA_AWS"*) cruda=si ;;
   *) cruda=no ;;

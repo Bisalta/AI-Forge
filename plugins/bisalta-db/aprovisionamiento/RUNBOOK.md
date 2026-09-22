@@ -180,9 +180,9 @@ Nombres de secreto sugeridos (no forman parte del catálogo de la
 aplicación, que usa `secret_id` para referenciarlos por ARN — libres de
 elegir al crearlos, R2 no depende del nombre exacto):
 
-- `bisalta-db/postgres/claude_lectura`
-- `bisalta-db/postgres/neo_lectura`
-- `bisalta-db/sqlserver/bisalta_lectura`
+- `dev/bd/claude-lectura-postgres`
+- `dev/bd/neo-lectura-postgres`
+- `dev/bd/claude-lectura-sqlserver`
 
 ## Política IAM
 
@@ -831,9 +831,9 @@ la instancia de prueba para confirmar el verde de cierre —
 Para cada uno de los tres secretos (ver "Forma del secreto"):
 
 ```
-aws secretsmanager get-secret-value --secret-id bisalta-db/postgres/claude_lectura --region us-east-1
-aws secretsmanager get-secret-value --secret-id bisalta-db/postgres/neo_lectura --region us-east-1
-aws secretsmanager get-secret-value --secret-id bisalta-db/sqlserver/bisalta_lectura --region us-east-1
+aws secretsmanager get-secret-value --secret-id dev/bd/claude-lectura-postgres --region us-east-1
+aws secretsmanager get-secret-value --secret-id dev/bd/neo-lectura-postgres --region us-east-1
+aws secretsmanager get-secret-value --secret-id dev/bd/claude-lectura-sqlserver --region us-east-1
 ```
 
 Esperado, corriendo con la identidad IAM que tiene la policy de la sección
@@ -1017,7 +1017,7 @@ Orden para dar de baja una base (por ejemplo, `Ecommerce_qa`, con
    enumeración no distingue "esta base sale" de "estas otras se quedan".
 3. Correr `sqlserver-parte-a.sql` real (recrea el login — con una
    contraseña nueva, que hay que cargar de nuevo en el secreto
-   `bisalta-db/sqlserver/bisalta_lectura`) y `sqlserver-parte-b.sql` real
+   `dev/bd/claude-lectura-sqlserver`) y `sqlserver-parte-b.sql` real
    (recorre la lista, ya sin `Ecommerce_qa` desde el paso 1, y re-concede
    exactamente esas cinco). El mecanismo para conservar las bases que se
    quedan no es "no tocarlas": es volver a concederlas desde la

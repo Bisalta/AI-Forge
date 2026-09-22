@@ -1,6 +1,18 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v11
+- **Versión**: v12
+
+### Cambios v11 → v12 (respuestas de Patrick Ocampo, Slack 22-sep-2026 11:14)
+
+**1. Los nombres de los secretos los eligió Patrick**: `dev/bd/claude-lectura-postgres` y `dev/bd/claude-lectura-sqlserver`. Ambiente primero, como los `dev/…` que ya existen en la cuenta, y `bd` como categoría, como los `onpremise/bd/…`. Su razón: *"con eso entra en las dos convenciones que hay en vez de inventar una tercera"* — que es exactamente lo que hacía el nombre inventado por el planner en v1. Propagados a las 12 entradas del catálogo y al runbook. **Él crea los secretos con esos nombres exactos.**
+
+**2. La regla de secretos estaba mal escrita, y el que la corrige es quien la escribió.** Patrick: *"«una conexión, un secreto» no describe lo que yo quería. Doce secretos con la misma contraseña adentro no aíslan nada — sólo multiplican por doce los lugares donde rotar y donde se puede filtrar."* La formulación correcta, que **reemplaza** a la de v10 punto 4 en todo el expediente:
+
+> **Un secreto por credencial, y el aislamiento por política IAM por consumidor.**
+
+Lo que importaba era que Claude y NEO no compartieran secreto, **no** que cada entrada de catálogo tuviera el suyo. Las 12 conexiones sobre 2 secretos cumplen eso. **El catálogo no cambia de forma**; lo que cambia es la regla que dice por qué está bien. `D51` queda cerrada en sus puntos (a) y (b).
+
+**3. `neo_lectura`: sigue abierto, y no se toca el catálogo por eso.** El supuesto de Patrick —que aún no confirma— es que NEO **no entra por este plugin**: corre en su propia EC2 en la misma VPC y leería su secreto con el rol de instancia de esa máquina. Si se confirma, el catálogo está bien sin NEO y no hay nada que agregar. Instrucción textual: *"mientras tanto no toques el catálogo por eso."*
 
 ### Cambios v10 → v11 (enmienda del planner, 21-sep-2026)
 
@@ -104,7 +116,7 @@ Es la disciplina que este mismo contract fija dos veces —en "Cambios v3 → v4
 1. **`SSISDB` queda FUERA del loop de SQL Server.** Decisión de Patrick, con una razón más fuerte que la que este contract tenía: *"guarda los proyectos desplegados con sus parámetros y connection managers, o sea que es un lugar donde viven cadenas de conexión, más los logs de ejecución. Cero dato de negocio y sí credenciales."* Un servidor MCP cuyo propósito es que ninguna credencial pase por el contexto no puede alcanzar el lugar donde viven las cadenas de conexión. El loop la excluye por nombre, además del filtro `database_id > 4` que no la agarra (su id es 36).
 2. **El aprovisionamiento de Postgres lo provee Patrick** — vuelve la decisión de v4, revertida en v5. Su Parte 0 **ya existe** y su condición es `datname ILIKE '%prod%'`, equivalente a la que este contract cerró en v4. Textual: *"No escribas el de Postgres de nuevo. El de SQL Server sí, ese no existe."* **Su `.sql` todavía no llegó**, así que `postgres-parte-0.sql` de R1 se mantiene en el árbol como implementación de referencia hasta que llegue el suyo, y entonces se compara y se reemplaza. El hallazgo `MAJOR 2` de la ronda 4 (la medición del PASO 1 no discrimina) se corrige igual sobre el nuestro: vale para los dos scripts.
 3. **La aprobación de Dev SQL se reemplaza entera cuando Patrick mande el texto corregido**, no se parchea. Textual: *"Hoy hay en el expediente una aprobación con fecha que declara menos de lo que autoriza, y eso es peor que no tenerla… lo reemplazás entero, no le agregues una línea al pie."* Pendiente de que lo envíe.
-4. **La política IAM lleva regla propia**: *"Una conexión, un secreto, un consumidor — nada de un secreto compartido."* Entra al contract como propiedad del diseño de secretos, no sólo como tarea de Patrick.
+4. **La política IAM lleva regla propia.** ~~*"Una conexión, un secreto, un consumidor — nada de un secreto compartido."*~~ **Reformulada por su autor en v12**, porque la primera redacción no describía lo que quería: **un secreto por credencial, y el aislamiento por política IAM por consumidor**. Doce secretos con la misma contraseña adentro no aíslan nada — multiplican por doce los lugares donde rotar y donde se puede filtrar.
 5. **Dev/qa no es homogéneo, y son seis bases sensibles, no dos.** A `rrhh` y `bisalta` se suman `construplaza`, `qa` y —lo que ninguna de las dos partes había visto— **`portalrh_dev` y `portalrh_qa`, el portal de RRHH**.
 6. **No hay forma de dar un subconjunto con `pg_read_all_data`.** Conectarse es leer todo y `CONNECT` lo concede PUBLIC por omisión, así que el rol llega a las 29 aunque los `GRANT` por base se corran sólo en algunas. Los dos caminos, y Patrick no ve un tercero: (a) las 29, `rrhh` incluida, asumido explícito como se hizo con Dev SQL; (b) un subconjunto, que obliga a `REVOKE CONNECT ON DATABASE <cada excluida> FROM PUBLIC`, afecta a todos los roles del cluster y exige verificar antes que ninguna app dependa de ese `CONNECT`. **Decisión abierta de Patrick.**
 
