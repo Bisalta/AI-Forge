@@ -173,9 +173,13 @@ corregido ahí también.
   `EC2AMAZ-2RGHL0C`, el valor medido manda (Patrick Ocampo, textual: "si no
   coincide, el valor manda sobre el mío"): actualizar la constante
   `@esperada` en los dos scripts antes de ejecutarlos. Esta medición no se
-  pudo hacer durante esta ronda porque el login `bisalta_lectura` todavía
-  no existe en esa instancia — es la primera acción de quien ejecute el
-  runbook, con cualquier login `sysadmin` que ya tenga acceso.
+  hizo durante esta ronda porque **de este lado nadie tiene conexión a esa
+  instancia**, no porque falte el login nuevo: `SERVERPROPERTY('MachineName')`
+  **la contesta cualquier conexión a ese SQL Server** y no necesita
+  `bisalta_lectura` (corrección de Patrick Ocampo, 22-sep-2026 — una versión
+  anterior de esta nota atribuía la falta de medición al login ausente, y era
+  falso). Es la primera acción de quien ejecute el runbook, con cualquier
+  login `sysadmin` que ya tenga acceso.
 - Clientes CLI instalados: `psql` (Postgres) y `sqlcmd` (SQL Server). Medido
   el 18-sep-2026 en la máquina de referencia de este repo: `psql` 14.18
   presente, `sqlcmd` ausente — instalarlo antes de correr los scripts de

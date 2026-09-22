@@ -324,3 +324,26 @@ dos direcciones, dos fuentes de verdad.
 (`bash SDD/tests/run.sh`). Ninguno necesita una base: la lista blanca se
 afirma por código de salida **antes de conectar**, y el protocolo se ejercita
 alimentando stdin con tramas JSON-RPC.
+
+
+---
+
+## Instalación desde un marketplace local — el detalle que muerde
+
+`/plugin marketplace add <ruta>` seguido de `/plugin install bisalta-db@ai-forge` **copia** el
+plugin a `~/.claude/plugins/cache/ai-forge/bisalta-db/<version>/`. **No sigue el árbol de trabajo.**
+
+Consecuencia medida el 22-sep-2026: se cambió el `secret_id` de las 12 entradas del catálogo en el
+repo, y el plugin instalado siguió pidiendo el identificador viejo — con un error
+`secreto_inaccesible` que se lee como un problema de permisos y no lo es.
+
+**Cada vez que cambie cualquier archivo del plugin, hay que reinstalar** para que la copia se
+refresque. Y ojo con el diagnóstico: `secreto_inaccesible` tiene ahora **tres causas** distintas que
+se ven igual — falta el permiso IAM, la forma del secreto no es la esperada, o **el catálogo
+instalado está viejo**. Antes de culpar a la política, comparar:
+
+```
+python3 -c "import json;print(sorted({e['secret_id'] for e in json.load(open('CATALOGO'))}))"
+```
+
+sobre el catálogo del repo y sobre el de `~/.claude/plugins/cache/ai-forge/bisalta-db/<version>/`.
