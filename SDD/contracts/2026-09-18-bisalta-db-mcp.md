@@ -1,6 +1,20 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v16
+- **Versión**: v17
+
+### Cambios v16 → v17 (SQL Server aprovisionado por Patrick Ocampo, Slack 23-sep-2026 13:05)
+
+Patrick creó el login `bisalta_lectura` con `db_datareader` en las seis bases de la lista, el secreto `dev/bd/claude-lectura-sqlserver` —que la política IAM cubrió sola por el comodín— y lo verificó **conectándose como el login**: lee (84 tablas en `COMPRAS`), `CREATE TABLE` → `Msg 262: permission denied in database 'COMPRAS'`, y no puede abrir `SSISDB` ni `CONSTRUPLAZA_EFLOW` (267 GB que nadie pidió) — la regla de "arranca en cero" quedó probada, no declarada.
+
+**1. La precondición de `AC44` queda cerrada.** `SERVERPROPERTY('MachineName')` medido por Patrick vía SSM contra la instancia: `EC2AMAZ-2RGHL0C`. Coincide con el valor de la guarda. Los scripts y el runbook dejan de marcarlo "sin confirmar".
+
+**2. Nace `AC48`: el login no enumera las bases del servidor.** Patrick encontró que `bisalta_lectura` podía listar **los 36 nombres de base del servidor** —`SSISDB`, `CONSTRUPLAZA_EFLOW`, `Construplaza_Security`, `PortalClientes`, …— sin poder abrirlas: entra a `master` por `guest`, no por un usuario propio. Su verificación no lo vio porque buscaba al login en `sys.database_principals`, y ese camino no crea ningún usuario — **la verificación estaba bien escrita para la pregunta, y la pregunta era incompleta**. Lo mismo vale para las verificaciones de `AC7`, `AC42` y `AC43`: miden dónde el login **tiene usuario**, no qué **ve**. Lo cerró con `DENY VIEW ANY DATABASE TO [bisalta_lectura]`, y pidió que vaya al script, porque sin él la enumeración vuelve sola si se recrea el login.
+
+**3. Decisión del planner: `AC48` no es una garantía del catálogo.** Patrick lo sugirió. `garantias` es el eje de **qué frena una escritura**; el `DENY` restringe **qué metadatos se ven**, que es otra propiedad. Meterla en el mismo campo haría que `garantias` signifique dos cosas. Se declara como fila propia en "Garantías por motor", con su asimetría: **en Postgres `pg_database` es legible por todo rol** —medido el 23-sep: la consulta a `pg_db_role_setting` resolvió nombres como `rdsadmin` y `babelfish_db`—, y ocultarla rompe los clientes que listan bases, como el `\l` de psql — comportamiento conocido, no medido acá. Riesgo aceptado; dueño Ian Vargas, y se le informa a Patrick.
+
+**4. La corrección de Patrick sobre SQL Server, y por qué no cambia el nivel.** Yo había descrito el rol de SQL Server como "la única barrera", en tono de debilidad. Patrick midió que el rechazo es **por privilegio** (`Msg 262`), que el consumidor no puede apagar — mientras que en Postgres el primer intento lo frenó un parámetro de sesión que el rol sí apaga con un `SET`. Tiene razón en la fuerza, y la `condicion` de esa garantía lo dice desde v17. **El nivel sigue siendo `condicional`**, porque el criterio de v16 no mide fuerza sino verificación: el plugin no comprueba el privilegio en cada consulta. Fuerza y nivel son ejes distintos, y el catálogo declara los dos.
+
+**5. El script de Patrick.** Anunció que manda su script de creación aparte. Si difiere de `sqlserver-parte-a.sql`/`sqlserver-parte-b.sql`, la diferencia entra primero a este contract y después a los scripts — no al revés.
 
 ### Cambios v15 → v16 (review §7.5 de v15, ronda 1 `ESCALATE` + dos huecos de seguridad medidos, 23-sep-2026)
 
@@ -416,6 +430,7 @@ Arreglo con `nombre`, `dialecto`, `ambiente`, `base` y `garantias` de cada entra
 | Sesión abierta en solo lectura | sí, `default_transaction_read_only=on` — **condicional** (v15): es un valor por omisión de la sesión y el rol lo apaga con un `SET`, medido el 22-sep-2026 | **no existe equivalente** |
 | `DENY` de escritura sobre el rol | no aplica | **no** — `db_denydatawriter` se quitó en v10 por decisión de Patrick Ocampo. Sin él no hay `DENY` explícito, así que un `GRANT` de escritura concedido por error no tendría nada que lo anule |
 | Motor que rechaza escrituras | sí, endpoint `cluster-ro-` de Aurora — **incondicional desde v16, porque AC46 lo comprueba en cada consulta**: Aurora apunta ese endpoint al writer si el cluster se queda sin réplicas, y entonces el plugin se niega | **no hay réplica** |
+| Enumeración de los nombres de base (v17, `AC48`) | **visibles**: `pg_database` es legible por todo rol; ocultarla rompe clientes (conocido, no medido) — riesgo aceptado | **cerrada** con `DENY VIEW ANY DATABASE`: el login ve sólo `master` y `tempdb` |
 | Alcance del permiso | `pg_read_all_data`, de cluster | `db_datareader`, **por base**: una base nueva no queda cubierta sola |
 
 Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que evita que alguien asuma que todas las conexiones son igual de seguras. **Medido el 18-sep-2026**: las 32 bases de Dev SQL están `ONLINE` y **ninguna** tiene `is_read_only`, así que del lado del motor no hay ninguna barrera — el rol y el `DENY` son todo lo que hay.
@@ -567,7 +582,7 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 
 **AC44** — `sqlserver-parte-a.sql` **aborta si no corre contra la instancia declarada**. Compara `SERVERPROPERTY('MachineName')` contra el nombre esperado de Dev SQL y, si no coincide, emite `RAISERROR` con severidad 16 y activa `SET NOEXEC ON` — o sea que no crea el login. Es el equivalente en SQL Server de lo que `postgres-parte-0.sql` hace para Postgres, y hace falta porque un `login` es objeto **de instancia** y nada más en el script dice contra qué servidor corre.
 `manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
-**Precondición del planner**: el valor esperado que Patrick sacó del registro de SSM es `EC2AMAZ-2RGHL0C`, y él mismo pidió que **se confirme midiendo** — `SELECT SERVERPROPERTY('MachineName')` conectado a Dev SQL — antes de fijarlo en el script. Textual: *"si no coincide, el valor manda sobre el mío."* Hasta que se mida, el script lleva el valor de Patrick con la comprobación pendiente anotada.
+**Precondición del planner — cerrada en v17**: el valor esperado es `EC2AMAZ-2RGHL0C`. Patrick lo sacó primero del registro de SSM y lo **midió** el 23-sep-2026 con `SERVERPROPERTY('MachineName')` contra la instancia: coincide.
 **Mutación declarada**: cambiar el nombre esperado por el de cualquier otra instancia; correr el script contra Dev SQL tiene que **abortar** sin crear el login — o sea, la comprobación de que crea el login se pone roja. Restaurar el nombre correcto.
 
 **AC45a** (valor devuelto) — `listar_conexiones` devuelve, por cada garantía de cada conexión, su `nombre` y su `nivel`, y su `condicion` cuando el nivel es `condicional`. Sin mutación obligatoria (`quality-gates.md` §10.1: valor devuelto).
@@ -596,6 +611,10 @@ Casos del test — rechazados: en `postgres`, `WITH x AS (INSERT INTO t VALUES (
 **Mutaciones declaradas**: (a) quitar el chequeo de palabras de escritura pone rojo el caso del CTE con `INSERT`; (b) quitar el chequeo de `set_config` pone rojo su caso; (c) correr el chequeo de palabras sobre el SQL **sin normalizar** pone rojo el caso `SELECT 'delete' AS x`.
 
 
+**AC48** (detección, `manual-only`) — `sqlserver-parte-a.sql` aplica `DENY VIEW ANY DATABASE TO [bisalta_lectura]` **después** de crear el login y **fuera** del bloque condicional que lo crea, de modo que cada corrida lo vuelve a aplicar (`DENY` es idempotente). Verificado **conectándose como el login**, no como administrador: `SELECT name FROM sys.databases` devuelve exactamente `master` y `tempdb`, y una lectura sobre una tabla de `COMPRAS` sigue devolviendo filas.
+`manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
+**Mutación declarada**: sin el `DENY`, la misma consulta como el login lista todas las bases del servidor. **Evidencia mínima aceptada**: el par antes/después que Patrick midió el 23-sep —36 nombres antes, `master` y `tempdb` después—, que es la mitad rojo → verde del triple; la vuelta al rojo exigiría quitar el `DENY` en una instancia viva, y no hay instancia de prueba. El par vive hoy en Slack: pegarlo en el verification report de R1 es parte de `D61`.
+
 ## Checklist del arquetipo
 
 - `third-party-integration` → **sandbox/mock para desarrollo**: `N/A — las conexiones de Postgres del catálogo son de dev/qa, que ya son el ambiente no productivo. Para SQL Server no hay sandbox posible: Dev SQL es una copia de producción, y decirlo es más honesto que llamarlo sandbox.`
@@ -622,6 +641,7 @@ Casos del test — rechazados: en `postgres`, `WITH x AS (INSERT INTO t VALUES (
 | `shellcheck` ausente: el gate 2 saldría `[SKIPPED]`, nunca verde. | Prerequisito declarado en los dos briefs: instalarlo antes de la primera corrida de gates. |
 | La suite tarda ~62 s hoy y los triples de mutación la alargan. | El umbral de `doc_quality_gates.md` se revisa con el número medido al cerrar, igual que en GEN-101. |
 | Las filas de copias de producción quedan en el transcript. | Riesgo aceptado con dueño (ver arriba). No hay mitigación técnica en este alcance. |
+| En Postgres, `claude_lectura` ve los nombres de todas las bases del cluster (v17). | Riesgo aceptado: `pg_database` es legible por todo rol, y revocarlo rompe los clientes que listan bases (el `\l` de psql, entre otros — comportamiento conocido de Postgres, **no medido acá**). En SQL Server el equivalente se cerró con `AC48`. Dueño: Ian Vargas. Se le informa a Patrick Ocampo, que administra el cluster; si decide cerrarlo de otra forma, entra como `contract-change-request`. |
 | Una función con efecto lateral que se puede llamar dentro de un `SELECT` (`nextval`, `pg_advisory_lock`, …) no la enumera la lista blanca (v16). | Riesgo aceptado: la lista blanca no puede enumerar funciones. En Postgres la frenan la sesión de solo lectura, la réplica —comprobada por AC46— y los permisos del rol; en SQL Server una función definida por usuario no puede modificar datos. |
 | ~~El cluster de dev/qa podría no tener réplica de lectura…~~ | ✅ **CERRADO el 22-sep-2026**: `describe-db-clusters` sobre `sistemas-costruplaza-db` devuelve `ReaderEndpoint = sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com`, idéntico al host que declaran las seis entradas de Postgres del catálogo. La garantía `endpoint-replica-lectura` se sostiene. (`IAMDatabaseAuthenticationEnabled` sigue en `false`, consistente con la decisión de v4.) |
 | ~~**El `secret_id` de las 12 entradas del catálogo no lo acordó nadie.**~~ | ✅ **CERRADO.** (a) y (b) en v12: Patrick eligió `dev/bd/claude-lectura-postgres` y `dev/bd/claude-lectura-sqlserver`, y reformuló su propia regla a *"un secreto por credencial, aislamiento por política IAM por consumidor"*, bajo la cual el esquema de 12 conexiones sobre 2 secretos es correcto. (c) en v13: `neo_lectura` salió del diseño, así que **ningún artefacto manda crearlo**. `D51` figura cerrada en el ledger. |
