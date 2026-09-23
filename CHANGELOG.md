@@ -6,7 +6,7 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ### 0.1.0 — 2026-09-18
 
-Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v16).
+Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v17).
 Consulta de solo lectura a las bases de dev/qa de Bisalta desde Claude Code, **sin que
 ninguna credencial entre en el contexto de la sesión**. La credencial no desaparece: pasa de un
 archivo que hoy hay que leerle al modelo —y que queda archivado en el transcript— a un secreto de
@@ -91,6 +91,14 @@ encontró antes de que existiera el login. v16 lo rechaza en la lista blanca (`A
 réplica en cada consulta** (`AC46`): el endpoint `cluster-ro-` apunta al writer si el cluster se queda
 sin réplicas, y hoy tiene una sola. La lección, en `SDD/retro.md` RT50: una mutación prueba que el
 test detecta que la barrera se quitó; no prueba que la barrera cubra la amenaza.
+
+**Lo que encontró quien ejecutó el aprovisionamiento (v17)**: al crear el login de SQL Server,
+Patrick Ocampo vio que podía **listar los 36 nombres de base del servidor** entrando a `master` por
+`guest` — sin abrirlas, pero la lista dice qué sistemas existen. Su propia verificación no lo veía,
+porque buscaba dónde el login tenía usuario, y ese camino no crea ninguno: medía membresía cuando
+la propiedad era visibilidad. `DENY VIEW ANY DATABASE` queda en el script (`AC48`). En Postgres el
+equivalente no se puede cerrar igual: `pg_database` es legible por todo rol, y queda como riesgo
+aceptado.
 
 **Lo que dejó el kilometraje**: dos defectos que la suite encontró y que valen por separado. (1) El
 tope de bytes salía vacío porque `process.exit()` **corta lo que `process.stdout` todavía tiene en
