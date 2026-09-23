@@ -28,11 +28,11 @@ Leé la sección **"Cambios v18 → v19"** del contract (punto 4) y los textos d
 
 ## Pasos
 
-- [ ] **T1** Leer el contract v19, `quality-gates.md` §5, §6 y §10, y el archivo de casos.
-- [ ] **T2** **Antes de tocar el código**: correr el bloque nuevo del test contra el `lista-blanca.js` actual, y registrar **qué índices fallan** y cuál es el veredicto actual de cada uno. Es el rojo de partida, y el report lo necesita (por índice, no por consulta).
-- [ ] **T3** `AC51` y `AC52` en el código. Suite completa en verde, **con los 21 casos** del archivo coincidiendo.
-- [ ] **T4** Commit. Árbol limpio.
-- [ ] **T5** Evidencia: el runner (`sdd-run-gates.sh -o <report> --full`) sobre el árbol limpio, y un addendum con:
+- [x] **T1** Leer el contract v19, `quality-gates.md` §5, §6 y §10, y el archivo de casos.
+- [x] **T2** **Antes de tocar el código**: correr el bloque nuevo del test contra el `lista-blanca.js` actual, y registrar **qué índices fallan** y cuál es el veredicto actual de cada uno. Es el rojo de partida, y el report lo necesita (por índice, no por consulta).
+- [x] **T3** `AC51` y `AC52` en el código. Suite completa en verde, **con los 21 casos** del archivo coincidiendo.
+- [x] **T4** Commit. Árbol limpio.
+- [x] **T5** Evidencia: el runner (`sdd-run-gates.sh -o <report> --full`) sobre el árbol limpio, y un addendum con:
   - el rojo de partida de T2 (índices y veredictos, por índice);
   - los triples de las dos mutaciones declaradas —(AC51) volver a la `normalizar()` anterior, que sacás de `git show dffb83a:plugins/bisalta-db/scripts/lista-blanca.js` (un hash fijo: `HEAD~1` cambia según en qué commit estés parado); (AC52) quitar las cuatro palabras—, con un script que **verifica que cada mutación se aplicó** (`git diff --quiet` distinto de 0), imprime el **exit code** de las tres corridas y los **índices** de los asserts que caen, restaura con `git checkout` y exige árbol limpio al final;
   - la tabla de binding AC ↔ test.
@@ -52,4 +52,10 @@ El último bloque es el JSON `sdd.result` (`plugins/sdd-flow/standards/orchestra
 
 ## Execution Report
 
-(lo llenás vos)
+- **Agente**: `AGENT_r2` · **Contract**: v19 · **Commit del código**: `e6bdb25` (la evidencia va en el commit siguiente)
+- **Tasks**: 5 en total · 5 completas · 0 bloqueadas · 0 salteadas
+- **Estado de retorno**: `blocked`. Hay una decisión abierta sobre el alcance de AC51, no un fallo del trabajo: los 21 casos coinciden y los dos triples dan verde → rojo → verde. La pregunta está en el `sdd.result` y en la sección "Hallazgo" del verification report
+- **Gates**: runner `--full`, exit 0, 4 verdes · 0 rojos · 7 `[SKIPPED]`. Detalle en `SDD/verification/feat-GEN-108-mcp-bisalta-db-v19-parte-2-gates.md`. Rojo de partida, triples, binding e impact set en `SDD/verification/feat-GEN-108-mcp-bisalta-db-v19-parte-2.md`
+- **Files changed**: `plugins/bisalta-db/scripts/lista-blanca.js` · `SDD/tests/test_lista_blanca.sh` · `SDD/verification/feat-GEN-108-mcp-bisalta-db-v19-parte-2.md` (nuevo) · `SDD/verification/feat-GEN-108-mcp-bisalta-db-v19-parte-2-gates.md` (nuevo, lo generó el runner) · este Execution Report
+- **No tocados**: el archivo de casos, el contract, `conexion.js`, `catalogo*`, `aprovisionamiento/*`, ledgers, CHANGELOG
+- **Conexiones a bases**: ninguna
