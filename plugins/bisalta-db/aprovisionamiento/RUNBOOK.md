@@ -1151,6 +1151,95 @@ instancia de prueba para SQL Server (ver "Prerequisitos" arriba, sandbox
 
 `manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
 
+### AC49 — el `ALTER ROLE` de los cuatro valores está en el script, no sólo en el rol
+
+`AC49` (contract v19, "Cambios v18 → v19" punto 2) nace del mismo patrón que
+`AC48`: un ajuste que Patrick Ocampo fijó a mano en el rol (`claude_lectura`)
+el 22-sep desaparece en silencio la próxima vez que alguien recree el rol, si
+no está en el script que lo crea. `postgres-parte-a.sql` aplica
+`ALTER ROLE claude_lectura SET` con los cuatro valores —
+`default_transaction_read_only = on`, `statement_timeout = '60s'`,
+`idle_in_transaction_session_timeout = '30s'`, `lock_timeout = '5s'` —
+**fuera** del bloque `DO $$ ... $$` condicional que crea el rol, para que
+cada corrida los vuelva a aplicar (`ALTER ROLE ... SET` es idempotente).
+
+**Comprobación real, conectado como el rol** (sin que el cliente mande
+ninguno de los cuatro parámetros — ni `PGOPTIONS`, ni `-c`):
+
+```
+psql -h sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com -U claude_lectura -d proveedores_dev -c "SELECT current_setting('default_transaction_read_only'), current_setting('statement_timeout'), current_setting('idle_in_transaction_session_timeout'), current_setting('lock_timeout');"
+```
+
+Esperado: `on`, `60s`, `30s`, `5s`, en ese orden — los cuatro valores del
+rol, no los que el cliente no mandó.
+
+`manual-only: requiere el cluster; misma razón que AC1.`
+
+**Evidencia mínima aceptada**: la lectura de `pg_db_role_setting` del
+23-sep-2026, que ya muestra los cuatro valores sobre el rol (Slack, Patrick
+Ocampo) — cubre que el rol los tiene hoy; la corrida de arriba, cuando se
+ejecute, confirma que el script los vuelve a dejar así si el rol se recrea.
+
+### AC50 — el esquema `public`: `GRANT` explícito antes del `REVOKE` de `PUBLIC`
+
+`AC50` (contract v19, "Cambios v18 → v19" punto 3) cierra el mismo hueco que
+`AC49` para el esquema `public`: el `REVOKE CREATE ON SCHEMA public FROM
+PUBLIC` que Patrick aplicó a mano el 22-sep en las seis bases no estaba en
+ningún script, así que una base nueva agregada con `postgres-parte-b.sql`
+volvía a tener el hueco (PG 14 concede `CREATE` en `public` a `PUBLIC` por
+omisión — "Cambios v14 → v15" punto 2). `postgres-parte-b.sql`, en cada base
+que recorre, ahora primero concede `CREATE ON SCHEMA public` al dueño de la
+base **y** a todo rol que ya tenga objetos en `public` —enumerados desde
+`pg_class`, no escritos a mano, porque son distintos por base
+(`INVENTARIO.md`; `D42`: en `proveedores_dev` y `proveedores_qa` es
+`ian.vargas`)— y **después** revoca `CREATE ON SCHEMA public FROM PUBLIC`.
+El orden es la condición: revocar primero rompería las migraciones de quien
+ya crea ahí.
+
+**Comprobación real, conectado como `claude_lectura`**:
+
+```
+psql -h sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com -U claude_lectura -d proveedores_dev -c "CREATE TABLE zz_scratch_ac50 (id int);"
+```
+
+Esperado: falla con `ERROR: permission denied for schema public` — el rol
+lee (`pg_read_all_data`), no crea. Ningún GRANT explícito nombra a
+`claude_lectura`, así que le queda el default que `postgres-parte-b.sql`
+revoca de `PUBLIC`.
+
+Control positivo, conectado como el dueño de la base (o cualquier rol que
+ya tenga objetos en `public`): el mismo `CREATE TABLE` de scratch tiene que
+**pasar** — confirma que el `GRANT` explícito de arriba sostuvo el acceso de
+quien ya crea ahí, y que el `REVOKE` no le pegó a todo el mundo por igual.
+Descartar la tabla de scratch (`DROP TABLE zz_scratch_ac50;`) después de
+probar.
+
+`manual-only: requiere el cluster.`
+
+**El `REVOKE CONNECT` sobre la base `postgres` — paso explícito de este
+runbook, no de ningún script**: `postgres-parte-b.sql` corre "por base"
+sobre el catálogo de la aplicación (`proveedores_dev`, `proveedores_qa`,
+…), y la base de mantenimiento `postgres` nunca está en ese catálogo — por
+eso este paso no puede vivir en un script que itera el catálogo, y Patrick
+lo aplicó a mano el 22-sep directamente contra `postgres`:
+
+```
+psql -h sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com -U <admin> -d postgres -c "REVOKE CONNECT ON DATABASE postgres FROM PUBLIC;"
+```
+
+**Verificación**, conectado como `claude_lectura` (que nunca tuvo un
+`GRANT CONNECT` explícito sobre `postgres` — sólo el default de `PUBLIC`
+que la línea de arriba revoca):
+
+```
+psql -h sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com -U claude_lectura -d postgres -c "SELECT 1;"
+```
+
+Esperado: falla con `FATAL: permission denied for database "postgres"` — la
+conexión ni siquiera abre. Cualquier rol administrativo con `GRANT CONNECT`
+explícito sobre `postgres` (o superusuario) sigue entrando: el `REVOKE` es
+de `PUBLIC`, no le pega a un `GRANT` puntual.
+
 ### AC8 — cada secreto existe, tiene los dos campos, y es legible con la política IAM
 
 Para cada uno de los dos secretos (ver "Forma del secreto"):

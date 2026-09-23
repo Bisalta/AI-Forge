@@ -47,3 +47,33 @@ BEGIN
   EXECUTE format('GRANT CONNECT ON DATABASE %I TO claude_lectura', current_database());
 END
 $$;
+
+-- AC50 (contract v19, "Cambios v18 → v19" punto 3). El REVOKE CREATE ON
+-- SCHEMA public FROM PUBLIC que Patrick aplicó a mano el 22-sep en las seis
+-- bases no estaba en ningún script: una base nueva agregada acá volvía a
+-- tener el hueco (PG 14 concede CREATE en `public` a PUBLIC por omisión —
+-- ver "Cambios v14 → v15" punto 2). EL ORDEN ES LA CONDICIÓN: revocar
+-- primero rompería las migraciones de quien ya crea ahí, así que primero se
+-- concede CREATE explícito al dueño de la base y a todo rol que YA tenga
+-- objetos en `public` — enumerados acá desde el catálogo (pg_class), nunca
+-- escritos a mano, porque son distintos por base (INVENTARIO.md) — y recién
+-- después se revoca de PUBLIC. Idempotente: GRANT y REVOKE repetidos no
+-- fallan.
+DO $$
+DECLARE
+  duenio_base text := (SELECT pg_catalog.pg_get_userbyid(datdba) FROM pg_database WHERE datname = current_database());
+  duenio_objeto text;
+BEGIN
+  EXECUTE format('GRANT CREATE ON SCHEMA public TO %I', duenio_base);
+
+  FOR duenio_objeto IN
+    SELECT DISTINCT pg_catalog.pg_get_userbyid(c.relowner)
+    FROM pg_catalog.pg_class c
+    WHERE c.relnamespace = 'public'::regnamespace
+  LOOP
+    EXECUTE format('GRANT CREATE ON SCHEMA public TO %I', duenio_objeto);
+  END LOOP;
+
+  REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+END
+$$;

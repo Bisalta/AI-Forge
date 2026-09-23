@@ -27,9 +27,12 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const TIMEOUT_SENTENCIA_MS = 120000;
-// Margen sobre el statement_timeout del motor: si el cliente queda colgado
-// antes de que el motor corte (red caída, handshake que no avanza), corta
-// igual y el caso reporta tiempo agotado en vez de esperar para siempre.
+// Desde v19 (AC28) esto ya NO se manda al motor como `statement_timeout`: el
+// límite de sentencia lo fija el rol (AC49 — 60s en Postgres; si 60s queda
+// corto para un agregado legítimo, se sube en el rol, no acá). Esta constante
+// sólo sirve de base para el corte de PROCESO de abajo, que es el que corta
+// en los dos motores cuando el motor no corta solo (red caída, handshake que
+// no avanza) o cuando no hay equivalente del lado del servidor (SQL Server).
 const TIMEOUT_PROCESO_MS = TIMEOUT_SENTENCIA_MS + 5000;
 const MAX_BUFFER = 64 * 1024 * 1024;
 
@@ -136,9 +139,10 @@ function resolverCredencial(entrada) {
  * Comando de Postgres. El usuario, el host, el puerto y la base viajan en el
  * conninfo; la contraseña, sólo en el archivo que apunta la variable de
  * archivo de credenciales de libpq.
- * AC28 (sesión de solo lectura + statement_timeout) y AC29
- * (`application_name` = usuario del secreto, para que `pg_stat_activity`
- * atribuya del lado del motor) se verifican sobre lo que esta función
+ * AC28 (sesión de solo lectura; el `statement_timeout` ya no viaja por acá,
+ * lo fija el rol — AC49) y AC29 (`application_name` = usuario del secreto,
+ * para que `pg_stat_activity` atribuya del lado del motor) se verifican
+ * sobre lo que esta función
  * devuelve. Con un solo rol (`claude_lectura` — contract v13, "Cambios
  * v12 → v13" punto 1: `neo_lectura` salió porque NEO no abre ninguna
  * conexión Postgres), `application_name` ya no distingue CONSUMIDORES —
@@ -158,8 +162,11 @@ function construirComandoPostgres(entrada, usuario, rutaPassfile, sql) {
       '--command', GUARDA_REPLICA, '--command', sql, conninfo],
     env: {
       PGPASSFILE: rutaPassfile,
-      PGOPTIONS: '-c default_transaction_read_only=on' +
-        ' -c statement_timeout=' + TIMEOUT_SENTENCIA_MS,
+      // AC28 (v19): PGOPTIONS deja de llevar `statement_timeout` — el rol lo
+      // fija (AC49) y si cada cliente manda el suyo, el servidor no tiene
+      // piso y el valor del rol es decorativo (contract, "Cambios v18 → v19"
+      // punto 1).
+      PGOPTIONS: '-c default_transaction_read_only=on',
       // AC29 va por PGAPPNAME y NO por `-c application_name` dentro de
       // PGOPTIONS. Medido contra el motor real el 23-sep-2026: psql fija su
       // propio `application_name` en la conexión y le GANA al `-c`, así que
@@ -302,10 +309,14 @@ function ejecutarConsulta(entrada, sql) {
         'la conexión `' + entrada.nombre + '` no llegó a una réplica de lectura; la consulta no se ejecutó');
     }
     if (r.error && (r.error.code === 'ETIMEDOUT' || r.signal !== null)) {
-      throw fallo(7, 'tiempo_agotado', 'la consulta superó los ' + TIMEOUT_SENTENCIA_MS + ' ms');
+      // Corte de PROCESO (el plugin lo mata): puede citar su propio valor.
+      throw fallo(7, 'tiempo_agotado', 'la consulta superó los ' + TIMEOUT_PROCESO_MS + ' ms');
     }
     if (/statement timeout|Timeout expired|query_canceled/i.test(salidaError)) {
-      throw fallo(7, 'tiempo_agotado', 'la consulta superó los ' + TIMEOUT_SENTENCIA_MS + ' ms');
+      // Corte del MOTOR por su propio límite de sentencia (AC28/AC49: el rol
+      // lo fija, no el plugin). No cita 120000 ms: ese ya no es el límite
+      // vigente, y citarlo sería afirmar un valor que el plugin no controla.
+      throw fallo(7, 'tiempo_agotado', 'la consulta alcanzó el límite de tiempo de la sesión');
     }
     if (r.status !== 0) {
       throw fallo(6, 'conexion_fallida', salidaError.replace(/\s+$/, '').slice(0, 500));

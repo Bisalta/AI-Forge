@@ -72,3 +72,15 @@ END
 $$;
 
 GRANT pg_read_all_data TO claude_lectura;
+
+-- AC49 (contract v19, "Cambios v18 → v19" punto 2). Los cuatro valores que
+-- Patrick Ocampo fijó a mano en el rol el 22-sep, ahora en el script que crea
+-- el rol: un ajuste que no está acá desaparece en silencio la próxima vez
+-- que alguien recree el rol — el mismo patrón que el DENY de AC48 en SQL
+-- Server. FUERA del bloque condicional de arriba y a propósito: ALTER ROLE
+-- ... SET es idempotente, así que cada corrida los vuelve a aplicar aunque
+-- el rol ya exista.
+ALTER ROLE claude_lectura SET default_transaction_read_only = on;
+ALTER ROLE claude_lectura SET statement_timeout = '60s';
+ALTER ROLE claude_lectura SET idle_in_transaction_session_timeout = '30s';
+ALTER ROLE claude_lectura SET lock_timeout = '5s';

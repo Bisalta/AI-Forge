@@ -298,7 +298,7 @@ assert_contains "$(cat "$TMP_DIR/psql-invocado.log")" "PASSFILE_MODO -rw-------"
 # ---------------------------------------------------------------------------
 opciones="$(grep '^PGOPTIONS ' "$TMP_DIR/psql-invocado.log")"
 assert_contains "$opciones" "default_transaction_read_only=on" "AC28 el comando abre la sesión en solo lectura"
-assert_contains "$opciones" "statement_timeout=120000" "AC28 el comando fija el statement_timeout en 120000"
+assert_no_contains "$opciones" "statement_timeout" "AC28 PGOPTIONS no lleva statement_timeout (el límite lo fija el rol, AC49)"
 # AC29 viaja por PGAPPNAME. `-c application_name` dentro de PGOPTIONS NO sirve:
 # psql fija el suyo en la conexión y le gana, así que `pg_stat_activity` termina
 # mostrando `psql`. Medido contra el motor real el 23-sep-2026 (contract v15).

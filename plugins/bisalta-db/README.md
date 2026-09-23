@@ -101,13 +101,22 @@ Las herramientas quedan disponibles como
    `pg_read_all_data`). Lo crea el runbook de `aprovisionamiento/`. Un solo
    rol: NEO no abre ninguna conexión Postgres (lee Odoo por XML-RPC), así
    que no hay un segundo consumidor que necesite el suyo (contract v13).
-2. **La sesión** se abre en `default_transaction_read_only=on`, con
-   `statement_timeout=120000`.
+2. **La sesión** se abre en `default_transaction_read_only=on`. El límite de
+   tiempo de sentencia **ya no lo manda el plugin** (hasta v18 mandaba
+   `statement_timeout=120000` por `PGOPTIONS`, y le ganaba al del rol): lo
+   fija el rol (`ALTER ROLE claude_lectura SET statement_timeout = '60s'`,
+   `aprovisionamiento/postgres-parte-a.sql`); si 60s queda corto para un
+   agregado legítimo, se sube ahí, no en el cliente (v19).
 3. **La lista blanca** exige que *cada* sentencia empiece con `SELECT` o
    `WITH` **y** que no contenga una escritura embebida (`INSERT`, `UPDATE`,
    `DELETE`, `MERGE` o `INTO` como palabra; en `postgres`, además,
-   `set_config`), después de quitar comentarios y literales. Es la **primera**
-   barrera, no la única: detrás están la réplica, la sesión y el rol.
+   `set_config`), después de quitar comentarios y literales. **No es la
+   barrera que impide una escritura** (v19): es la primera capa, la que
+   rechaza temprano y con un mensaje claro; lo que impide el daño son las
+   capas de atrás — la réplica, la sesión y el rol. Patrick Ocampo revisó el
+   validador buscando cómo esquivarla: encontró doce formas de pasarla y
+   ninguna es una brecha, porque cada una choca después con alguna de esas
+   capas.
 4. **El catálogo**: `ambiente` admite `dev` y `qa` **y nada más**. Producción
    es irrepresentable, no rechazada por nombre — rechazar por nombre es red,
    no barrera.
@@ -288,7 +297,7 @@ plugin al equipo, no algo que este código controle.
 | Sentencia rechazada por la lista blanca | 4 | `no_es_lectura`, con los primeros 90 caracteres de la sentencia ofensora |
 | El secreto no resuelve | 5 | `secreto_inaccesible`, con la conexión y el `secret_id`, **sin la salida cruda de `aws`** |
 | Conexión rechazada o caída | 6 | `conexion_fallida`, con el mensaje del cliente, sin la credencial |
-| `statement_timeout` (120 s) | 7 | `tiempo_agotado` |
+| Tiempo agotado: el motor corta por su propio límite de sentencia (Postgres: `statement_timeout` del rol, 60s — v19), o el plugin corta el proceso (125 s, los dos motores) | 7 | `tiempo_agotado` |
 | Binario del cliente ausente | 8 | `cliente_ausente`, nombrando el binario |
 | La conexión Postgres no llegó a una réplica de lectura (v16) | 9 | `no_es_replica`, con el nombre de la conexión. **El SQL del consumidor no se ejecutó** |
 
