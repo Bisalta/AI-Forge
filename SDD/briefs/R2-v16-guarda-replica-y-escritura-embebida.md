@@ -32,13 +32,13 @@ Todo está en el texto de los ACs. En particular, **el literal de la guarda de A
 
 ## Pasos
 
-- [ ] **T1** Leer el contract v16 (Cambios v15→v16 y los ACs de arriba), `quality-gates.md` §5, §6, §10 y §10.1.
-- [ ] **T2** AC47 en `lista-blanca.js` + sus casos en `test_lista_blanca.sh`. Correr la suite.
-- [ ] **T3** AC46 en `conexion.js`. En el stub de psql de `test_servidor_mcp.sh`: (a) agregar un registro **por argumento** (una línea por arg) **sin quitar** la línea `ARGS` existente, para poder assertar el orden exacto de los dos `--command`; (b) un modo `no-replica` de `BISALTA_STUB_PSQL_MODO` que escribe en stderr `ERROR:  bisalta-db: la conexion no llego a una replica de lectura` y sale 1. Asserts (a)–(d) del AC. Correr la suite.
-- [ ] **T4** AC45a/b/c: renombres y el assert nuevo sobre el mensaje. Correr la suite.
-- [ ] **T5** README, `catalogo.json`, comentario de `catalogo.js`. Barrido **por concepto**, no por nombre: `grep` de "incondicional", "empieza con", "SELECT o WITH", "lista blanca" en `plugins/bisalta-db/` y revisar cada aparición contra v16.
-- [ ] **T6** Commit (convención del repo, `[FIX] [GEN-108] [bisalta-db] …`). Árbol limpio.
-- [ ] **T7** Evidencia, en este orden:
+- [x] **T1** Leer el contract v16 (Cambios v15→v16 y los ACs de arriba), `quality-gates.md` §5, §6, §10 y §10.1.
+- [x] **T2** AC47 en `lista-blanca.js` + sus casos en `test_lista_blanca.sh`. Correr la suite.
+- [x] **T3** AC46 en `conexion.js`. En el stub de psql de `test_servidor_mcp.sh`: (a) agregar un registro **por argumento** (una línea por arg) **sin quitar** la línea `ARGS` existente, para poder assertar el orden exacto de los dos `--command`; (b) un modo `no-replica` de `BISALTA_STUB_PSQL_MODO` que escribe en stderr `ERROR:  bisalta-db: la conexion no llego a una replica de lectura` y sale 1. Asserts (a)–(d) del AC. Correr la suite.
+- [x] **T4** AC45a/b/c: renombres y el assert nuevo sobre el mensaje. Correr la suite.
+- [x] **T5** README, `catalogo.json`, comentario de `catalogo.js`. Barrido **por concepto**, no por nombre: `grep` de "incondicional", "empieza con", "SELECT o WITH", "lista blanca" en `plugins/bisalta-db/` y revisar cada aparición contra v16.
+- [x] **T6** Commit (convención del repo, `[FIX] [GEN-108] [bisalta-db] …`). Árbol limpio.
+- [x] **T7** Evidencia, en este orden:
   1. `bash plugins/sdd-flow/scripts/sdd-run-gates.sh -o SDD/verification/feat-GEN-108-mcp-bisalta-db-v16.md --full` sobre el árbol limpio. Exit 0 esperado.
   2. **Script de mutación**, versionado en el addendum (§ al final) y corrido **una sola vez**, con su salida pegada entera. Requisitos, todos obligatorios — la review de v15 los marcó uno por uno:
      - cubre **todas** las mutaciones declaradas: AC45b (1)–(5), AC45c (a)–(b), AC46 (a)–(c), AC47 (a)–(c);
@@ -72,4 +72,12 @@ El último bloque de tu respuesta es el JSON `sdd.result` de `plugins/sdd-flow/s
 
 ## Execution Report
 
-(lo llenás vos)
+- **Agente**: `AGENT_r2` · tier `opus` · contract **v16**.
+- **Tasks**: 7 total · 7 completadas · 0 bloqueadas · 0 salteadas.
+- **Commits**: `ef47e82` (implementación y tests) y el commit de evidencia que agrega `SDD/verification/feat-GEN-108-mcp-bisalta-db-v16.md` y este Execution Report.
+- **Gates**: los corrió `sdd-run-gates.sh --full` sobre `ef47e82` con árbol limpio, exit 0 (lint, unit tests, security y suite completa en verde; el resto `[SKIPPED]` por el propio doc de gates). Detalle y salida en la parte del runner de `SDD/verification/feat-GEN-108-mcp-bisalta-db-v16.md`; no se duplica acá.
+- **Triples de mutación**: las trece mutaciones declaradas (AC45b 1-5, AC45c a-b, AC46 a-c, AC47 a-c), verde → rojo → verde, con exit code por corrida. Salida y script en el §1 y el §6 del addendum.
+- **`manual-only`**: AC46 (writer → `no_es_replica` código 9, exit del proceso 9; réplica → filas) y AC29 (seis de seis `claude_lectura`), **con el servidor del repo**. La verificación de AC29 por el plugin instalado queda para el planner. §3 del addendum.
+- **Files changed**: `plugins/bisalta-db/scripts/conexion.js`, `plugins/bisalta-db/scripts/lista-blanca.js`, `plugins/bisalta-db/scripts/catalogo.js` (sólo comentario), `plugins/bisalta-db/catalogo.json` (sólo `condicion` de `sesion-read-only`, seis entradas), `plugins/bisalta-db/README.md`, `SDD/tests/test_servidor_mcp.sh`, `SDD/tests/test_lista_blanca.sh`, `SDD/tests/test_catalogo.sh`, `SDD/verification/feat-GEN-108-mcp-bisalta-db-v16.md` (nuevo), y este brief (Execution Report).
+- **Dependencias nuevas**: ninguna.
+- **Para el planner** (§5 del addendum): cuatro lecturas que elegí y explico (`set_config` sin distinguir mayúsculas, el límite de "palabra", la condición de clasificación de `no_es_replica`, dos constantes para guarda y texto reconocido), y dos textos fuera de mi lista de archivos que siguen describiendo la lista blanca sólo por su ancla: la descripción de la herramienta `consultar` en `servidor-mcp.js` y la de `plugin.json`.
