@@ -193,12 +193,11 @@ Validarlo a mano:
 node plugins/bisalta-db/scripts/catalogo.js
 ```
 
-### Las tres entradas de hoy
+### Las 12 entradas de hoy
 
 | `nombre` | Fuente | Nota |
 |---|---|---|
-| `proveedores-dev` | base `proveedores_dev` del cluster Aurora de dev/qa | |
-| `proveedores-qa` | base `proveedores_qa` del mismo cluster | |
+| `proveedores-dev` · `proveedores-qa` · `smartcheck-dev` · `smartcheck-qa` · `smartfleet-dev` · `smartfleet-qa` | bases del cluster Aurora de dev/qa (`sistemas-costruplaza-db`), por el endpoint de réplica | |
 | `compras` · `compras-stg` · `ecommerce` · `ecommerce-qa` · `exactus` · `bi` | bases de la instancia `Dev SQL` (`10.24.40.137`), concedidas **a pedido nombrado** — el alcance arranca en cero y cada base entra con fecha y solicitante | copias de producción |
 
 Dos precisiones sobre estos valores:
@@ -207,13 +206,16 @@ Dos precisiones sobre estos valores:
   `proveedores_dev`) porque el contrato de datos fija ese formato para
   `nombre`. La base a la que apuntan sí conserva su nombre real en el campo
   `base`.
-- El `host` de las dos entradas de Postgres es el **endpoint de réplica de
+- El `host` de las 6 entradas de Postgres es el **endpoint de réplica de
   lectura** (`cluster-ro-`), que es lo que sostiene la garantía
   `endpoint-replica-lectura`. El runbook de `aprovisionamiento/` documenta el
-  endpoint de escritura del mismo cluster, que es otro. Antes del primer uso
-  real conviene confirmarlo contra `aws rds describe-db-clusters`
-  (`ReaderEndpoint`): si el cluster no tuviera réplica, esa garantía hay que
-  sacarla de la entrada, no dejarla escrita.
+  endpoint de escritura del mismo cluster, que es otro. Medido: el
+  `ReaderEndpoint` existe (22-sep-2026), y el 23-sep el cluster tenía **una
+  sola réplica** — con los nombres de instancia cruzados, la que se llama
+  `…-reader` es hoy el writer, huella de que ya hubo un failover. **Aurora
+  apunta el endpoint de lectura al writer cuando el cluster se queda sin
+  réplicas**, así que esta garantía depende de que exista al menos una. Cómo se
+  clasifica eso está pendiente de decisión (review de v15, `ESCALATE`).
 
 ## La credencial
 

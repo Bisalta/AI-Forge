@@ -66,8 +66,9 @@ pesa 55 MB y tiene 3.458 planillas completas con cédulas y salarios, mientras `
 el nombre, está vacía. La guarda por nombre del aprovisionamiento queda declarada **freno, no
 clasificador**. Detalle en `SDD/retro.md` RT23-RT33.
 
-**Lo que corrigió el sistema real, entre v12 y v15**: cuatro versiones que salieron de medir contra
-AWS y contra las bases, no de revisar el diseño. **Un solo rol**, `claude_lectura` (v13): NEO lee
+**Lo que corrigió el sistema real, entre v12 y v15**: tres de esas cuatro versiones (v12, v13 y
+v15) salieron de medir contra AWS y contra las bases, no de revisar el diseño; v14 salió de un
+`contract-change-request` de `AGENT_r1`, que encontró dos ACs sin reconciliar con v13. **Un solo rol**, `claude_lectura` (v13): NEO lee
 Odoo por XML-RPC y no abre ninguna conexión Postgres, así que un segundo rol era una clave sin
 consumidor. **Nombres de secreto** elegidos por Patrick Ocampo con la convención que la cuenta ya
 usaba (`dev/bd/claude-lectura-*`, v12), y la política IAM sobre el patrón y no sobre ARNs exactos.

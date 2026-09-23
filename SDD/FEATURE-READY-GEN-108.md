@@ -24,13 +24,13 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 
 🔴 **La aprobación de Esteban Fait o Sebastián sigue pendiente.** Patrick aprobó el login de Dev SQL sabiendo que son copias de producción; la política de uso de IA exige además la suya. **Es precondición de habilitar el plugin al equipo, no de mergearlo.**
 
-🟡 **De las tres garantías de Postgres, sólo una es incondicional** (v15). Patrick midió el peor caso el 22-sep: el rol apaga la sesión de solo lectura con un `SET`, y en PG 14 el esquema `public` traía `CREATE` para todo rol, así que por el endpoint de escritura podía crear tablas propias. Lo cerró ese día. Lo que queda en pie sin condiciones es el endpoint `cluster-ro-`: el motor rechaza la escritura y no hay `SET` que lo apague. El catálogo lo declara así, entrada por entrada, y `listar_conexiones` lo muestra.
+🟡 **De las tres garantías de Postgres, sólo una se declaró incondicional** (v15), **y la review de v15 la puso en duda**: el endpoint de réplica depende de que el cluster tenga al menos una réplica, y hoy tiene exactamente una. Ver "Siguiente paso". Patrick midió el peor caso el 22-sep: el rol apaga la sesión de solo lectura con un `SET`, y en PG 14 el esquema `public` traía `CREATE` para todo rol, así que por el endpoint de escritura podía crear tablas propias. Lo cerró ese día. v15 declaró incondicional al endpoint `cluster-ro-`, porque el motor rechaza la escritura contra una réplica y no hay `SET` que lo apague. Pero Aurora apunta ese endpoint al **writer** cuando el cluster se queda sin réplicas, y el 23-sep el cluster tenía **una sola** — con los nombres de instancia cruzados, huella de un failover anterior. Contra eso, el `SET` no hace falta.
 
 🟡 **En SQL Server el rol es la única barrera**, y es condicional: sin `db_denydatawriter` no hay `DENY` que anule un `GRANT` de escritura concedido por error (`D48`, aceptado por Patrick).
 
 🟡 **La cuenta de producción no está enumerada** (`D43`). Ninguna entrada del catálogo apunta ahí, pero "producción es irrepresentable" descansa en eso, no en un inventario.
 
-✅ **Postgres probado de punta a punta contra la base real (23-sep-2026).** Las seis bases del catálogo responden a través del plugin instalado, con la sesión en solo lectura, contra la réplica, y con `application_name = claude_lectura`.
+✅ **Postgres probado de punta a punta contra la base real (23-sep-2026).** Las seis conexiones de Postgres del catálogo responden a través del plugin instalado, las seis con `application_name = claude_lectura`. La sesión en solo lectura y la conexión contra la réplica se verificaron en `proveedores-dev`, no en las seis.
 
 ✅ **La prueba en vivo encontró un defecto que la suite no veía.** `AC29` estaba verde en los tests y la sesión real se llamaba `psql`: el test miraba cómo se armaba el comando, no qué efecto tenía (`RT48`). Corregido en v15 y verificado contra la base. Es la razón para no confiar en un AC de efecto externo hasta verlo contra el sistema.
 
@@ -40,8 +40,9 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 
 1. **`plugins/bisalta-db/catalogo.json`** — doce entradas (seis de Postgres, seis de SQL Server), ninguna con usuario ni contraseña, sólo `secret_id`. Cada garantía declara su nivel y la condición de la que depende.
 2. **`plugins/bisalta-db/scripts/lista-blanca.js`** — la guarda que decide qué SQL corre. Si algo va a fallar feo, falla acá.
-3. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-R2.md` §2** — los diecisiete triples de mutación declarados, con el patch literal de cada uno, más un decimoctavo de la ronda 2. Es la evidencia de que las barreras se pueden poner rojas.
-4. **`plugins/bisalta-db/aprovisionamiento/APROBACIONES.md`** — quién autorizó qué, y la diferencia entre lo que la aprobación enumera y lo que el acceso alcanza.
+3. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-v15.md`** — la evidencia del ciclo corto de v15: la escalera sellada por el runner, los triples de `AC29` y `AC45`, y la verificación contra la base.
+4. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-R2.md` §2** — los diecisiete triples de mutación declarados, con el patch literal de cada uno, más un decimoctavo de la ronda 2. Es la evidencia de que las barreras se pueden poner rojas.
+5. **`plugins/bisalta-db/aprovisionamiento/APROBACIONES.md`** — quién autorizó qué, y la diferencia entre lo que la aprobación enumera y lo que el acceso alcanza.
 
 ## Estado honesto
 
@@ -49,7 +50,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 |---|---|
 | **R2 — el plugin** | `APPROVED` por el reviewer. 30 ACs, 17 triples `verde → rojo → verde` re-corridos por él |
 | **R1 — el aprovisionamiento** | `APPROVED` por el reviewer por última vez sobre el contract **v14** (`2529071`, 22-sep). Antes hubo dos `ESCALATE`, los dos por el cap de tres rondas. `E9` era un defecto del contract: un cambio de diseño que no reconcilió los ACs que lo verifican. `E10` era de medición: el barrido de clase buscó con los patrones de las citas ya corregidas y no por el concepto, y se le escapó un `PRINT` que habría revocado bases recién concedidas. El planner resolvió los dos, y la review sobre v14 los cubrió después |
-| **Ciclo corto de v15 (`AC29`, `AC45`)** | **En review.** Lo escribió el planner sin pasar por el reviewer, y `quality-gates.md` §7.5 no admite eso: toda corrección de un artefacto ya aprobado vuelve al loop. Son cuatro commits posteriores a `2529071` (`2583be1`, `047643c`, `5e29179`, `b711c18`) |
+| **Ciclo corto de v15 (`AC29`, `AC45`)** | **En review.** Lo escribió el planner sin pasar por el reviewer, y `quality-gates.md` §7.5 no admite eso: toda corrección de un artefacto ya aprobado vuelve al loop. El alcance es **todo lo posterior a `2529071`**, el último `APPROVED` de R1 — se escribe como rango y no como lista porque una lista de commits dentro de un documento que se commitea después queda vieja en el mismo acto: el commit del propio brief ya no figuraría. La review de ronda 1 devolvió `ESCALATE` (ver "Siguiente paso") |
 | **Aprovisionamiento de Postgres** | **Ejecutado por Patrick el 22-sep.** Su verificación —431 objetos legibles, cero escribibles, `CREATE TABLE` rechazado— está en Slack, **no en un artefacto del repo**. Nuestras consultas del 23-sep responden en las seis bases |
 | **Aprovisionamiento de SQL Server** | **Pendiente de Patrick**: el login de Dev SQL, su secreto, correr los scripts, y medir `SERVERPROPERTY('MachineName')` para cerrar `AC44` |
 | **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep (`COMPRAS`, `COMPRAS_STG`, `Ecommerce`, `Ecommerce_qa`, `EXACTUS`, `BI`), **iniciales para probar la herramienta**, no definitivas |
@@ -59,7 +60,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 
 ## Siguiente paso
 
-1. **Review del ciclo corto de v15** (§7.5), hasta `APPROVED`.
+1. **Review del ciclo corto de v15** (§7.5), hasta `APPROVED`. La ronda 1 devolvió **`ESCALATE`**: correcciones directas (bindings, exit codes en los triples, afirmaciones de este brief más amplias que lo medido) y tres decisiones que el contract no tenía — partir `AC45`, declarar la verificación de `AC29` contra el motor, y **cerrar qué significa "incondicional"**.
 2. **Tu gate de Feature Ready**, sobre este brief.
 3. **Merge.** No habilita nada al equipo por sí solo.
 

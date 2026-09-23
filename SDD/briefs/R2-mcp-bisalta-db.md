@@ -128,7 +128,7 @@ La mutación se aplica **sobre el sistema que el AC vigila, nunca sobre el test*
 | AC26 | `AC26 un resultado de más de 1000 filas devuelve exactamente 1000` (+2) | `SDD/tests/test_servidor_mcp.sh` | pass |
 | AC27 | `AC27 un resultado de más de 1 MiB marca truncado en true` (+2) | `SDD/tests/test_servidor_mcp.sh` | pass |
 | AC28 | `AC28 el comando abre la sesión en solo lectura` · `AC28 el comando fija el statement_timeout en 120000` | `SDD/tests/test_servidor_mcp.sh` | pass |
-| AC29 | `AC29 el comando lleva el application_name del usuario del secreto` | `SDD/tests/test_servidor_mcp.sh` | pass |
+| AC29 | `AC29 el comando lleva el usuario del secreto en PGAPPNAME` · `AC29 PGOPTIONS no lleva application_name (psql le gana al -c)` (v15: el nombre anterior, `…lleva el application_name del usuario del secreto`, ya no existe — el mecanismo cambió de `PGOPTIONS` a `PGAPPNAME`) | `SDD/tests/test_servidor_mcp.sh` | pass |
 | AC30 | `AC30 la bitácora registra la conexión` … `el código de salida` (+2) | `SDD/tests/test_servidor_mcp.sh` | pass |
 | AC31 | `AC31 con una conexión desconocida no se invoca el binario aws` (+1 de control, +4) | `SDD/tests/test_servidor_mcp.sh` | pass |
 | AC32 | `AC32 con el cliente ausente del PATH la consulta devuelve el código 8` (+3) | `SDD/tests/test_servidor_mcp.sh` | pass |

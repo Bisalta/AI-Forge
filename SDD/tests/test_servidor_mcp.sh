@@ -293,7 +293,7 @@ assert_contains "$opciones" "default_transaction_read_only=on" "AC28 el comando 
 assert_contains "$opciones" "statement_timeout=120000" "AC28 el comando fija el statement_timeout en 120000"
 # AC29 viaja por PGAPPNAME. `-c application_name` dentro de PGOPTIONS NO sirve:
 # psql fija el suyo en la conexión y le gana, así que `pg_stat_activity` termina
-# mostrando `psql`. Medido contra el motor real el 22-sep-2026 (contract v15).
+# mostrando `psql`. Medido contra el motor real el 23-sep-2026 (contract v15).
 # El segundo assert es el que impide la regresión: prohíbe la forma que se ve
 # bien y no funciona.
 appname="$(grep '^PGAPPNAME ' "$TMP_DIR/psql-invocado.log")"

@@ -2,7 +2,7 @@
 
 - **Versión**: v15
 
-### Cambios v14 → v15 (primera corrida contra el motor real, 22-sep-2026)
+### Cambios v14 → v15 (primera corrida contra el motor real, 23-sep-2026 — la Parte A la corrió Patrick Ocampo el 22-sep a la noche)
 
 Patrick Ocampo corrió la Parte A y las seis bases del catálogo quedaron legibles. Con eso el plugin consultó por primera vez contra la base de verdad, y la corrida en vivo encontró dos cosas que ningún test del harness podía ver. Ciclo corto de fixes sobre la misma branch, decidido por Ian Vargas.
 
@@ -316,7 +316,7 @@ Símbolos y archivos existentes que se modifican, con sus consumidores grepeados
 | `SDD/docs/doc_quality_gates.md` | se agregan `plugins/bisalta-db/scripts/*.sh` al glob del gate 2 y se corrige el prerequisito de `shellcheck` | `sdd-run-gates.sh` parsea su tabla de gates | AC38 |
 | `SDD/docs/doc_architecture.md` | se agrega `plugins/bisalta-db/` al layout y a las reglas de ubicación | lectura humana y de agentes | AC39 |
 
-**No se modifica ningún símbolo ejecutable existente.** Todo el código nuevo es aditivo, en archivos nuevos. Por eso no hay análisis de regresión de callers: la suite existente tiene que seguir verde sin cambios, y eso es AC40. **La cantidad de archivos de esa suite se deriva del árbol, no se cita acá** — una cifra congelada en prosa es exactamente lo que este cambio de versión corrige.
+**No se modifica ningún símbolo ejecutable existente**, con una excepción desde v15: `SDD/tests/lib.sh` —la lib de asserts de `GEN-94`, compartida por toda la suite— suma `assert_no_contains`. Es aditivo: ninguna función existente cambia, y la regresión es la suite completa en verde. Todo el resto del código nuevo es aditivo, en archivos nuevos. Por eso no hay análisis de regresión de callers: la suite existente tiene que seguir verde sin cambios, y eso es AC40. **La cantidad de archivos de esa suite se deriva del árbol, no se cita acá** — una cifra congelada en prosa es exactamente lo que este cambio de versión corrige.
 
 ## Source of truth
 

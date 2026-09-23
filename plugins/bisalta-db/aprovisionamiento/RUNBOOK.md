@@ -471,14 +471,26 @@ FROM pg_roles WHERE rolname = 'claude_lectura';
 | `rolinherit = f` | entró `NOINHERIT`: no vería una sola tabla aunque conecte (ver la nota de `pg_read_all_data` en `postgres-parte-a.sql`) |
 | `lee_todo = f` | falta el `GRANT pg_read_all_data` |
 | todo `t`, `conecta = f` | parte A completa; falta `postgres-parte-b.sql` sobre esa base |
-| **todo `t`, `conecta = t`** | el rol está bien: entonces **la contraseña del secreto no es la del rol** — ver "Forma del secreto", los dos órdenes de creación |
+| **todo `t`, `conecta = t`** | el rol `claude_lectura` está bien: entonces **lo que el cliente manda no coincide con él**. Puede ser la contraseña (ver "Forma del secreto", los dos órdenes de creación) **o el `username` del secreto** — ver abajo |
 
-Antes de llegar acá conviene descartar lo que no es autenticación: que el
-`secret_id` del catálogo instalado sea el mismo que el del repo (ver
-`README.md`, la nota sobre la copia que deja `/plugin install`), que el
-`username` del secreto sea `claude_lectura`, que la contraseña no traiga
-espacios ni saltos alrededor, y que el puerto del endpoint `cluster-ro-`
-abra. Un fallo en cualquiera de esos da un error distinto, no éste.
+**Esta consulta fija el nombre `claude_lectura` en el código.** Si el `username`
+del secreto está mal escrito, la consulta igual encuentra el rol bueno, cae en la
+última fila y hace concluir que la contraseña no coincide, cuando el problema es
+el nombre. Por eso, antes de leer la tabla, descartar las dos causas que dan
+**este mismo error** — el mock authentication responde igual a un usuario
+inexistente que a una contraseña equivocada:
+
+- **el `username` del secreto**: leerlo y compararlo con `claude_lectura`,
+  carácter por carácter;
+- **la contraseña con espacios o saltos alrededor**: es otro valor, así que no
+  coincide con la del rol aunque "sea la misma". Comparar el largo con y sin
+  recortar.
+
+Y dos causas que **no** dan este error, sino otro, y que por eso se reconocen
+solas: un `secret_id` del catálogo instalado distinto del del repo da
+`secreto_inaccesible` (ver `README.md`, la nota sobre la copia que deja
+`/plugin install`), y un puerto del endpoint `cluster-ro-` que no abre da un
+timeout de conexión.
 
 ### AC2 — un `INSERT` con `claude_lectura` falla
 

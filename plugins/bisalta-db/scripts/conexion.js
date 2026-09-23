@@ -144,7 +144,7 @@ function construirComandoPostgres(entrada, usuario, rutaPassfile, sql) {
       PGOPTIONS: '-c default_transaction_read_only=on' +
         ' -c statement_timeout=' + TIMEOUT_SENTENCIA_MS,
       // AC29 va por PGAPPNAME y NO por `-c application_name` dentro de
-      // PGOPTIONS. Medido contra el motor real el 22-sep-2026: psql fija su
+      // PGOPTIONS. Medido contra el motor real el 23-sep-2026: psql fija su
       // propio `application_name` en la conexión y le GANA al `-c`, así que
       // `pg_stat_activity` mostraba `psql` y no el usuario del secreto. Las
       // tres formas se midieron una al lado de la otra; sólo PGAPPNAME y el
