@@ -1,14 +1,14 @@
 # Feature Ready — `bisalta-db` v0.1.0 · consulta de solo lectura sin credencial en contexto
 
-**Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v11** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
-**Agentes**: `AGENT_r1` (infra, 8 rondas en tres alcances) · `AGENT_r2` (third-party-integration, 2 rondas)
+**Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v15** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
+**Agentes**: `AGENT_r1` (infra) · `AGENT_r2` (third-party-integration) · el planner escribió el ciclo corto de v15, que está **en review** (ver "Estado honesto")
 **Gates**: suite 17/17 · secret-scan exit 0 · shellcheck exit 0 · linter de closure exit 0
 
 ---
 
 ## Qué es
 
-Un plugin que le da a Claude Code y a NEO consulta de solo lectura contra las bases de Bisalta **sin que ninguna credencial entre en el contexto de la sesión**. La credencial no desaparece: pasa de un archivo que hoy hay que leerle al modelo —y que queda archivado en el transcript— a un secreto de AWS que el proceso resuelve, usa y tira.
+Un plugin que le da a Claude Code consulta de solo lectura contra las bases de Bisalta **sin que ninguna credencial entre en el contexto de la sesión**. La credencial no desaparece: pasa de un archivo que hoy hay que leerle al modelo —y que queda archivado en el transcript— a un secreto de AWS que el proceso resuelve, usa y tira. **NEO no lo usa**: lee Odoo por XML-RPC, contra la aplicación y no contra la base (contract v13).
 
 ## Decisiones que tomé por vos
 
@@ -24,15 +24,23 @@ Un plugin que le da a Claude Code y a NEO consulta de solo lectura contra las ba
 
 🔴 **La aprobación de Esteban Fait o Sebastián sigue pendiente.** Patrick aprobó el login de Dev SQL sabiendo que son copias de producción; la política de uso de IA exige además la suya. **Es precondición de habilitar el plugin al equipo, no de mergearlo.**
 
-✅ **`AC34` probado contra una sesión real de Claude Code (22-sep-2026).** El plugin se instaló desde el marketplace local, Claude Code negoció `2024-11-05`, descubrió las dos herramientas y las invocó sin ajustes. Con él quedaron verificados en vivo `AC35`, `AC33` y la lista blanca cortando antes de conectar. **Era el riesgo declarado desde v1 y ya no lo es.**
+🟡 **De las tres garantías de Postgres, sólo una es incondicional** (v15). Patrick midió el peor caso el 22-sep: el rol apaga la sesión de solo lectura con un `SET`, y en PG 14 el esquema `public` traía `CREATE` para todo rol, así que por el endpoint de escritura podía crear tablas propias. Lo cerró ese día. Lo que queda en pie sin condiciones es el endpoint `cluster-ro-`: el motor rechaza la escritura y no hay `SET` que lo apague. El catálogo lo declara así, entrada por entrada, y `listar_conexiones` lo muestra.
+
+🟡 **En SQL Server el rol es la única barrera**, y es condicional: sin `db_denydatawriter` no hay `DENY` que anule un `GRANT` de escritura concedido por error (`D48`, aceptado por Patrick).
 
 🟡 **La cuenta de producción no está enumerada** (`D43`). Ninguna entrada del catálogo apunta ahí, pero "producción es irrepresentable" descansa en eso, no en un inventario.
 
+✅ **Postgres probado de punta a punta contra la base real (23-sep-2026).** Las seis bases del catálogo responden a través del plugin instalado, con la sesión en solo lectura, contra la réplica, y con `application_name = claude_lectura`.
+
+✅ **La prueba en vivo encontró un defecto que la suite no veía.** `AC29` estaba verde en los tests y la sesión real se llamaba `psql`: el test miraba cómo se armaba el comando, no qué efecto tenía (`RT48`). Corregido en v15 y verificado contra la base. Es la razón para no confiar en un AC de efecto externo hasta verlo contra el sistema.
+
+✅ **`AC34` probado contra una sesión real de Claude Code (22-sep-2026).** Claude Code negoció `2024-11-05`, descubrió las dos herramientas y las invocó sin ajustes. Era el riesgo declarado desde v1.
+
 ## Qué mirar en 5 minutos
 
-1. **`plugins/bisalta-db/catalogo.json`** — tres entradas, ninguna con usuario ni contraseña, sólo `secret_id`. Es el contrato de datos entero en 35 líneas.
+1. **`plugins/bisalta-db/catalogo.json`** — doce entradas (seis de Postgres, seis de SQL Server), ninguna con usuario ni contraseña, sólo `secret_id`. Cada garantía declara su nivel y la condición de la que depende.
 2. **`plugins/bisalta-db/scripts/lista-blanca.js`** — la guarda que decide qué SQL corre. Si algo va a fallar feo, falla acá.
-3. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-R2.md` §2** — los 17 triples de mutación con el patch literal de cada uno. Es la evidencia de que las barreras se pueden poner rojas.
+3. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-R2.md` §2** — los diecisiete triples de mutación declarados, con el patch literal de cada uno, más un decimoctavo de la ronda 2. Es la evidencia de que las barreras se pueden poner rojas.
 4. **`plugins/bisalta-db/aprovisionamiento/APROBACIONES.md`** — quién autorizó qué, y la diferencia entre lo que la aprobación enumera y lo que el acceso alcanza.
 
 ## Estado honesto
@@ -40,14 +48,19 @@ Un plugin que le da a Claude Code y a NEO consulta de solo lectura contra las ba
 | | |
 |---|---|
 | **R2 — el plugin** | `APPROVED` por el reviewer. 30 ACs, 17 triples `verde → rojo → verde` re-corridos por él |
-| **R1 — el aprovisionamiento** | `APPROVED` por el reviewer sobre el alcance de **v9** (la lista explícita), tras auditarle el barrido de clase receta por receta. Antes hubo un `ESCALATE` sobre el alcance de v7, resuelto por ratificación del planner: el defecto que quedaba era del contract, no del implementador |
-| **10 de los 12 ACs de R1** | `manual-only` con razón escrita, en estado **`pendiente-de-ejecución`**. Ningún harness de este repo puede crear un rol de Postgres |
-| **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep (`COMPRAS`, `COMPRAS_STG`, `Ecommerce`, `Ecommerce_qa`, `EXACTUS`, `BI` — 861 GB de 1383), **iniciales para probar la herramienta**, no definitivas |
-| **Ejecución del aprovisionamiento** | **Frenada por Patrick** hasta que defina alcance |
-| **Deuda** | `D32`–`D44`. Dos son del propio `sdd-flow` (`D34`/`D35`: el verification report queda fuera del gate que valida el árbol) |
+| **R1 — el aprovisionamiento** | `APPROVED` por el reviewer por última vez sobre el contract **v14** (`2529071`, 22-sep). Antes hubo dos `ESCALATE`, los dos por el cap de tres rondas. `E9` era un defecto del contract: un cambio de diseño que no reconcilió los ACs que lo verifican. `E10` era de medición: el barrido de clase buscó con los patrones de las citas ya corregidas y no por el concepto, y se le escapó un `PRINT` que habría revocado bases recién concedidas. El planner resolvió los dos, y la review sobre v14 los cubrió después |
+| **Ciclo corto de v15 (`AC29`, `AC45`)** | **En review.** Lo escribió el planner sin pasar por el reviewer, y `quality-gates.md` §7.5 no admite eso: toda corrección de un artefacto ya aprobado vuelve al loop. Son cuatro commits posteriores a `2529071` (`2583be1`, `047643c`, `5e29179`, `b711c18`) |
+| **Aprovisionamiento de Postgres** | **Ejecutado por Patrick el 22-sep.** Su verificación —431 objetos legibles, cero escribibles, `CREATE TABLE` rechazado— está en Slack, **no en un artefacto del repo**. Nuestras consultas del 23-sep responden en las seis bases |
+| **Aprovisionamiento de SQL Server** | **Pendiente de Patrick**: el login de Dev SQL, su secreto, correr los scripts, y medir `SERVERPROPERTY('MachineName')` para cerrar `AC44` |
+| **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep (`COMPRAS`, `COMPRAS_STG`, `Ecommerce`, `Ecommerce_qa`, `EXACTUS`, `BI`), **iniciales para probar la herramienta**, no definitivas |
+| **Deuda y retro del ciclo** | 26 ítems de deuda (`D32`–`D57`) y 27 entradas de retro (`RT23`–`RT49`). Dos ítems de deuda son del propio `sdd-flow` (`D34`/`D35`: el verification report queda fuera del gate que valida el árbol) |
 
-**Lo que este PR NO hace**: no crea ningún rol, no toca ninguna base, no carga ningún secreto. Es código y procedimientos.
+**Lo que este PR NO hace**: no crea ningún rol, no toca ninguna base, no carga ningún secreto. Es código y procedimientos. Lo que ya existe en AWS y en las bases lo hizo Patrick a mano, siguiendo el runbook.
 
 ## Siguiente paso
 
-Mergear no habilita nada por sí solo. Para que el plugin funcione hacen falta, en este orden: que Patrick cierre alcance (`qa`, los dos clusters sin medir, SQL Server), que corra los scripts y cargue las claves él mismo en Secrets Manager, que escriba la política IAM, y la aprobación de Esteban o Sebastián para habilitarlo al equipo.
+1. **Review del ciclo corto de v15** (§7.5), hasta `APPROVED`.
+2. **Tu gate de Feature Ready**, sobre este brief.
+3. **Merge.** No habilita nada al equipo por sí solo.
+
+Para **habilitarlo al equipo** hace falta además SQL Server completo (Patrick) y la aprobación de Esteban o Sebastián.

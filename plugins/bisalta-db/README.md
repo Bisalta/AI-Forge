@@ -369,6 +369,16 @@ sobre el catálogo del repo y sobre el de `~/.claude/plugins/cache/ai-forge/bisa
 
 Medido el 23-sep-2026, al reinstalar para tomar el contract v15. Tres cosas que no son obvias:
 
+**0. `remove` saca el marketplace entero, no un plugin.** `/plugin marketplace remove ai-forge`
+desinstala **todos** los plugins de `ai-forge`, no sólo `bisalta-db`. El 23-sep eso se llevó
+`sdd-flow` —y con él el hook `guard-git.sh`, que bloquea commits en rama protegida, `--no-verify` y
+`push --force`— sin ningún aviso, y el repo trabajó **casi dos horas** sin esa protección (09:39 a 11:30, medido por
+los timestamps del registro de plugins y del cache). Y al reinstalarlo apareció que la copia
+anterior era `sdd-flow` **0.10.0**, del 21-sep, mientras el repo ya iba por la 0.12: el plugin que
+hace cumplir el proceso llevaba dos versiones de atraso respecto del repo donde se aplicaba. Después
+del `add`, reinstalar **cada** plugin de `ai-forge` que estuviera instalado, no sólo el que motivó
+la reinstalación.
+
 **1. `remove` no borra la copia.** `/plugin marketplace remove ai-forge` saca el marketplace y el
 plugin del registro, pero deja la carpeta `cache/ai-forge/bisalta-db/<version>/` en el disco. Un
 `grep` sobre esa carpeta después del `remove` sigue encontrando el código viejo — y eso no dice
@@ -399,6 +409,6 @@ ps -eo pid,lstart,command | grep '[b]isalta-db.*servidor-mcp'
 
 Todo proceso que arrancó antes de reinstalar corre código viejo.
 
-**Orden completo**: `remove` → `add` → `install` → **reiniciar cada sesión que use el plugin** →
+**Orden completo**: `remove` → `add` → `install` **de cada plugin de `ai-forge` que tuvieras** → **reiniciar cada sesión que use el plugin** →
 confirmar con algo que el cambio nuevo haga observable. Una verificación que el código viejo
 también pasaría no confirma nada.

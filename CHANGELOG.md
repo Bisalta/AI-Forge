@@ -6,7 +6,7 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ### 0.1.0 — 2026-09-18
 
-Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v11).
+Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v15).
 Consulta de solo lectura a las bases de dev/qa de Bisalta desde Claude Code, **sin que
 ninguna credencial entre en el contexto de la sesión**. La credencial no desaparece: pasa de un
 archivo que hoy hay que leerle al modelo —y que queda archivado en el transcript— a un secreto de
@@ -65,6 +65,20 @@ sufijo de la cuenta. Y ni el tamaño ni el nombre clasifican el riesgo de una ba
 pesa 55 MB y tiene 3.458 planillas completas con cédulas y salarios, mientras `rrhh`, señalada por
 el nombre, está vacía. La guarda por nombre del aprovisionamiento queda declarada **freno, no
 clasificador**. Detalle en `SDD/retro.md` RT23-RT33.
+
+**Lo que corrigió el sistema real, entre v12 y v15**: cuatro versiones que salieron de medir contra
+AWS y contra las bases, no de revisar el diseño. **Un solo rol**, `claude_lectura` (v13): NEO lee
+Odoo por XML-RPC y no abre ninguna conexión Postgres, así que un segundo rol era una clave sin
+consumidor. **Nombres de secreto** elegidos por Patrick Ocampo con la convención que la cuenta ya
+usaba (`dev/bd/claude-lectura-*`, v12), y la política IAM sobre el patrón y no sobre ARNs exactos.
+**Guarda de instancia** en el script de SQL Server (`AC44`, v13), que crea un login —objeto de
+instancia— y no tenía nada que dijera contra qué servidor corría. Y dos que sólo aparecieron con la
+base enfrente (v15): `application_name` salía `psql` y no el usuario del secreto, porque psql le gana
+al `-c` de `PGOPTIONS` — corregido con `PGAPPNAME`, y el test ahora prohíbe explícitamente la forma
+que se ve bien y no funciona; y **cada garantía declara su nivel**. Patrick midió el peor caso y la
+sesión de solo lectura se apaga con un `SET`, y en PG 14 `public` traía `CREATE` para todo rol: de las
+tres garantías de Postgres, **sólo el endpoint de réplica es incondicional**, y el catálogo lo dice
+entrada por entrada. Detalle en `SDD/retro.md` RT42-RT49.
 
 **Lo que dejó el kilometraje**: dos defectos que la suite encontró y que valen por separado. (1) El
 tope de bytes salía vacío porque `process.exit()` **corta lo que `process.stdout` todavía tiene en
