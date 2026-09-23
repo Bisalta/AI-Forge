@@ -318,3 +318,12 @@ Es la **primera consulta a SQL Server** a través del plugin. Respuestas literal
 ```
 
 **Esto contradijo el texto de `AC48`**, que decía "exactamente `master` y `tempdb`". La propiedad se cumple —el login no enumera las otras bases del servidor, ni siquiera las otras cinco que tiene concedidas—, pero cada conexión se ve también a sí misma. El texto venía del reporte de Patrick, medido desde `master` (la base por omisión del login, donde la lista sí es `master` y `tempdb`), y se volvió normativo sin ese contexto. Enmendado dentro de v17 en el contract, el README y el runbook: la propiedad es "`master`, `tempdb` y la base de la propia conexión, y ninguna otra".
+
+**Agregado en v18 — la lectura de una tabla real después del `DENY`** (el MAJOR de la ronda 3: hasta acá la cláusula "sigue leyendo" de `AC48` no tenía evidencia en el repo). Como el login, a través del plugin, 23-sep-2026. Se usa un conteo porque `COMPRAS` es una copia de producción:
+
+```
+{"conexion":"compras","dialecto":"sqlserver","filas":[{"esquema":"dbo","tabla":"ABASTECEDOR_COMPRADOR"}],"filas_devueltas":1,"truncado":false,"motivo_truncado":null}
+{"conexion":"compras","dialecto":"sqlserver","filas":[{"filas":"8"}],"filas_devueltas":1,"truncado":false,"motivo_truncado":null}
+```
+
+Consultas: `SELECT TOP 1 TABLE_SCHEMA AS esquema, TABLE_NAME AS tabla FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_SCHEMA, TABLE_NAME` y `SELECT COUNT(*) AS filas FROM dbo.ABASTECEDOR_COMPRADOR`. El login lee una tabla de usuario real de una base concedida después del `DENY VIEW ANY DATABASE`.

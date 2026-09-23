@@ -1,6 +1,18 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v17
+- **Versión**: v18
+
+### Cambios v17 → v18 (ratificación del planner tras el `ESCALATE` de la ronda 3 de la review §7.5, 23-sep-2026)
+
+La ronda 3 —la última antes del cap de `quality-gates.md` §7.4— cerró con un solo MAJOR y cuatro MINOR, sin BLOCKER, con los hallazgos de las rondas 1 y 2 cerrados. El reviewer dejó escrito que, con esto resuelto, *"el ciclo queda en condiciones de ratificarse sin otra ronda"*. Esta ratificación **no la volvió a revisar nadie**: se declara así, igual que `E9` y `E10`.
+
+**1. La lectura de `AC48` queda medida (el MAJOR).** `AC48` exige que, después del `DENY`, el login siga leyendo una tabla real de una base concedida; la comprobación del runbook leía `sys.tables`, un catálogo, y el propio runbook dice que eso no prueba acceso a datos. Medido a través del plugin el 23-sep, como el login: `SELECT COUNT(*) AS filas FROM dbo.ABASTECEDOR_COMPRADOR` en `COMPRAS` → una fila. Se usa un conteo y no filas porque `COMPRAS` es una copia de producción. El runbook cambia su segunda consulta al mismo patrón.
+
+**2. Dos enmiendas que debieron ser bump.** `164d91e` (dentro de v16: `set_config` sin distinguir mayúsculas y las descripciones que lee el modelo, en `AC47`) y `388b60e` (dentro de v17: lo que ve el login, en `AC48`) cambiaron la **condición de aprobación** de un AC **después** de que había trabajo y evidencia sobre el texto anterior, y las dos las motivó un defecto. Con eso, "v16" y "v17" nombraban cada uno dos textos distintos del mismo AC. Quedan listadas acá y registradas como `E14` y `E15`. **Regla desde v18: cambiar la condición de aprobación de un AC es un bump, sin excepción.** Una aclaración que no cambia qué se aprueba puede ir sin bump; si cambia qué pasa y qué no, es versión nueva.
+
+**3. `AC40` era falso y se reconcilia.** Afirmaba que ningún test preexistente se modificaba. `test_escalation_ledger.sh` se modificó dos veces en este ciclo, las dos a sabiendas y registradas: `2fcaf84` dejó de congelar el total de un ledger que existe para crecer (`RT31`), y `3748b36` corrigió un enum escrito de memoria en el test que verifica el enum (`RT39`). Y `SDD/tests/lib.sh` —fuera del glob del AC, pero infraestructura de test— sumó `assert_no_contains` en v15. El AC se reescribe con esas excepciones declaradas.
+
+**4. Una frase vieja en "Garantías por motor".** Decía "el rol y el `DENY` son todo lo que hay" en SQL Server, escrita cuando el `DENY` era `db_denydatawriter` (quitado en v10). Hoy el único `DENY` es el de `AC48`, que no frena escrituras.
 
 ### Cambios v16 → v17 (SQL Server aprovisionado por Patrick Ocampo, Slack 23-sep-2026 13:05)
 
@@ -433,7 +445,7 @@ Arreglo con `nombre`, `dialecto`, `ambiente`, `base` y `garantias` de cada entra
 | Enumeración de los nombres de base (v17, `AC48`) | **visibles**: `pg_database` es legible por todo rol; ocultarla rompe clientes (conocido, no medido) — riesgo aceptado | **cerrada** con `DENY VIEW ANY DATABASE`: el login ve `master`, `tempdb` y la base de su propia conexión, y ninguna otra |
 | Alcance del permiso | `pg_read_all_data`, de cluster | `db_datareader`, **por base**: una base nueva no queda cubierta sola |
 
-Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que evita que alguien asuma que todas las conexiones son igual de seguras. **Medido el 18-sep-2026**: las 32 bases de Dev SQL están `ONLINE` y **ninguna** tiene `is_read_only`, así que del lado del motor no hay ninguna barrera — el rol y el `DENY` son todo lo que hay.
+Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que evita que alguien asuma que todas las conexiones son igual de seguras. **Medido el 18-sep-2026**: las 32 bases de Dev SQL están `ONLINE` y **ninguna** tiene `is_read_only`, así que del lado del motor no hay ninguna barrera — el rol es todo lo que hay del lado del motor para frenar una escritura (v18: esta frase decía "el rol y el `DENY`", de cuando el `DENY` era `db_denydatawriter`; el `DENY` de `AC48` no frena escrituras).
 
 ## Entrega de la credencial al cliente
 
@@ -566,7 +578,7 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 
 **AC39** — `SDD/docs/doc_architecture.md` incluye `plugins/bisalta-db/` en el layout y en las reglas de ubicación de archivos.
 
-**AC40** — `bash SDD/tests/run.sh` sale 0 con los tres archivos de test nuevos, y **ningún archivo de test preexistente se modifica**: `git diff --name-only origin/prod..HEAD -- 'SDD/tests/test_*.sh'` lista exactamente los tres nuevos y ninguno más. La cantidad de tests preexistentes **no se cita como constante** en ningún lado: se deriva del árbol.
+**AC40** — `bash SDD/tests/run.sh` sale 0, y `git diff --name-only origin/prod..HEAD -- 'SDD/tests/test_*.sh'` lista exactamente los tres archivos de test nuevos (`test_catalogo.sh`, `test_lista_blanca.sh`, `test_servidor_mcp.sh`) **más** `test_escalation_ledger.sh`, que es el único preexistente modificado y lo fue a sabiendas, dos veces (`2fcaf84`, `RT31`; `3748b36`, `RT39`). Fuera del glob, `SDD/tests/lib.sh` suma `assert_no_contains` (v15), aditivo: ninguna función existente cambia. Ninguna otra modificación a infraestructura de test. La cantidad de tests preexistentes **no se cita como constante** en ningún lado: se deriva del árbol. (Reescrito en v18: el texto anterior afirmaba que no se modificaba ningún test preexistente, y era falso desde v7.)
 
 **AC41** — La Parte 0 corrida contra un cluster que contiene al menos una base cuyo nombre termina en `_prod` **aborta con exit distinto de 0**, sin crear ningún rol; corrida contra un cluster sin ninguna `_prod`, sale 0 y continúa. El discriminante es **lo que el cluster contiene**, nunca el nombre de la base que se quiere consultar.
 `manual-only: requiere un cluster Postgres real; ningún harness de este repo levanta uno.`
@@ -613,7 +625,7 @@ Casos del test — rechazados: en `postgres`, `WITH x AS (INSERT INTO t VALUES (
 
 **AC48** (detección, `manual-only`) — `sqlserver-parte-a.sql` aplica `DENY VIEW ANY DATABASE TO [bisalta_lectura]` **después** de crear el login y **fuera** del bloque condicional que lo crea, de modo que cada corrida lo vuelve a aplicar (`DENY` es idempotente). Verificado **conectándose como el login**, no como administrador: `SELECT name FROM sys.databases` devuelve **`master`, `tempdb` y la base de la propia conexión, y ninguna otra** — ni siquiera las otras bases concedidas; y una lectura sobre una tabla de `COMPRAS` sigue devolviendo filas. (Enmienda dentro de v17: el texto original decía "exactamente `master` y `tempdb`", tomado del reporte de Patrick sin el contexto de la medición. Medido por el planner a través del plugin el 23-sep: conectado a `COMPRAS` se ven `COMPRAS`, `master` y `tempdb`; conectado a `EXACTUS`, `EXACTUS`, `master` y `tempdb` — cada conexión se ve a sí misma y no a las demás. Desde `master`, la base por omisión del login, la lista es `master` y `tempdb`, que es lo que Patrick midió.)
 `manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
-**Mutación declarada**: sin el `DENY`, la misma consulta como el login lista todas las bases del servidor. **Evidencia mínima aceptada**: el par antes/después que Patrick midió el 23-sep —36 nombres antes, `master` y `tempdb` después, desde `master`—, más la verificación del planner a través del plugin desde `COMPRAS` y `EXACTUS`, que es la mitad rojo → verde del triple; la vuelta al rojo exigiría quitar el `DENY` en una instancia viva, y no hay instancia de prueba. El par vive hoy en Slack: pegarlo en el verification report de R1 es parte de `D61`.
+**Mutación declarada**: sin el `DENY`, la misma consulta como el login lista todas las bases del servidor. **Evidencia mínima aceptada**: el par antes/después que Patrick midió el 23-sep —36 nombres antes, `master` y `tempdb` después, desde `master`—, más la verificación del planner a través del plugin desde `COMPRAS` y `EXACTUS`, y —desde v18— la lectura de una tabla real de `COMPRAS` después del `DENY`, que es la mitad rojo → verde del triple; la vuelta al rojo exigiría quitar el `DENY` en una instancia viva, y no hay instancia de prueba. El par vive hoy en Slack: pegarlo en el verification report de R1 es parte de `D61`.
 
 ## Checklist del arquetipo
 

@@ -1117,7 +1117,8 @@ idempotente, así que cada corrida lo reaplica).
 
 ```
 SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -Q "SELECT name FROM sys.databases ORDER BY name;"
-SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d COMPRAS -Q "SELECT TOP 1 * FROM sys.tables;"
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d COMPRAS -Q "SELECT TOP 1 TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_SCHEMA, TABLE_NAME;"
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d COMPRAS -Q "SELECT COUNT(*) AS filas FROM <esquema>.<tabla_real>;"
 ```
 
 Esperado: la primera consulta devuelve **exactamente** `master` y `tempdb`
@@ -1126,9 +1127,16 @@ sin `-d`**: la sesión arranca en la base por omisión del login, que es `master
 Conectado a otra base, la lista suma **esa** base y ninguna más — medido el
 23-sep a través del plugin: desde `COMPRAS` se ven `COMPRAS`, `master` y
 `tempdb`; desde `EXACTUS`, `EXACTUS`, `master` y `tempdb`. La propiedad es
-"`master`, `tempdb` y la base propia", no una lista fija; la segunda sigue
-devolviendo filas — el `DENY` restringe qué metadatos se ven, no la
-lectura ya concedida por `AC42`.
+"`master`, `tempdb` y la base propia", no una lista fija; la segunda identifica
+una tabla de usuario real de `COMPRAS`, y la tercera la cuenta: tiene que
+devolver un número, no `permission denied` — el `DENY` restringe qué
+metadatos se ven, no la lectura ya concedida por `AC42`. **No leer
+`sys.tables`** (lo hacía hasta v17): es un catálogo, y leerlo no prueba acceso
+a datos reales, como dice la verificación de `AC1` más arriba. Se usa un
+conteo y no `SELECT *` porque las bases de Dev SQL son copias de producción:
+prueba el permiso sin traer filas a la terminal, y una tabla vacía da `0` en
+vez de un falso rojo. Medido el 23-sep a través del plugin:
+`dbo.ABASTECEDOR_COMPRADOR` devuelve un conteo (v18).
 
 **Mutación declarada** (contract v17, AC48): sin el `DENY`, la misma
 consulta como el login lista todas las bases del servidor. **Evidencia
