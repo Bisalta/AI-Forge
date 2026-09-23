@@ -1,6 +1,20 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v18
+- **Versión**: v19
+
+### Cambios v18 → v19 (decisiones y revisión adversarial de Patrick Ocampo, Slack 23-sep-2026 15:14 y 15:48)
+
+**1. El límite de tiempo vive en el rol, no en el cliente.** Decisión de Patrick: el plugin deja de mandar `statement_timeout` en Postgres, y rige el `statement_timeout=60s` que él fijó en el rol. Su razón: si cada cliente manda el suyo, el servidor no tiene piso y el valor del rol es decorativo. Si 60 s queda corto para un agregado legítimo, se sube **en el rol**. En SQL Server no hay equivalente del lado del servidor: queda el corte del proceso que el plugin ya tiene, a los 125 s. `AC28` cambia; `D58` se paga.
+
+**2. El `ALTER ROLE` de Patrick entra a `postgres-parte-a.sql`** (nace `AC49`), con sus cuatro valores. `D59` se paga. El patrón que Patrick nombró, y que es la razón de este punto y del siguiente: *un ajuste que no está en el script que crea el objeto desaparece en silencio la próxima vez que alguien lo recrea*. El `DENY` de `AC48` fue el segundo caso; éste es el primero.
+
+**3. El tercer caso: el esquema `public`** (nace `AC50`). El `REVOKE CREATE ON SCHEMA public FROM PUBLIC` que Patrick aplicó a mano el 22-sep en las seis bases, y el `REVOKE CONNECT` sobre la base `postgres`, no estaban en ningún script: una base nueva agregada con `postgres-parte-b.sql` volvía a tener el hueco. La regla de a quién se le concede `CREATE` explícito antes de revocar es de Patrick: **el dueño de la base más todo rol que ya tenga objetos en `public`** — concederlo sólo al dueño rompe las migraciones de quien ya crea ahí.
+
+**4. La revisión adversarial de la lista blanca está hecha (`D62` se paga).** Patrick la corrió contra el código de la rama: encontró doce formas de pasarla, y **ninguna es una brecha** — cada una choca después con el privilegio, con la réplica, o con algo que no existe en estos servidores. Con eso queda medido lo que Patrick propuso para `D62`: **la lista blanca es la capa que da un error temprano y claro, no la que impide el daño**; lo que sostiene la garantía es lo que está detrás. Sus hallazgos se reparten así:
+- **Dos se arreglan, en el alcance de v19**: la normalización (`AC51`) y las sentencias de SQL Server sin separador (`AC52`). Los casos de prueba de los dos son **los de la revisión de Patrick, tal como él los entregue**; este contract fija la propiedad, no enumera los casos.
+- **Dos quedan como límite conocido, no como pendiente**: el SQL que viaja como texto a una función, y las funciones que escriben sin nombrar una escritura. Ver "Riesgos".
+
+**5. Descripción de la lista blanca.** El README y el brief dejan de presentarla como "la guarda que decide qué SQL corre": pasan a describirla como la primera capa, la que rechaza temprano y con un mensaje claro, delante de las que impiden el daño.
 
 ### Cambios v17 → v18 (ratificación del planner tras el `ESCALATE` de la ronda 3 de la review §7.5, 23-sep-2026)
 
@@ -429,7 +443,7 @@ Arreglo con `nombre`, `dialecto`, `ambiente`, `base` y `garantias` de cada entra
 | Sentencia rechazada por la lista blanca | 4 | `{ "error": "no_es_lectura" }` con los primeros 90 caracteres de la sentencia ofensora |
 | Secreto que no resuelve | 5 | `{ "error": "secreto_inaccesible" }` con nombre de conexión e identificador del secreto, sin la respuesta cruda de AWS |
 | Conexión rechazada o caída | 6 | `{ "error": "conexion_fallida" }` con el mensaje del cliente, sin la credencial |
-| `statement_timeout` alcanzado (120 s) | 7 | `{ "error": "tiempo_agotado" }` |
+| Tiempo agotado — en Postgres, el `statement_timeout` del rol (60 s desde v19); en los dos motores, el corte del proceso a los 125 s | 7 | `{ "error": "tiempo_agotado" }` |
 | Binario del cliente ausente | 8 | `{ "error": "cliente_ausente" }` nombrando el binario que falta |
 | La conexión Postgres no llegó a una réplica de lectura (v16, AC46) | 9 | `{ "error": "no_es_replica" }` con el nombre de la conexión. **El SQL del consumidor no se ejecutó.** |
 | Catálogo ilegible o inválido (v3) | 2 | `{ "error": "catalogo_invalido" }` con el motivo del rechazo. Es error de configuración, no de conexión: sin catálogo válido no hay conexión que nombrar. |
@@ -546,7 +560,7 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 
 **AC27** — Una consulta cuyo resultado serializado supera 1048576 bytes devuelve las filas que caben, con `truncado` en `true` y `motivo_truncado` en `limite_bytes`.
 
-**AC28** — El comando que el servidor construye para una conexión `postgres` incluye `default_transaction_read_only=on` y `statement_timeout=120000`.
+**AC28** — El comando que el servidor construye para una conexión `postgres` incluye `default_transaction_read_only=on` y **no** incluye `statement_timeout`: el límite de sentencia lo fija el rol (`AC49`). (v19: hasta v18 el comando mandaba `statement_timeout=120000`, que le ganaba al del rol.) **Mutación declarada**: volver a agregar `statement_timeout` a `PGOPTIONS` pone rojo el assert negativo.
 
 **AC29** — El comando que el servidor construye lleva un `application_name` igual al `username` del secreto, para que `pg_stat_activity` atribuya del lado del motor. **Desde v15 el valor viaja en la variable `PGAPPNAME`, y `PGOPTIONS` no lleva `application_name`**: medido contra el motor real, psql le gana al `-c application_name` de `PGOPTIONS` y la sesión quedaba nombrada `psql`. **Mutaciones declaradas (v15)**: (a) quitar `PGAPPNAME` del entorno del comando pone rojo el assert positivo; (b) devolver `application_name` a `PGOPTIONS` pone rojo el assert negativo — cada una enrojece exactamente uno de los dos. (Hasta v12 la razón era distinguir `claude_lectura` de `neo_lectura`; con el rol único de v13 **ya no distingue consumidores** —`D53`, aceptado— pero la atribución al rol sigue siendo útil y el AC no cambia de propiedad.) **Parte `manual-only` (v16) — efecto externo**: la propiedad vive en `pg_stat_activity`, y ningún stub la ve. A través del plugin **instalado**, en una sesión arrancada después de instalar, `SELECT current_setting('application_name')` en **cada** conexión Postgres del catálogo devuelve el `username` del secreto. Evidencia: la salida literal de cada consulta, pegada en el verification report.
 
@@ -627,6 +641,16 @@ Casos del test — rechazados: en `postgres`, `WITH x AS (INSERT INTO t VALUES (
 `manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
 **Mutación declarada**: sin el `DENY`, la misma consulta como el login lista todas las bases del servidor. **Evidencia mínima aceptada**: el par antes/después que Patrick midió el 23-sep —36 nombres antes, `master` y `tempdb` después, desde `master`—, más la verificación del planner a través del plugin desde `COMPRAS` y `EXACTUS`, y —desde v18— la lectura de una tabla real de `COMPRAS` después del `DENY`, que es la mitad rojo → verde del triple; la vuelta al rojo exigiría quitar el `DENY` en una instancia viva, y no hay instancia de prueba. El par vive hoy en Slack: pegarlo en el verification report de R1 es parte de `D61`.
 
+**AC49** (detección, `manual-only`) — `postgres-parte-a.sql` aplica `ALTER ROLE claude_lectura SET` con los cuatro valores que Patrick fijó a mano: `default_transaction_read_only = on`, `statement_timeout = '60s'`, `idle_in_transaction_session_timeout = '30s'`, `lock_timeout = '5s'`, **fuera** del bloque condicional que crea el rol, para que cada corrida los vuelva a aplicar. Verificado conectándose **como el rol**: `current_setting` de los cuatro devuelve esos valores cuando el cliente no manda ninguno.
+`manual-only: requiere el cluster; misma razón que AC1.` **Evidencia mínima aceptada**: la lectura de `pg_db_role_setting` del 23-sep, que ya muestra los cuatro valores sobre el rol.
+
+**AC50** (detección, `manual-only`) — `postgres-parte-b.sql`, en cada base que recorre: primero concede `CREATE ON SCHEMA public` al dueño de la base **y** a todo rol que ya tenga objetos en `public`, y **después** revoca `CREATE ON SCHEMA public FROM PUBLIC`. El orden es la condición: revocar primero rompe las migraciones de quien ya crea ahí. Verificado conectándose **como `claude_lectura`**: crear una tabla en `public` falla con `permission denied for schema public`.
+`manual-only: requiere el cluster.` El `REVOKE CONNECT` sobre la base `postgres` va al runbook como paso explícito, con su verificación.
+
+**AC51** (detección) — La normalización de la lista blanca es **un solo recorrido de izquierda a derecha** que distingue literales, identificadores entre comillas dobles, comentarios de línea y comentarios de bloque **anidados**, de modo que **el validador ve las mismas sentencias que ejecuta el motor**. Casos de prueba: los de la revisión de Patrick Ocampo del 23-sep, incorporados tal como él los entregue. **Mutación declarada**: volver a la normalización anterior (tres reemplazos en secuencia) pone rojo al menos uno de sus casos.
+
+**AC52** (detección) — En dialecto `sqlserver`, la lista de palabras que rechaza `AC47` incluye además `TRUNCATE`, `DROP`, `CREATE` y `ALTER`, porque T-SQL no exige separador entre sentencias. Casos de prueba: los de la revisión de Patrick para ese dialecto. **Mutación declarada**: quitar esas cuatro palabras pone rojo sus casos.
+
 ## Checklist del arquetipo
 
 - `third-party-integration` → **sandbox/mock para desarrollo**: `N/A — las conexiones de Postgres del catálogo son de dev/qa, que ya son el ambiente no productivo. Para SQL Server no hay sandbox posible: Dev SQL es una copia de producción, y decirlo es más honesto que llamarlo sandbox.`
@@ -654,6 +678,7 @@ Casos del test — rechazados: en `postgres`, `WITH x AS (INSERT INTO t VALUES (
 | La suite tarda ~62 s hoy y los triples de mutación la alargan. | El umbral de `doc_quality_gates.md` se revisa con el número medido al cerrar, igual que en GEN-101. |
 | Las filas de copias de producción quedan en el transcript. | Riesgo aceptado con dueño (ver arriba). No hay mitigación técnica en este alcance. |
 | En Postgres, `claude_lectura` ve los nombres de todas las bases del cluster (v17). | Riesgo aceptado: `pg_database` es legible por todo rol, y revocarlo rompe los clientes que listan bases (el `\l` de psql, entre otros — comportamiento conocido de Postgres, **no medido acá**). En SQL Server el equivalente se cerró con `AC48`. Dueño: Ian Vargas. Se le informa a Patrick Ocampo, que administra el cluster; si decide cerrarlo de otra forma, entra como `contract-change-request`. |
+| **Límite conocido (v19)**: una función que recibe SQL como texto lo ejecuta sin que la lista blanca lo vea, porque la normalización reemplaza los literales. | Estructural: sólo se cerraría con una lista blanca de funciones invocables, que este alcance no tiene. Lo frenan el privilegio y, en Postgres, la réplica; y en estos servidores las funciones de ese tipo requieren recursos que no están configurados. Medido por Patrick el 23-sep. |
 | Una función con efecto lateral que se puede llamar dentro de un `SELECT` (`nextval`, `pg_advisory_lock`, …) no la enumera la lista blanca (v16). | Riesgo aceptado: la lista blanca no puede enumerar funciones. En Postgres la frenan la sesión de solo lectura, la réplica —comprobada por AC46— y los permisos del rol; en SQL Server una función definida por usuario no puede modificar datos. |
 | ~~El cluster de dev/qa podría no tener réplica de lectura…~~ | ✅ **CERRADO el 22-sep-2026**: `describe-db-clusters` sobre `sistemas-costruplaza-db` devuelve `ReaderEndpoint = sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com`, idéntico al host que declaran las seis entradas de Postgres del catálogo. La garantía `endpoint-replica-lectura` se sostiene. (`IAMDatabaseAuthenticationEnabled` sigue en `false`, consistente con la decisión de v4.) |
 | ~~**El `secret_id` de las 12 entradas del catálogo no lo acordó nadie.**~~ | ✅ **CERRADO.** (a) y (b) en v12: Patrick eligió `dev/bd/claude-lectura-postgres` y `dev/bd/claude-lectura-sqlserver`, y reformuló su propia regla a *"un secreto por credencial, aislamiento por política IAM por consumidor"*, bajo la cual el esquema de 12 conexiones sobre 2 secretos es correcto. (c) en v13: `neo_lectura` salió del diseño, así que **ningún artefacto manda crearlo**. `D51` figura cerrada en el ledger. |
