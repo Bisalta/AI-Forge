@@ -27,12 +27,12 @@ Leé entera la sección **"Cambios v18 → v19"** del contract y los textos de `
 
 ## Pasos
 
-- [ ] **T1** Leer el contract v19 y `quality-gates.md` §5, §6 y §10.
-- [ ] **T2** `AC28` en código y test. Suite.
-- [ ] **T3** `AC49` y `AC50` en los `.sql` y el runbook.
-- [ ] **T4** README (y la `description` si corresponde). Barrido **por concepto**: `grep -rn -i "120000\|120 s\|statement_timeout\|guarda que decide\|lista blanca"` en `plugins/bisalta-db/`, y revisar cada aparición contra v19.
-- [ ] **T5** Commit. Árbol limpio.
-- [ ] **T6** Evidencia: el runner (`sdd-run-gates.sh -o <report> --full`) sobre el árbol limpio, y un addendum con el triple de `AC28` —script que verifica que la mutación se aplicó (`git diff --quiet` distinto de 0) e imprime el exit code de las tres corridas—, el diff de los `.sql`, y el resultado del barrido de T4. Commit y push.
+- [x] **T1** Leer el contract v19 y `quality-gates.md` §5, §6 y §10.
+- [x] **T2** `AC28` en código y test. Suite.
+- [x] **T3** `AC49` y `AC50` en los `.sql` y el runbook.
+- [x] **T4** README (y la `description` si corresponde). Barrido **por concepto**: `grep -rn -i "120000\|120 s\|statement_timeout\|guarda que decide\|lista blanca"` en `plugins/bisalta-db/`, y revisar cada aparición contra v19.
+- [x] **T5** Commit. Árbol limpio.
+- [x] **T6** Evidencia: el runner (`sdd-run-gates.sh -o <report> --full`) sobre el árbol limpio, y un addendum con el triple de `AC28` —script que verifica que la mutación se aplicó (`git diff --quiet` distinto de 0) e imprime el exit code de las tres corridas—, el diff de los `.sql`, y el resultado del barrido de T4. Commit y push.
 
 ## Reglas innegociables
 
@@ -47,4 +47,14 @@ El último bloque es el JSON `sdd.result` (`plugins/sdd-flow/standards/orchestra
 
 ## Execution Report
 
-(lo llenás vos)
+- **Total tasks**: 6 (T1-T6). **Completed**: 6. **Blocked**: 0. **Skipped**: 0.
+- **AC ↔ test binding**: ver tabla completa en `SDD/verification/feat-GEN-108-mcp-bisalta-db-v19-parte-1.md`.
+  - `AC28`: `SDD/tests/test_servidor_mcp.sh::"AC28 el comando abre la sesión en solo lectura"` y `::"AC28 PGOPTIONS no lleva statement_timeout (el límite lo fija el rol, AC49)"` — `pass`, con triple de mutación verde→rojo→verde.
+  - `AC49`: `manual-only` — código (`postgres-parte-a.sql`) y runbook (`RUNBOOK.md`, sección "AC49") listos; verificación contra el motor real diferida al planner (regla innegociable: ninguna conexión a ninguna base) — `manual`.
+  - `AC50`: `manual-only` — código (`postgres-parte-b.sql`) y runbook (`RUNBOOK.md`, sección "AC50", incluido el `REVOKE CONNECT` sobre `postgres` como paso explícito) listos; verificación contra el motor real diferida al planner — `manual`.
+- **Gates corridos**: `bash plugins/sdd-flow/scripts/sdd-run-gates.sh --full -o SDD/verification/feat-GEN-108-mcp-bisalta-db-v19-parte-1-gates.md` → exit 0, `{"green":4,"red":0,"skipped":7}`. Detalle y comandos por gate en ese reporte generado; addendum de mutación e impact set en `SDD/verification/feat-GEN-108-mcp-bisalta-db-v19-parte-1.md`.
+- **Rojos preexistentes**: ninguno — la suite (`bash SDD/tests/run.sh`) corrió `17 passed, 0 failed (17 total)` tanto en la base de partida (commit `ba4ff79`) como después de este trabajo (commit `b5e9239`), medido explícitamente con un checkout temporal a `ba4ff79` y vuelta a la branch.
+- **Files changed**: `plugins/bisalta-db/scripts/conexion.js`, `SDD/tests/test_servidor_mcp.sh`, `plugins/bisalta-db/aprovisionamiento/postgres-parte-a.sql`, `plugins/bisalta-db/aprovisionamiento/postgres-parte-b.sql`, `plugins/bisalta-db/aprovisionamiento/RUNBOOK.md`, `plugins/bisalta-db/README.md`, `SDD/verification/feat-GEN-108-mcp-bisalta-db-v19-parte-1.md` (nuevo), `SDD/verification/feat-GEN-108-mcp-bisalta-db-v19-parte-1-gates.md` (nuevo, generado por el runner), este brief.
+- **Fuera de alcance, no tocado**: `plugins/bisalta-db/scripts/lista-blanca.js`, `SDD/tests/test_lista_blanca.sh`, el contract, `SDD/retro.md`, `SDD/debt.md`, `SDD/escalations.md`, `SDD/FEATURE-READY-GEN-108.md`, `CHANGELOG.md`.
+- **Docs delta**: no aplica — el cambio no tocó capas/rutas/contratos del Architectural Delta ni agregó comandos de verificación nuevos; `doc_quality_gates.md` y `doc_architecture.md` quedan sin cambios.
+- **Contabilidad**: sin `MINOR` encontrados por este agente ni `N/A` nuevos que registrar en `SDD/debt.md`; sin dependencias nuevas; sin decisión arquitectónica nueva que requiera ADR.
