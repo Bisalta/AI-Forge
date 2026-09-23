@@ -36,11 +36,21 @@ Vos no podés leer Slack: estas cifras vienen del planner, y en el report se cit
 
 ## Pasos
 
-- [ ] **T1** Leer el contract v17 y `quality-gates.md` §5 y §6.
-- [ ] **T2** Los cambios de la tabla de arriba.
-- [ ] **T3** Barrido por concepto: `grep -rn -i "sin confirmar\|MachineName"` en `plugins/bisalta-db/` y revisar cada aparición contra v17. Ninguna aparición puede seguir diciendo que el valor falta medirse.
-- [ ] **T4** Suite y secret-scan en verde. Commit (`[FIX] [GEN-108] [bisalta-db] …`, cerrando con `Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`). Árbol limpio.
-- [ ] **T5** Evidencia: `bash plugins/sdd-flow/scripts/sdd-run-gates.sh -o SDD/verification/feat-GEN-108-mcp-bisalta-db-R1-v17.md --full` sobre el árbol limpio, y un addendum con: el diff de los `.sql` y del runbook, el resultado del barrido de T3, lo que encontraste en el inverso, y las cifras de Patrick de arriba **citadas como reportadas por él**. La verificación de `AC48` desde el plugin la agrega el planner. Commit y push.
+- [x] **T1** Leer el contract v17 y `quality-gates.md` §5 y §6.
+- [x] **T2** Los cambios de la tabla de arriba.
+- [x] **T3** Barrido por concepto: `grep -rn -i "sin confirmar\|MachineName"` en `plugins/bisalta-db/` y revisar cada aparición contra v17. Ninguna aparición puede seguir diciendo que el valor falta medirse. Resultado: cero apariciones de "sin confirmar"; las 7 apariciones restantes de `MachineName` describen el valor ya medido.
+- [x] **T4** Suite y secret-scan en verde. Commit `6371ac9` (`[FIX] [GEN-108] [bisalta-db] R1 v17 — AC44 medido y AC48, DENY VIEW ANY DATABASE`). Árbol limpio.
+- [x] **T5** Evidencia: `sdd-run-gates.sh --full` corrido sobre el commit `6371ac9` (árbol limpio) → `SDD/verification/feat-GEN-108-mcp-bisalta-db-R1-v17.md` (4 verde, 0 rojo, 7 skipped, suite 17/17). Addendum agregado con diffs, barrido T3, análisis del inverso y cifras de Patrick citadas como reportadas por él. Commit `a5afe40` y push a `origin/feat-GEN-108-mcp-bisalta-db` (`3526572..a5afe40`).
+
+## Execution Report
+
+- **Tasks**: 5 total, 5 completadas, 0 blocked, 0 skipped.
+- **Archivos tocados**: `plugins/bisalta-db/aprovisionamiento/sqlserver-parte-a.sql`, `plugins/bisalta-db/aprovisionamiento/sqlserver-parte-b.sql`, `plugins/bisalta-db/aprovisionamiento/sqlserver-inverso.sql` (sólo comentario, sin cambio de código — el `DROP LOGIN` se alcanza en todo camino), `plugins/bisalta-db/aprovisionamiento/RUNBOOK.md`, `plugins/bisalta-db/catalogo.json`, `plugins/bisalta-db/README.md`, `SDD/verification/feat-GEN-108-mcp-bisalta-db-R1-v17.md` (nuevo).
+- **AC ↔ verificación**: `AC44` (precondición cerrada — "sin confirmar" → "medido", valor coincide) y `AC48` (nuevo — `DENY VIEW ANY DATABASE` en el script, sección de verificación `manual-only` nueva en RUNBOOK.md). Ambos son `manual-only` (misma razón que `AC5`: requieren la instancia de Dev SQL); la verificación real contra el plugin instalado la agrega el planner, según el brief.
+- **Gates**: `bash plugins/sdd-flow/scripts/sdd-run-gates.sh -o SDD/verification/feat-GEN-108-mcp-bisalta-db-R1-v17.md --full` → exit 0 (4 verde: lint, unit tests, security, suite completa; 7 skipped por N/A del propio doc de gates; 0 rojo). Ver reporte completo + addendum en el archivo referenciado.
+- **Rojos preexistentes**: ninguno.
+- **Commits**: `6371ac9` (código) y `a5afe40` (evidencia), ambos pusheados a `feat-GEN-108-mcp-bisalta-db`. Nota de contexto: entre el inicio de esta tarea y el primer commit, otro agente pusheó `3526572` sobre la misma branch (archivos fuera de mi scope: `SDD/FEATURE-READY-GEN-108.md` y `SDD/verification/feat-GEN-108-mcp-bisalta-db-v16.md`) — quedó como ancestro de mis dos commits, sin conflicto ni superposición de archivos.
+- **Reglas innegociables**: ninguna conexión a ninguna base (cumplida); cero dependencias nuevas; ninguna mitigación prohibida; las cifras de Patrick citadas como reportadas por él, nunca medidas por este agente; nada ambiguo encontrado en el contract v17 para este alcance.
 
 ## Reglas innegociables
 
