@@ -136,10 +136,70 @@ assert_eq "$([ "$ec" -ne 0 ] && echo distinto-de-cero || echo cero)" "distinto-d
   "AC14 el validador rechaza una entrada con garantias vacío"
 assert_contains "$salida" "garantias" "AC14 el rechazo nombra el campo garantias"
 
-ruta="$(fixture garantia-desconocida.json "c[0].garantias=['rol-solo-lectura','inventada']")"
+ruta="$(fixture garantia-desconocida.json "c[0].garantias=[{nombre:'inventada',nivel:'incondicional'}]")"
 node "$VALIDADOR" "$ruta" >/dev/null 2>&1
 assert_eq "$([ $? -ne 0 ] && echo distinto-de-cero || echo cero)" "distinto-de-cero" \
   "AC14 el validador rechaza una garantía que no está en la lista cerrada"
+
+# ---------------------------------------------------------------------------
+# AC45 — el nivel de cada garantía (contract v15)
+#
+# Declarar las tres garantías de Postgres al mismo nivel era una afirmación que
+# no se sostiene: medido el 22-sep-2026, el rol apaga `sesion-read-only` con un
+# SET y en PG 14 el esquema `public` traía CREATE para PUBLIC. La única
+# incondicional es el endpoint de réplica. Estos asserts son las barreras que
+# impiden volver a la afirmación plana.
+# ---------------------------------------------------------------------------
+ruta="$(fixture garantia-cadena.json "c[0].garantias=['rol-solo-lectura']")"
+salida="$(node "$VALIDADOR" "$ruta" 2>&1)"; ec=$?
+assert_eq "$([ "$ec" -ne 0 ] && echo distinto-de-cero || echo cero)" "distinto-de-cero" \
+  "AC45 el validador rechaza una garantía declarada como cadena suelta"
+assert_contains "$salida" "nivel" "AC45 el rechazo de la cadena suelta nombra el nivel que falta"
+
+ruta="$(fixture nivel-invalido.json "c[0].garantias=[{nombre:'rol-solo-lectura',nivel:'mas-o-menos'}]")"
+node "$VALIDADOR" "$ruta" >/dev/null 2>&1
+assert_eq "$([ $? -ne 0 ] && echo distinto-de-cero || echo cero)" "distinto-de-cero" \
+  "AC45 el validador rechaza un nivel fuera del enum cerrado"
+
+ruta="$(fixture condicional-sin-condicion.json "c[0].garantias=[{nombre:'rol-solo-lectura',nivel:'condicional'}]")"
+salida="$(node "$VALIDADOR" "$ruta" 2>&1)"; ec=$?
+assert_eq "$([ "$ec" -ne 0 ] && echo distinto-de-cero || echo cero)" "distinto-de-cero" \
+  "AC45 una garantía condicional sin declarar de qué depende se rechaza"
+assert_contains "$salida" "condicion" "AC45 el rechazo nombra la condicion ausente"
+
+ruta="$(fixture incondicional-con-condicion.json "c[0].garantias=[{nombre:'endpoint-replica-lectura',nivel:'incondicional',condicion:'algo'}]")"
+node "$VALIDADOR" "$ruta" >/dev/null 2>&1
+assert_eq "$([ $? -ne 0 ] && echo distinto-de-cero || echo cero)" "distinto-de-cero" \
+  "AC45 una garantía incondicional que declara una condicion se contradice y se rechaza"
+
+ruta="$(fixture garantia-campo-extra.json "c[0].garantias=[{nombre:'rol-solo-lectura',nivel:'condicional',condicion:'x',comentario:'y'}]")"
+node "$VALIDADOR" "$ruta" >/dev/null 2>&1
+assert_eq "$([ $? -ne 0 ] && echo distinto-de-cero || echo cero)" "distinto-de-cero" \
+  "AC45 el validador rechaza un campo desconocido dentro de una garantía"
+
+# El catálogo que se distribuye declara exactamente UNA incondicional por cada
+# entrada de Postgres, y es el endpoint de réplica. Derivado del catálogo real,
+# no de una cifra copiada.
+incondicionales="$(node -e "
+  const c=require('$CATALOGO_REAL'); const l=Array.isArray(c)?c:c.conexiones;
+  const pg=l.filter(e=>e.dialecto==='postgres');
+  const malas=pg.filter(e=>{
+    const inc=e.garantias.filter(g=>g.nivel==='incondicional');
+    return inc.length!==1 || inc[0].nombre!=='endpoint-replica-lectura';
+  });
+  process.stdout.write(malas.length===0?'ok':'mal:'+malas.map(e=>e.nombre).join(','));
+")"
+assert_eq "$incondicionales" "ok" \
+  "AC45 cada conexión Postgres declara el endpoint de réplica como su única garantía incondicional"
+
+sqlserver_condicionales="$(node -e "
+  const c=require('$CATALOGO_REAL'); const l=Array.isArray(c)?c:c.conexiones;
+  const sq=l.filter(e=>e.dialecto==='sqlserver');
+  const malas=sq.filter(e=>e.garantias.some(g=>g.nivel==='incondicional'));
+  process.stdout.write(malas.length===0?'ok':'mal:'+malas.map(e=>e.nombre).join(','));
+")"
+assert_eq "$sqlserver_condicionales" "ok" \
+  "AC45 ninguna conexión SQL Server declara una garantía incondicional"
 
 # ---------------------------------------------------------------------------
 # Resto del contrato de datos

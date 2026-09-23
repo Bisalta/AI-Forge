@@ -37,6 +37,17 @@ const AMBIENTES = ['dev', 'qa'];
 // parte del scope reabierto de R1").
 const GARANTIAS = ['rol-solo-lectura', 'sesion-read-only', 'endpoint-replica-lectura', 'deny-escritura'];
 
+// Nivel de cada garantía (contract v15). Las tres garantías de Postgres no son
+// igual de fuertes y declararlas al mismo nivel era una afirmación que no se
+// sostiene: medido el 22-sep-2026, el rol puede apagar `sesion-read-only` con
+// un SET, y en PG 14 el esquema `public` traía CREATE concedido a PUBLIC. La
+// única incondicional es el endpoint `cluster-ro-`: ahí la escritura la
+// rechaza el motor y no hay SET que lo apague.
+//   incondicional -> nada que el consumidor pueda hacer la levanta.
+//   condicional   -> se sostiene mientras se cumpla `condicion`.
+const NIVELES = ['incondicional', 'condicional'];
+const CAMPOS_GARANTIA = ['nombre', 'nivel', 'condicion'];
+
 // Cluster y host de la cuenta AWS de PRODUCCIÓN (contract v3, "Out of
 // scope"). Ninguna entrada puede apuntar ahí.
 const HOSTS_PROHIBIDOS = ['cluster-cr4rbgr7qlr6', '192.168.252.22'];
@@ -133,8 +144,34 @@ function validarEntradas(entradas) {
       problemas.push(etiqueta + ': `garantias` tiene que ser un arreglo de al menos un elemento');
     } else {
       for (let g = 0; g < entrada.garantias.length; g += 1) {
-        if (GARANTIAS.indexOf(entrada.garantias[g]) === -1) {
-          problemas.push(etiqueta + ': garantía desconocida: ' + entrada.garantias[g]);
+        const garantia = entrada.garantias[g];
+        const donde = etiqueta + ': garantias[' + g + ']';
+        if (garantia === null || typeof garantia !== 'object' || Array.isArray(garantia)) {
+          problemas.push(donde + ': tiene que ser un objeto con `nombre` y `nivel`');
+          continue;
+        }
+        const claves = Object.keys(garantia);
+        for (let k = 0; k < claves.length; k += 1) {
+          if (CAMPOS_GARANTIA.indexOf(claves[k]) === -1) {
+            problemas.push(donde + ': campo desconocido: ' + claves[k]);
+          }
+        }
+        if (GARANTIAS.indexOf(garantia.nombre) === -1) {
+          problemas.push(donde + ': garantía desconocida: ' + garantia.nombre);
+        }
+        if (NIVELES.indexOf(garantia.nivel) === -1) {
+          problemas.push(donde + ': `nivel` tiene que ser uno de ' + NIVELES.join(', '));
+          continue;
+        }
+        // Una garantía condicional SIN decir de qué depende vuelve a ser la
+        // afirmación plana que este cambio vino a eliminar: el catálogo no
+        // puede declarar una condición que no nombra.
+        if (garantia.nivel === 'condicional' && !esCadenaNoVacia(garantia.condicion)) {
+          problemas.push(donde + ': una garantía `condicional` tiene que declarar `condicion`');
+        }
+        // Y una incondicional con `condicion` se estaría contradiciendo.
+        if (garantia.nivel === 'incondicional' && garantia.condicion !== undefined) {
+          problemas.push(donde + ': una garantía `incondicional` no lleva `condicion`');
         }
       }
     }

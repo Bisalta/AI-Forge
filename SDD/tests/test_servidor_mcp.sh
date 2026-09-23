@@ -90,6 +90,7 @@ cat > "$BIN_DIR/psql" <<'STUB'
 {
   printf 'ARGS %s\n' "$*"
   printf 'PGOPTIONS %s\n' "${PGOPTIONS:-(vacio)}"
+  printf 'PGAPPNAME %s\n' "${PGAPPNAME:-(vacio)}"
   if [ -n "${PGPASSFILE:-}" ] && [ -f "$PGPASSFILE" ]; then
     printf 'PASSFILE_EXISTE si\n'
     printf 'PASSFILE_MODO %s\n' "$(ls -l "$PGPASSFILE" | cut -c1-10)"
@@ -209,6 +210,11 @@ salida="$(servidor_jsonrpc '{"jsonrpc":"2.0","id":1,"method":"tools/call","param
 cuerpo="$(cuerpos "$salida")"
 assert_contains "$cuerpo" '"nombre":"proveedores-dev"' "AC35 listar_conexiones devuelve el nombre de la conexión"
 assert_contains "$cuerpo" '"garantias"' "AC35 listar_conexiones devuelve las garantías"
+# El nivel viaja con la garantía en la proyección pública: si se quedara sólo en
+# el catálogo, quien llama a listar_conexiones volvería a ver tres garantías
+# planas — que es justo lo que v15 vino a corregir.
+assert_contains "$cuerpo" '"nivel"' "AC45 listar_conexiones propaga el nivel de cada garantía"
+assert_contains "$cuerpo" '"incondicional"' "AC45 listar_conexiones distingue la garantía incondicional"
 assert_contains "$cuerpo" '"ambiente":"dev"' "AC35 listar_conexiones devuelve el ambiente"
 for campo in '"host"' '"puerto"' '"secret_id"' '"region"'; do
   case "$cuerpo" in
@@ -285,7 +291,14 @@ assert_contains "$(cat "$TMP_DIR/psql-invocado.log")" "PASSFILE_MODO -rw-------"
 opciones="$(grep '^PGOPTIONS ' "$TMP_DIR/psql-invocado.log")"
 assert_contains "$opciones" "default_transaction_read_only=on" "AC28 el comando abre la sesión en solo lectura"
 assert_contains "$opciones" "statement_timeout=120000" "AC28 el comando fija el statement_timeout en 120000"
-assert_contains "$opciones" "application_name=$USUARIO_ESPERADO" "AC29 el comando lleva el application_name del usuario del secreto"
+# AC29 viaja por PGAPPNAME. `-c application_name` dentro de PGOPTIONS NO sirve:
+# psql fija el suyo en la conexión y le gana, así que `pg_stat_activity` termina
+# mostrando `psql`. Medido contra el motor real el 22-sep-2026 (contract v15).
+# El segundo assert es el que impide la regresión: prohíbe la forma que se ve
+# bien y no funciona.
+appname="$(grep '^PGAPPNAME ' "$TMP_DIR/psql-invocado.log")"
+assert_contains "$appname" "PGAPPNAME $USUARIO_ESPERADO" "AC29 el comando lleva el usuario del secreto en PGAPPNAME"
+assert_no_contains "$opciones" "application_name" "AC29 PGOPTIONS no lleva application_name (psql le gana al -c)"
 
 # ---------------------------------------------------------------------------
 # AC30 — la bitácora

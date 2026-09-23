@@ -9,9 +9,20 @@
     "secret_id": "dev/bd/claude-lectura-postgres",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura",
-      "sesion-read-only",
-      "endpoint-replica-lectura"
+      {
+        "nombre": "endpoint-replica-lectura",
+        "nivel": "incondicional"
+      },
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "pg_read_all_data no otorga escritura, pero un GRANT futuro sí puede. En PG 14 el esquema public traía CREATE concedido a PUBLIC — el rol podía crear tablas propias; revocado por Patrick Ocampo el 22-sep-2026."
+      },
+      {
+        "nombre": "sesion-read-only",
+        "nivel": "condicional",
+        "condicion": "el rol puede apagarla con un SET: es un valor por omisión de la sesión, no un candado. Medido el 22-sep-2026."
+      }
     ]
   },
   {
@@ -24,9 +35,20 @@
     "secret_id": "dev/bd/claude-lectura-postgres",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura",
-      "sesion-read-only",
-      "endpoint-replica-lectura"
+      {
+        "nombre": "endpoint-replica-lectura",
+        "nivel": "incondicional"
+      },
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "pg_read_all_data no otorga escritura, pero un GRANT futuro sí puede. En PG 14 el esquema public traía CREATE concedido a PUBLIC — el rol podía crear tablas propias; revocado por Patrick Ocampo el 22-sep-2026."
+      },
+      {
+        "nombre": "sesion-read-only",
+        "nivel": "condicional",
+        "condicion": "el rol puede apagarla con un SET: es un valor por omisión de la sesión, no un candado. Medido el 22-sep-2026."
+      }
     ]
   },
   {
@@ -39,9 +61,20 @@
     "secret_id": "dev/bd/claude-lectura-postgres",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura",
-      "sesion-read-only",
-      "endpoint-replica-lectura"
+      {
+        "nombre": "endpoint-replica-lectura",
+        "nivel": "incondicional"
+      },
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "pg_read_all_data no otorga escritura, pero un GRANT futuro sí puede. En PG 14 el esquema public traía CREATE concedido a PUBLIC — el rol podía crear tablas propias; revocado por Patrick Ocampo el 22-sep-2026."
+      },
+      {
+        "nombre": "sesion-read-only",
+        "nivel": "condicional",
+        "condicion": "el rol puede apagarla con un SET: es un valor por omisión de la sesión, no un candado. Medido el 22-sep-2026."
+      }
     ]
   },
   {
@@ -54,9 +87,20 @@
     "secret_id": "dev/bd/claude-lectura-postgres",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura",
-      "sesion-read-only",
-      "endpoint-replica-lectura"
+      {
+        "nombre": "endpoint-replica-lectura",
+        "nivel": "incondicional"
+      },
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "pg_read_all_data no otorga escritura, pero un GRANT futuro sí puede. En PG 14 el esquema public traía CREATE concedido a PUBLIC — el rol podía crear tablas propias; revocado por Patrick Ocampo el 22-sep-2026."
+      },
+      {
+        "nombre": "sesion-read-only",
+        "nivel": "condicional",
+        "condicion": "el rol puede apagarla con un SET: es un valor por omisión de la sesión, no un candado. Medido el 22-sep-2026."
+      }
     ]
   },
   {
@@ -69,9 +113,20 @@
     "secret_id": "dev/bd/claude-lectura-postgres",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura",
-      "sesion-read-only",
-      "endpoint-replica-lectura"
+      {
+        "nombre": "endpoint-replica-lectura",
+        "nivel": "incondicional"
+      },
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "pg_read_all_data no otorga escritura, pero un GRANT futuro sí puede. En PG 14 el esquema public traía CREATE concedido a PUBLIC — el rol podía crear tablas propias; revocado por Patrick Ocampo el 22-sep-2026."
+      },
+      {
+        "nombre": "sesion-read-only",
+        "nivel": "condicional",
+        "condicion": "el rol puede apagarla con un SET: es un valor por omisión de la sesión, no un candado. Medido el 22-sep-2026."
+      }
     ]
   },
   {
@@ -84,9 +139,20 @@
     "secret_id": "dev/bd/claude-lectura-postgres",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura",
-      "sesion-read-only",
-      "endpoint-replica-lectura"
+      {
+        "nombre": "endpoint-replica-lectura",
+        "nivel": "incondicional"
+      },
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "pg_read_all_data no otorga escritura, pero un GRANT futuro sí puede. En PG 14 el esquema public traía CREATE concedido a PUBLIC — el rol podía crear tablas propias; revocado por Patrick Ocampo el 22-sep-2026."
+      },
+      {
+        "nombre": "sesion-read-only",
+        "nivel": "condicional",
+        "condicion": "el rol puede apagarla con un SET: es un valor por omisión de la sesión, no un candado. Medido el 22-sep-2026."
+      }
     ]
   },
   {
@@ -99,7 +165,11 @@
     "secret_id": "dev/bd/claude-lectura-sqlserver",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura"
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48)."
+      }
     ]
   },
   {
@@ -112,7 +182,11 @@
     "secret_id": "dev/bd/claude-lectura-sqlserver",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura"
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48)."
+      }
     ]
   },
   {
@@ -125,7 +199,11 @@
     "secret_id": "dev/bd/claude-lectura-sqlserver",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura"
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48)."
+      }
     ]
   },
   {
@@ -138,7 +216,11 @@
     "secret_id": "dev/bd/claude-lectura-sqlserver",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura"
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48)."
+      }
     ]
   },
   {
@@ -151,7 +233,11 @@
     "secret_id": "dev/bd/claude-lectura-sqlserver",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura"
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48)."
+      }
     ]
   },
   {
@@ -164,7 +250,11 @@
     "secret_id": "dev/bd/claude-lectura-sqlserver",
     "region": "us-east-1",
     "garantias": [
-      "rol-solo-lectura"
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48)."
+      }
     ]
   }
 ]

@@ -133,14 +133,31 @@ la barrera es el texto.
 
 | | Postgres (`dev`/`qa`) | SQL Server (`Dev SQL`) |
 |---|---|---|
-| Rol de solo lectura | sí | sí — **y es la única barrera**, literalmente, desde v10 |
-| Sesión abierta en solo lectura | sí, `default_transaction_read_only=on` | **no existe equivalente** |
+| Rol de solo lectura | sí — **condicional** (v15): `pg_read_all_data` no escribe, pero un `GRANT` futuro sí puede; en PG 14 `public` traía `CREATE` para `PUBLIC` y el rol creaba tablas propias hasta que se revocó el 22-sep-2026 | sí — **y es la única barrera**, literalmente, desde v10. **Condicional**: se sostiene mientras nadie conceda escritura |
+| Sesión abierta en solo lectura | sí, `default_transaction_read_only=on` — **condicional** (v15): es un valor por omisión de la sesión y el rol lo apaga con un `SET`, medido el 22-sep-2026 | **no existe equivalente** |
 | `DENY` de escritura sobre el rol | no aplica | **no** — `db_denydatawriter` se quitó en v10 por decisión de Patrick Ocampo. Sin él no queda un `DENY` explícito, así que un `GRANT` de escritura concedido por error no tendría nada que lo anule |
-| Motor que rechaza escrituras | sí (endpoint `cluster-ro-`) | **no hay réplica** |
+| Motor que rechaza escrituras | sí (endpoint `cluster-ro-`) — **la única incondicional** (v15): la escritura la rechaza el motor y no hay `SET` que lo apague | **no hay réplica** |
 | Alcance del permiso | `pg_read_all_data`, de cluster — alcanza las 29 bases del cluster de dev/qa desde que el rol existe, no sólo las del catálogo | `db_datareader`, **por base**: una base nueva no queda cubierta sola |
 
 Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que
 evita que alguien asuma que todas las conexiones son igual de seguras.
+
+**Y las garantías tampoco son iguales entre sí** (contract v15). Cada una
+declara su `nivel`, y `listar_conexiones` lo devuelve:
+
+| Nivel | Qué significa | Cuáles |
+|---|---|---|
+| `incondicional` | nada que el consumidor pueda hacer la levanta | `endpoint-replica-lectura` — el motor rechaza la escritura contra una réplica; no hay `SET` que lo apague |
+| `condicional` | se sostiene mientras se cumpla la `condicion` que la propia entrada declara | `rol-solo-lectura` y `sesion-read-only` |
+
+No es una distinción teórica: el 22-sep-2026 Patrick Ocampo midió el peor caso
+y `sesion-read-only` **se apaga con un `SET`** —es un valor por omisión de la
+sesión, no un candado— y en PG 14 el esquema `public` traía `CREATE` concedido
+a `PUBLIC`, o sea a todo rol que exista, así que por el endpoint de escritura el
+rol creaba tablas propias. Ninguna tabla existente quedó expuesta, y el hueco se
+cerró el mismo día; lo que no se puede seguir sosteniendo es que las tres
+garantías aguanten lo mismo. En SQL Server la única que hay es `condicional`,
+que es exactamente la asimetría que la tabla de arriba describe.
 Las conexiones de `Dev SQL` son además **copias de producción** (`EXACTUS` 395 GB, `BI`
 177 GB, `COMPRAS` 107 GB): los tamaños no son de desarrollo.
 
@@ -160,7 +177,7 @@ si algo no cierra.
 | `base` | cadena no vacía |
 | `secret_id` | identificador o ARN del secreto |
 | `region` | cadena no vacía |
-| `garantias` | al menos un elemento de `rol-solo-lectura`, `sesion-read-only`, `endpoint-replica-lectura`, `deny-escritura` |
+| `garantias` | al menos un **objeto** `{nombre, nivel}`, más `condicion` cuando el nivel es `condicional`. `nombre` ∈ `rol-solo-lectura`, `sesion-read-only`, `endpoint-replica-lectura`, `deny-escritura`; `nivel` ∈ `incondicional`, `condicional` |
 
 **No existe campo de usuario ni de contraseña.** Los dos salen del secreto, en
 la forma estándar de RDS: un campo `username` y otro con la contraseña, en la

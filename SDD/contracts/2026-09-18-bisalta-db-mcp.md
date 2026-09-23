@@ -1,6 +1,26 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v14
+- **Versión**: v15
+
+### Cambios v14 → v15 (primera corrida contra el motor real, 22-sep-2026)
+
+Patrick Ocampo corrió la Parte A y las seis bases del catálogo quedaron legibles. Con eso el plugin consultó por primera vez contra la base de verdad, y la corrida en vivo encontró dos cosas que ningún test del harness podía ver. Ciclo corto de fixes sobre la misma branch, decidido por Ian Vargas.
+
+**1. `AC29` estaba verde en los tests y rojo en la realidad.** `current_setting('application_name')` devolvía `psql`, no el usuario del secreto. Medido una al lado de la otra, con el mismo rol contra la misma base:
+
+| Mecanismo | `application_name` resultante |
+|---|---|
+| `-c application_name=…` dentro de `PGOPTIONS` — lo que el código hacía | `psql` |
+| variable `PGAPPNAME` | el usuario del secreto |
+| parámetro `application_name` en el conninfo | el usuario del secreto |
+
+psql fija su propio `application_name` al conectar y le gana al `-c`. El test del harness sustituye `psql` por un stub y verificaba **cómo se armaba el comando**, no **qué efecto tenía**: el comando era el que el AC describía, y el efecto no. Sobrevivió a 17 triples de mutación y a un reviewer adversarial porque ninguno de los dos tenía un motor enfrente. La propiedad de `AC29` **no cambia**; cambia el mecanismo y cambia la verificación, que ahora prohíbe explícitamente la forma que se ve bien y no funciona.
+
+**2. Las garantías de Postgres no son igual de fuertes, y el catálogo las declaraba al mismo nivel.** Patrick midió el peor caso: el rol apaga `default_transaction_read_only` con un `SET` —es un valor por omisión de la sesión, no un candado— y, por el endpoint de escritura, **creaba tablas propias en `public`**, porque en PG 14 ese esquema trae `CREATE` concedido a `PUBLIC`. Ninguna tabla existente quedó expuesta —lo comprobó sobre los 431 objetos de las seis bases— y cerró el hueco ese mismo día, en el mismo orden que se usó con `CONNECT`: primero el `GRANT CREATE ON SCHEMA public` explícito a quien ya lo usaba, recién después el `REVOKE` de `PUBLIC`. Su pedido, textual en sustancia: **que el catálogo no declare las tres garantías al mismo nivel**. La única incondicional es el endpoint `cluster-ro-`, donde el motor rechaza la escritura y no hay `SET` que lo apague. Nace `AC45`.
+
+**3. Una cita a una versión que no existía.** La corrección del punto 3 de "Cambios v10 → v11" afirmaba que el header y los puntos 1 y 5 del brief "se corrigieron recién en v15". No hubo v15 hasta ésta: esa corrección la hizo el commit `2529071` sobre el contract v14, sin bumpear la versión. Reescrita para nombrar el commit.
+
+**Derivados de lo que midió Patrick, registrados y sin AC propio:** `claude_lectura` ve **0 filas en `cron.job`** — la RLS de pg_cron aguanta contra `pg_read_all_data` porque el rol es `NOBYPASSRLS`, así que ningún comando de cron queda a la vista. La base `postgres` sigue fuera del alcance: `cron.job_run_details` tiene `DELETE` concedido a `PUBLIC` por diseño de pg_cron, y además se le revocó el `CONNECT` explícito que le había quedado. Y la deuda de propiedad de `D42` creció: el `CREATE` explícito sobre `public` en `proveedores_dev` y `proveedores_qa` quedó nombrado a `ian.vargas`, dueño de esas bases, así que el día que la propiedad pase a un rol de servicio hay que mover **dos** cosas, no una.
 
 ### Cambios v13 → v14 (enmienda del planner, 22-sep-2026)
 
@@ -45,7 +65,7 @@ Tres defectos **del contract**, señalados como `ADVISORY` por el reviewer en la
 
 **2. Dos líneas de la sección "Cambios v8 → v9" leen como vigentes** — *"cada base concedida lleva las dos membresías"* — cuando v10 las derogó. Están dentro de un changelog de versión, así que describen lo que era cierto entonces; pero sin marca, alguien que las lea de paso concluye lo contrario de lo que el contract manda hoy. Quedan marcadas.
 
-**3. El brief de R1 seguía fijado en el contract v6** y describía `db_denydatawriter` como vigente en sus puntos 3 y 6. Corregidos **esos dos puntos**; el header y los puntos 1 y 5 quedaron sin tocar y se corrigieron recién en v15 — la afirmación de esta línea era más amplia de lo que el cambio hizo.
+**3. El brief de R1 seguía fijado en el contract v6** y describía `db_denydatawriter` como vigente en sus puntos 3 y 6. Corregidos **esos dos puntos**; el header y los puntos 1 y 5 quedaron sin tocar y se corrigieron recién en el commit `2529071`, sobre este mismo contract v14 y sin bumpear la versión — la afirmación de esta línea era más amplia de lo que el cambio hizo. (Hasta v15 esta línea decía "recién en v15", una versión que en ese momento no existía.)
 
 Y un defecto de `CHANGELOG.md` que el reviewer clasificó como del agente pero es **prosa del planner**: la entrada `0.1.0` de `bisalta-db` presentaba `db_denydatawriter` como garantía vigente —*"el rol deja de ser la única barrera de ese motor"*—, el inverso exacto de lo que v10 decide. Corregido acá, no en el brief del agente.
 
@@ -323,7 +343,7 @@ Arreglo de objetos. El validador **rechaza cualquier campo no listado acá** y c
 | `base` | requerido | cadena no vacía | el catálogo entero se rechaza |
 | `secret_id` | requerido | identificador o ARN del secreto | el catálogo entero se rechaza |
 | `region` | requerido | cadena no vacía | el catálogo entero se rechaza |
-| `garantias` | requerido | arreglo de al menos un elemento, cada uno exactamente `rol-solo-lectura`, `sesion-read-only`, `endpoint-replica-lectura` o `deny-escritura` (v4) | el catálogo entero se rechaza |
+| `garantias` | requerido | arreglo de al menos un objeto. Cada objeto lleva `nombre` —exactamente `rol-solo-lectura`, `sesion-read-only`, `endpoint-replica-lectura` o `deny-escritura` (v4)— y `nivel` —exactamente `incondicional` o `condicional` (v15)—. Un objeto con `nivel` = `condicional` lleva además `condicion`, cadena no vacía; uno `incondicional` no la lleva. Ningún otro campo | el catálogo entero se rechaza |
 
 **No existe un campo de usuario ni de contraseña.** Los dos salen del secreto, que tiene la forma estándar de RDS: un campo llamado `username` y otro llamado `password`, ambos en la carga JSON del secreto.
 
@@ -367,10 +387,10 @@ Arreglo con `nombre`, `dialecto`, `ambiente`, `base` y `garantias` de cada entra
 
 | | Postgres (`dev`/`qa`) | SQL Server (`Dev SQL`) |
 |---|---|---|
-| Rol de solo lectura | sí | sí — **y es la única barrera**, literalmente, desde v10 |
-| Sesión abierta en solo lectura | sí, `default_transaction_read_only=on` | **no existe equivalente** |
+| Rol de solo lectura | sí — **condicional** (v15): `pg_read_all_data` no escribe, pero un `GRANT` futuro sí puede; en PG 14 `public` traía `CREATE` para `PUBLIC` y el rol creaba tablas propias hasta que se revocó el 22-sep-2026 | sí — **y es la única barrera**, literalmente, desde v10. **Condicional**: se sostiene mientras nadie conceda escritura |
+| Sesión abierta en solo lectura | sí, `default_transaction_read_only=on` — **condicional** (v15): es un valor por omisión de la sesión y el rol lo apaga con un `SET`, medido el 22-sep-2026 | **no existe equivalente** |
 | `DENY` de escritura sobre el rol | no aplica | **no** — `db_denydatawriter` se quitó en v10 por decisión de Patrick Ocampo. Sin él no hay `DENY` explícito, así que un `GRANT` de escritura concedido por error no tendría nada que lo anule |
-| Motor que rechaza escrituras | sí, endpoint `cluster-ro-` de Aurora | **no hay réplica** |
+| Motor que rechaza escrituras | sí, endpoint `cluster-ro-` de Aurora — **la única incondicional** (v15): la escritura la rechaza el motor y no hay `SET` que lo apague | **no hay réplica** |
 | Alcance del permiso | `pg_read_all_data`, de cluster | `db_datareader`, **por base**: una base nueva no queda cubierta sola |
 
 Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que evita que alguien asuma que todas las conexiones son igual de seguras. **Medido el 18-sep-2026**: las 32 bases de Dev SQL están `ONLINE` y **ninguna** tiene `is_read_only`, así que del lado del motor no hay ninguna barrera — el rol y el `DENY` son todo lo que hay.
@@ -476,7 +496,7 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 
 **AC28** — El comando que el servidor construye para una conexión `postgres` incluye `default_transaction_read_only=on` y `statement_timeout=120000`.
 
-**AC29** — El comando que el servidor construye lleva un `application_name` igual al `username` del secreto, para que `pg_stat_activity` atribuya del lado del motor. (Hasta v12 la razón era distinguir `claude_lectura` de `neo_lectura`; con el rol único de v13 **ya no distingue consumidores** —`D53`, aceptado— pero la atribución al rol sigue siendo útil y el AC no cambia de propiedad.)
+**AC29** — El comando que el servidor construye lleva un `application_name` igual al `username` del secreto, para que `pg_stat_activity` atribuya del lado del motor. **Desde v15 el valor viaja en la variable `PGAPPNAME`, y `PGOPTIONS` no lleva `application_name`**: medido contra el motor real, psql le gana al `-c application_name` de `PGOPTIONS` y la sesión quedaba nombrada `psql`. **Mutaciones declaradas (v15)**: (a) quitar `PGAPPNAME` del entorno del comando pone rojo el assert positivo; (b) devolver `application_name` a `PGOPTIONS` pone rojo el assert negativo — cada una enrojece exactamente uno de los dos. (Hasta v12 la razón era distinguir `claude_lectura` de `neo_lectura`; con el rol único de v13 **ya no distingue consumidores** —`D53`, aceptado— pero la atribución al rol sigue siendo útil y el AC no cambia de propiedad.)
 
 **AC30** — La bitácora escribe una línea JSON por invocación con conexión, dialecto, hash de la consulta, filas devueltas, si truncó, duración y exit code.
 
@@ -524,6 +544,9 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 `manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
 **Precondición del planner**: el valor esperado que Patrick sacó del registro de SSM es `EC2AMAZ-2RGHL0C`, y él mismo pidió que **se confirme midiendo** — `SELECT SERVERPROPERTY('MachineName')` conectado a Dev SQL — antes de fijarlo en el script. Textual: *"si no coincide, el valor manda sobre el mío."* Hasta que se mida, el script lleva el valor de Patrick con la comprobación pendiente anotada.
 **Mutación declarada**: cambiar el nombre esperado por el de cualquier otra instancia; correr el script contra Dev SQL tiene que **abortar** sin crear el login — o sea, la comprobación de que crea el login se pone roja. Restaurar el nombre correcto.
+
+**AC45** — Cada garantía del catálogo declara su `nivel`, y `listar_conexiones` lo devuelve. El validador rechaza: una garantía escrita como cadena suelta; un `nivel` fuera de `incondicional`/`condicional`; una garantía `condicional` sin `condicion`; una `incondicional` con `condicion`; un campo desconocido dentro de la garantía. En el catálogo distribuido, **cada conexión Postgres declara exactamente una garantía incondicional y es `endpoint-replica-lectura`**, y **ninguna conexión SQL Server declara una incondicional**. Las dos últimas propiedades se derivan del catálogo real, no de una cifra.
+**Mutaciones declaradas**: (a) quitar del validador la regla "una garantía `condicional` exige `condicion`" pone rojos los dos asserts que la verifican; (b) declarar `endpoint-replica-lectura` como `condicional` en una sola entrada de Postgres pone rojo el assert derivado del catálogo.
 
 ## Checklist del arquetipo
 
