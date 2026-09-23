@@ -55,18 +55,93 @@ const PROCEDIMIENTO_SQLSERVER = /(^|[^A-Za-z0-9_])(sp_|xp_)/i;
 const ESCRITURA_EMBEBIDA = /(^|[^A-Za-z0-9_])(INSERT|UPDATE|DELETE|MERGE|INTO)([^A-Za-z0-9_]|$)/i;
 const FUNCION_PROHIBIDA_POSTGRES = /(^|[^A-Za-z0-9_])set_config([^A-Za-z0-9_]|$)/i;
 
+// Reglas propias de SQL Server (contract v19, AC52): T-SQL no exige separador
+// entre sentencias, así que una sentencia que empieza con SELECT puede seguir
+// con cualquier otra sin `;`. Es la lista de AC47 más TRUNCATE, DROP, CREATE y
+// ALTER; si una palabra se suma a ESCRITURA_EMBEBIDA, se suma también acá.
+const ESCRITURA_EMBEBIDA_SQLSERVER = /(^|[^A-Za-z0-9_])(INSERT|UPDATE|DELETE|MERGE|INTO|TRUNCATE|DROP|CREATE|ALTER)([^A-Za-z0-9_]|$)/i;
+
 /**
- * Quita comentarios de bloque, comentarios de línea y literales de texto.
- * Mismo orden que el `perl -0777` del script original: un `-- UPDATE ...` no
- * puede disparar un rechazo falso, y una palabra dentro de una cadena
- * tampoco. Los literales se reemplazan por `''` (comilla vacía) para no
- * romper la forma de la sentencia.
+ * Quita comentarios de línea, comentarios de bloque y literales de texto, en
+ * UN SOLO RECORRIDO de izquierda a derecha (contract v19, AC51).
+ *
+ * 🔴 TRES REEMPLAZOS EN SECUENCIA NO VEN LO MISMO QUE EL MOTOR. Cada pasada
+ * ignora lo que las otras ya saben: un `--` o un `/*` dentro de un literal se
+ * quitaba como comentario ANTES de reconocer el literal, y se llevaba puesto
+ * el resto de la línea —o del texto—, incluida una escritura que el motor sí
+ * ejecuta. Y un bloque anidado se cerraba en el primer `*\/`, dejando a la
+ * vista como código lo que para el motor sigue siendo comentario. El
+ * recorrido decide en cada posición qué construcción está abierta, igual que
+ * el lexer del motor:
+ *   - literal de comilla simple, con `''` como comilla escapada → `''`;
+ *   - identificador entre comillas dobles → se copia tal cual, y adentro un
+ *     `--`, un `/*` o una comilla simple no abren nada;
+ *   - comentario de línea → se quita hasta el salto de línea, que se queda;
+ *   - comentario de bloque, ANIDADO en los dos motores → un espacio.
+ * Un literal o un bloque SIN CERRAR deja el resto del texto a la vista, sin
+ * normalizar —lo mismo que hacían los reemplazos anteriores, que no
+ * encontraban el cierre—: el motor lo rechaza por sintaxis y no ejecuta nada,
+ * así que ocultarlo no le sirve a ninguna consulta legítima y dejarlo visible
+ * falla cerrado.
  */
 function normalizar(sql) {
-  return String(sql)
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/--[^\n]*/g, '')
-    .replace(/'(?:[^']|'')*'/g, "''");
+  const texto = String(sql);
+  const largo = texto.length;
+  let salida = '';
+  let i = 0;
+  while (i < largo) {
+    const c = texto.charAt(i);
+    const siguiente = texto.charAt(i + 1);
+    if (c === "'") {
+      const inicio = i;
+      let cerrado = false;
+      i += 1;
+      while (i < largo) {
+        if (texto.charAt(i) === "'") {
+          if (texto.charAt(i + 1) === "'") {
+            i += 2;
+            continue;
+          }
+          i += 1;
+          cerrado = true;
+          break;
+        }
+        i += 1;
+      }
+      salida += cerrado ? "''" : texto.slice(inicio);
+    } else if (c === '"') {
+      // `""` dentro del identificador se copia igual: cerrar y reabrir
+      // produce el mismo texto que la comilla escapada.
+      let fin = texto.indexOf('"', i + 1);
+      fin = fin === -1 ? largo : fin + 1;
+      salida += texto.slice(i, fin);
+      i = fin;
+    } else if (c === '-' && siguiente === '-') {
+      const salto = texto.indexOf('\n', i);
+      i = salto === -1 ? largo : salto;
+    } else if (c === '/' && siguiente === '*') {
+      const inicio = i;
+      let profundidad = 1;
+      i += 2;
+      while (i < largo && profundidad > 0) {
+        const par = texto.substr(i, 2);
+        if (par === '/*') {
+          profundidad += 1;
+          i += 2;
+        } else if (par === '*/') {
+          profundidad -= 1;
+          i += 2;
+        } else {
+          i += 1;
+        }
+      }
+      salida += profundidad === 0 ? ' ' : texto.slice(inicio);
+    } else {
+      salida += c;
+      i += 1;
+    }
+  }
+  return salida;
 }
 
 /**
@@ -139,8 +214,10 @@ function validarSql(sql, dialecto) {
     // 🔴 ESTOS DOS VAN AL FINAL, DESPUÉS DE TODOS LOS DEMÁS (AC47): así
     // ningún rechazo que ya existía cambia de motivo. Y miran `sentencia`,
     // que ya está normalizada — sobre el SQL crudo, `SELECT 'delete' AS x`
-    // se rechazaría por una palabra que vive dentro de un literal.
-    if (ESCRITURA_EMBEBIDA.test(sentencia)) {
+    // se rechazaría por una palabra que vive dentro de un literal. En
+    // sqlserver la lista suma las cuatro de AC52, con el mismo motivo.
+    const escritura = dialecto === 'sqlserver' ? ESCRITURA_EMBEBIDA_SQLSERVER : ESCRITURA_EMBEBIDA;
+    if (escritura.test(sentencia)) {
       return rechazo('escritura_embebida', sentencia);
     }
     if (dialecto === 'postgres' && FUNCION_PROHIBIDA_POSTGRES.test(sentencia)) {

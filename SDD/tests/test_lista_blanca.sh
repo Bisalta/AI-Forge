@@ -259,6 +259,71 @@ sqlserver|procedimiento_de_sistema|un sp_ con DELETE|SELECT * FROM sp_helpdb DEL
 CASOS
 
 # ---------------------------------------------------------------------------
+# AC51 / AC52 — los casos de la revisión adversarial de Patrick Ocampo (v19)
+# ---------------------------------------------------------------------------
+# 🔴 LOS CASOS VIVEN EN UN SOLO LUGAR Y NO SE COPIAN. El archivo de casos es
+# la revisión tal como Patrick la entregó (contract v19, "Cambios v18 → v19"
+# punto 4): se carga y se recorre, no se transcribe acá. Cada consulta viaja
+# de `require()` directo al stdin del validador —nunca por una variable de
+# bash, nunca por argv— y el assert mira SÓLO el código de salida: el JSON del
+# CLI trae los primeros 90 caracteres de la sentencia, y este output termina
+# en el reporte de gates. El nombre de cada assert cita el caso por su índice
+# en `CASOS` (base 0) y su `motivo`.
+#
+# Dos veredictos parecen errores y no lo son: el comentario de bloque anidado
+# se ACEPTA (para el motor es sólo la lectura que lo precede), y la sección
+# "límite conocido" se acepta a propósito (contract v19, "Riesgos").
+CASOS_ADVERSARIALES="$REPO_ROOT/SDD/tests/fixtures/casos-adversariales-lista-blanca.js"
+
+# Índice, dialecto, veredicto esperado (0 = aceptar, 4 = rechazar) y motivo de
+# cada caso, uno por línea y separados por tabulador. Un caso mal formado sale
+# con dialecto `invalido` para que el assert lo marque, no para saltearlo.
+listar_casos_adversariales() {
+  node -e '
+    var casos = require(process.argv[1]).CASOS;
+    for (var i = 0; i < casos.length; i += 1) {
+      var c = casos[i];
+      var bien = Array.isArray(c) && typeof c[1] === "string" && typeof c[2] === "boolean";
+      var motivo = String(c && c[3]).replace(/[\t\r\n]+/g, " ");
+      process.stdout.write(i + "\t" + (bien ? c[0] : "invalido") + "\t" + (c[2] === true ? 0 : 4) + "\t" + motivo + "\n");
+    }
+  ' "$CASOS_ADVERSARIALES"
+}
+
+# Escribe en stdout la consulta del caso <índice>, sin pasar por bash.
+consulta_adversarial() {
+  node -e 'process.stdout.write(require(process.argv[1]).CASOS[Number(process.argv[2])][1]);' \
+    "$CASOS_ADVERSARIALES" "$1"
+}
+
+# 🔴 UN RECORRIDO QUE NO RECORRE NADA ES UNA MEDICIÓN MUERTA. Si el archivo no
+# carga, o no exporta casos, el while de abajo no itera y el bloque quedaría
+# verde sin haber mirado nada. No se congela el total: el archivo es de
+# Patrick y puede crecer.
+LISTA_CASOS="$(listar_casos_adversariales 2>/dev/null)"
+assert_eq "$?" "0" "AC51/AC52 el archivo de casos adversariales carga"
+if [ -n "$LISTA_CASOS" ]; then
+  assert_eq "vacio=no" "vacio=no" "AC51/AC52 el archivo de casos adversariales trae casos"
+else
+  assert_eq "vacio=si" "vacio=no" "AC51/AC52 el archivo de casos adversariales trae casos"
+fi
+
+while IFS="$(printf '\t')" read -r indice dialecto esperado motivo; do
+  [ -z "$indice" ] && continue
+  # 🔴 LOS DOS ESTADOS DEL PIPE, NO EL DEL PIPE. Si la consulta no se pudo
+  # leer, el validador recibe stdin vacío y sale 4 (`sin_sentencias`): un caso
+  # de rechazo pasaría sin haber mirado su consulta. Con `pipefail` ese 4 es
+  # lo que devolvería `$?`, así que el productor se comprueba aparte.
+  consulta_adversarial "$indice" | node "$LISTA_BLANCA" "$dialecto" >/dev/null 2>&1
+  estados="${PIPESTATUS[0]} ${PIPESTATUS[1]}"
+  ec="${estados#* }"
+  [ "${estados%% *}" = "0" ] || ec="consulta_ilegible"
+  assert_exit "$esperado" "$ec" "AC51/AC52 caso $indice ($dialecto): $motivo"
+done <<EOF
+$LISTA_CASOS
+EOF
+
+# ---------------------------------------------------------------------------
 # Uso
 # ---------------------------------------------------------------------------
 printf '%s' 'SELECT 1' | node "$LISTA_BLANCA" >/dev/null 2>&1
