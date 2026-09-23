@@ -6,7 +6,7 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ### 0.1.0 — 2026-09-18
 
-Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v15).
+Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v16).
 Consulta de solo lectura a las bases de dev/qa de Bisalta desde Claude Code, **sin que
 ninguna credencial entre en el contexto de la sesión**. La credencial no desaparece: pasa de un
 archivo que hoy hay que leerle al modelo —y que queda archivado en el transcript— a un secreto de
@@ -80,6 +80,17 @@ que se ve bien y no funciona; y **cada garantía declara su nivel**. Patrick mid
 sesión de solo lectura se apaga con un `SET`, y en PG 14 `public` traía `CREATE` para todo rol: de las
 tres garantías de Postgres, **sólo el endpoint de réplica es incondicional**, y el catálogo lo dice
 entrada por entrada. Detalle en `SDD/retro.md` RT42-RT49.
+
+**Lo que la lista blanca no frenaba (v16)**: aceptaba escrituras dentro de un `WITH` en los dos
+dialectos —`WITH x AS (DELETE … RETURNING *) SELECT …` en Postgres, `WITH c AS (…) DELETE FROM c`
+en SQL Server—, `SELECT … INTO`, que crea una tabla, y `set_config` para apagar la sesión de solo
+lectura. Sobrevivió a 17 triples de mutación y a tres rondas de review, porque los tests
+verificaban bien lo que enumeraban y nadie había enumerado esto. No hubo exposición: en Postgres lo
+frenaban tres barreras detrás, medidas con cinco sondas sin efecto posible, y en SQL Server se
+encontró antes de que existiera el login. v16 lo rechaza en la lista blanca (`AC47`) y **comprueba la
+réplica en cada consulta** (`AC46`): el endpoint `cluster-ro-` apunta al writer si el cluster se queda
+sin réplicas, y hoy tiene una sola. La lección, en `SDD/retro.md` RT50: una mutación prueba que el
+test detecta que la barrera se quitó; no prueba que la barrera cubra la amenaza.
 
 **Lo que dejó el kilometraje**: dos defectos que la suite encontró y que valen por separado. (1) El
 tope de bytes salía vacío porque `process.exit()` **corta lo que `process.stdout` todavía tiene en
