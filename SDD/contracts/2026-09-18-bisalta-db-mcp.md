@@ -1,6 +1,18 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v19
+- **Versión**: v20
+
+### Cambios v19 → v20 (ratificación del planner sobre el `BLOCKED` de `AGENT_r2`, 23-sep-2026)
+
+`AGENT_r2` implementó `AC51` tal como estaba escrito, y los 21 casos de Patrick coinciden. Pero probando por su cuenta encontró que **el arreglo introdujo dos regresiones**: dos formas de comillado que el código anterior rechazaba —por accidente— pasaban a aceptarse, y en las dos el motor ejecuta algo que el validador ya no ve. No las arregló porque `AC51` enumeraba sólo dos reglas de comillado, y agregar otras era cerrar una decisión que el contract no tomó: devolvió `BLOCKED`, que es exactamente lo que el protocolo pide. La causa es del plan (`E18`): **una especificación de lexer que enumera algunas reglas de comillado de un dialecto y no todas no garantiza la propiedad que promete**. Y es `RT3` otra vez: la corrección introdujo el defecto.
+
+**1. `AC51` conoce las reglas de comillado de cada dialecto.** Ver el AC. En Postgres suma los literales de escape (`E'…'`), donde la barra invertida escapa el carácter siguiente; en SQL Server suma los identificadores entre corchetes, con `]]` como escape, y los literales con prefijo `N`.
+
+**2. Una construcción sin cerrar se rechaza.** Un literal, un identificador o un comentario de bloque que llega al final del texto sin cerrarse no es SQL válido para ninguno de los dos motores, así que rechazarlo no pierde ninguna consulta legítima, y saca la ambigüedad de qué parte del texto se valida. Motivo `construccion_sin_cerrar`, exit 4. (Hasta v19, el código dejaba el resto del texto visible sin normalizar: fallaba cerrado, pero por accidente, y sin regla escrita.)
+
+**3. Lo que queda afuera, declarado.** Cualquier regla de comillado de un dialecto que `AC51` no enumere es límite conocido, en la misma categoría que los dos de v19 — ver "Riesgos".
+
+Los casos de prueba de estas reglas los escribe `AGENT_r2` en `SDD/tests/test_lista_blanca.sh`. **No van al archivo de casos de Patrick**, que es su revisión y no se edita.
 
 ### Cambios v18 → v19 (decisiones y revisión adversarial de Patrick Ocampo, Slack 23-sep-2026 15:14 y 15:48)
 
@@ -647,7 +659,12 @@ Casos del test — rechazados: en `postgres`, `WITH x AS (INSERT INTO t VALUES (
 **AC50** (detección, `manual-only`) — `postgres-parte-b.sql`, en cada base que recorre: primero concede `CREATE ON SCHEMA public` al dueño de la base **y** a todo rol que ya tenga objetos en `public`, y **después** revoca `CREATE ON SCHEMA public FROM PUBLIC`. El orden es la condición: revocar primero rompe las migraciones de quien ya crea ahí. Verificado conectándose **como `claude_lectura`**: crear una tabla en `public` falla con `permission denied for schema public`.
 `manual-only: requiere el cluster.` El `REVOKE CONNECT` sobre la base `postgres` va al runbook como paso explícito, con su verificación.
 
-**AC51** (detección) — La normalización de la lista blanca es **un solo recorrido de izquierda a derecha** que distingue literales, identificadores entre comillas dobles, comentarios de línea y comentarios de bloque **anidados**, de modo que **el validador ve las mismas sentencias que ejecuta el motor**. Casos de prueba: los de la revisión de Patrick Ocampo del 23-sep, incorporados tal como él los entregue. **Mutación declarada**: volver a la normalización anterior (tres reemplazos en secuencia) pone rojo al menos uno de sus casos.
+**AC51** (detección) — La normalización de la lista blanca es **un solo recorrido de izquierda a derecha** que conoce las reglas de comillado de cada dialecto, de modo que **el validador ve las mismas sentencias que ejecuta el motor**:
+- **en los dos dialectos**: literales entre comillas simples con `''` como escape; identificadores entre comillas dobles con `""` como escape (se copian tal cual); comentarios de línea (`--` hasta el fin de línea); comentarios de bloque **anidados**;
+- **en `postgres`, además** (v20): literales de escape con prefijo `E` o `e` pegado a la comilla, donde la barra invertida escapa el carácter siguiente —incluida una comilla—. Las comillas de dólar siguen rechazándose por `AC20`;
+- **en `sqlserver`, además** (v20): identificadores entre corchetes, con `]]` como escape adentro (se copian tal cual), y literales con prefijo `N`, con las mismas reglas que un literal común.
+Un literal, identificador o comentario de bloque **sin cerrar** al final del texto se rechaza con motivo `construccion_sin_cerrar`, exit 4 (v20).
+Casos de prueba: los 21 de la revisión de Patrick Ocampo (`SDD/tests/fixtures/casos-adversariales-lista-blanca.js`), más los que `AGENT_r2` escribe para las reglas de v20 y para la construcción sin cerrar. **Mutaciones declaradas**: (a) volver a la normalización anterior a v19 pone rojo al menos uno de los casos de Patrick; (b) quitar la regla de los literales `E'…'` pone rojo su caso; (c) quitar la regla de los corchetes pone rojo sus casos; (d) aceptar una construcción sin cerrar pone rojo su caso. (Reescrito en v20: el texto de v19 enumeraba sólo comillas simples y dobles.)
 
 **AC52** (detección) — En dialecto `sqlserver`, la lista de palabras que rechaza `AC47` incluye además `TRUNCATE`, `DROP`, `CREATE` y `ALTER`, porque T-SQL no exige separador entre sentencias. Casos de prueba: los de la revisión de Patrick para ese dialecto. **Mutación declarada**: quitar esas cuatro palabras pone rojo sus casos.
 
@@ -678,6 +695,7 @@ Casos del test — rechazados: en `postgres`, `WITH x AS (INSERT INTO t VALUES (
 | La suite tarda ~62 s hoy y los triples de mutación la alargan. | El umbral de `doc_quality_gates.md` se revisa con el número medido al cerrar, igual que en GEN-101. |
 | Las filas de copias de producción quedan en el transcript. | Riesgo aceptado con dueño (ver arriba). No hay mitigación técnica en este alcance. |
 | En Postgres, `claude_lectura` ve los nombres de todas las bases del cluster (v17). | Riesgo aceptado: `pg_database` es legible por todo rol, y revocarlo rompe los clientes que listan bases (el `\l` de psql, entre otros — comportamiento conocido de Postgres, **no medido acá**). En SQL Server el equivalente se cerró con `AC48`. Dueño: Ian Vargas. Se le informa a Patrick Ocampo, que administra el cluster; si decide cerrarlo de otra forma, entra como `contract-change-request`. |
+| **Límite conocido (v20)**: una regla de comillado de un dialecto que `AC51` no enumera. | La normalización implementa las reglas enumeradas en `AC51`, no el lexer completo de cada motor. Lo frena lo mismo que a los límites de v19: el privilegio y, en Postgres, la réplica. |
 | **Límite conocido (v19)**: una función que recibe SQL como texto lo ejecuta sin que la lista blanca lo vea, porque la normalización reemplaza los literales. | Estructural: sólo se cerraría con una lista blanca de funciones invocables, que este alcance no tiene. Lo frenan el privilegio y, en Postgres, la réplica; y en estos servidores las funciones de ese tipo requieren recursos que no están configurados. Medido por Patrick el 23-sep. |
 | Una función con efecto lateral que se puede llamar dentro de un `SELECT` (`nextval`, `pg_advisory_lock`, …) no la enumera la lista blanca (v16). | Riesgo aceptado: la lista blanca no puede enumerar funciones. En Postgres la frenan la sesión de solo lectura, la réplica —comprobada por AC46— y los permisos del rol; en SQL Server una función definida por usuario no puede modificar datos. |
 | ~~El cluster de dev/qa podría no tener réplica de lectura…~~ | ✅ **CERRADO el 22-sep-2026**: `describe-db-clusters` sobre `sistemas-costruplaza-db` devuelve `ReaderEndpoint = sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com`, idéntico al host que declaran las seis entradas de Postgres del catálogo. La garantía `endpoint-replica-lectura` se sostiene. (`IAMDatabaseAuthenticationEnabled` sigue en `false`, consistente con la decisión de v4.) |
