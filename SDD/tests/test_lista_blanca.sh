@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # SDD/tests/test_lista_blanca.sh — plugins/bisalta-db/scripts/lista-blanca.js.
-# AC15-AC22 del contract SDD/contracts/2026-09-18-bisalta-db-mcp.md v3.
+# AC15-AC22 del contract SDD/contracts/2026-09-18-bisalta-db-mcp.md v3, y
+# AC47 (escrituras embebidas y set_config) de la v16.
 #
 # Port de tests/consultaLecturaWrapper.test.mjs de Bisalta/Proveedores-Back
 # (rama feat-PROV-131-api-comprassync): los doce casos, incluidos los cinco de
@@ -46,6 +47,12 @@ fi
 validar() {
   printf '%s' "$2" | node "$LISTA_BLANCA" "$1" >/dev/null 2>&1
   echo $?
+}
+
+# Corre la validación y devuelve el veredicto JSON que imprime el CLI, para
+# afirmar el MOTIVO además del código de salida.
+veredicto() {
+  printf '%s' "$2" | node "$LISTA_BLANCA" "$1" 2>/dev/null
 }
 
 # ---------------------------------------------------------------------------
@@ -191,6 +198,64 @@ ec="$(validar postgres "$ENCADENADAS")"
 assert_exit 0 "$ec" "AC22 dos lecturas encadenadas con punto y coma se aceptan en postgres"
 ec="$(validar sqlserver "$ENCADENADAS")"
 assert_exit 4 "$ec" "AC22 la misma entrada se rechaza en sqlserver"
+
+# ---------------------------------------------------------------------------
+# AC47 — escrituras embebidas y set_config (contract v16)
+# ---------------------------------------------------------------------------
+# 🔴 EMPEZAR CON SELECT O WITH NO ALCANZA. Un `WITH` puede llevar una
+# escritura adentro, `SELECT ... INTO` crea una tabla, y `set_config` apaga la
+# sesión de solo lectura desde un SELECT. Medido el 23-sep-2026: todos estos
+# casos se ACEPTABAN. Cada uno se afirma por código de salida Y por motivo: el
+# motivo es lo que prueba que el rechazo viene de la regla nueva y no de
+# alguna de las de arriba.
+while IFS='|' read -r dialecto motivo etiqueta sql; do
+  [ -z "$dialecto" ] && continue
+  ec="$(validar "$dialecto" "$sql")"
+  assert_exit 4 "$ec" "AC47 rechaza en $dialecto $etiqueta"
+  assert_contains "$(veredicto "$dialecto" "$sql")" "\"motivo\":\"$motivo\"" \
+    "AC47 el rechazo en $dialecto de $etiqueta tiene motivo $motivo"
+done <<'CASOS'
+postgres|escritura_embebida|un CTE con INSERT|WITH x AS (INSERT INTO t VALUES (1) RETURNING *) SELECT * FROM x
+postgres|escritura_embebida|un CTE con DELETE|WITH x AS (DELETE FROM t RETURNING *) SELECT * FROM x
+postgres|escritura_embebida|un CTE con UPDATE|WITH x AS (UPDATE t SET a = 1 RETURNING *) SELECT * FROM x
+postgres|escritura_embebida|un SELECT INTO|SELECT * INTO nueva FROM t
+postgres|funcion_prohibida|un set_config que apaga la sesión de solo lectura|SELECT set_config('default_transaction_read_only','off',false)
+postgres|funcion_prohibida|un set_config calificado con pg_catalog|SELECT pg_catalog.set_config('a','b',false)
+sqlserver|escritura_embebida|un CTE seguido de DELETE|WITH c AS (SELECT * FROM t) DELETE FROM c
+sqlserver|escritura_embebida|un CTE seguido de UPDATE|WITH c AS (SELECT * FROM t) UPDATE c SET a = 1
+sqlserver|escritura_embebida|un CTE seguido de INSERT|WITH c AS (SELECT * FROM t) INSERT INTO u SELECT * FROM c
+sqlserver|escritura_embebida|un CTE seguido de MERGE|WITH c AS (SELECT * FROM t) MERGE u USING c ON u.id = c.id WHEN MATCHED THEN DELETE
+sqlserver|escritura_embebida|un SELECT INTO|SELECT * INTO nueva FROM t
+postgres|escritura_embebida|un SELECT FOR UPDATE (rechazo de más, a sabiendas)|SELECT * FROM t FOR UPDATE
+CASOS
+
+# Lo que tiene que seguir pasando. El CTE de lectura de AC19 en los dos
+# dialectos, y una palabra de escritura que sólo vive dentro de un literal:
+# este último es el que prueba que el chequeo corre DESPUÉS de normalizar.
+while IFS='|' read -r dialecto etiqueta sql; do
+  [ -z "$dialecto" ] && continue
+  ec="$(validar "$dialecto" "$sql")"
+  assert_exit 0 "$ec" "AC47 acepta en $dialecto $etiqueta"
+done <<'CASOS'
+postgres|el CTE de lectura de AC19|WITH a AS (SELECT 1) SELECT * FROM a
+sqlserver|el CTE de lectura de AC19|WITH a AS (SELECT 1) SELECT * FROM a
+postgres|un delete que sólo vive dentro de un literal|SELECT 'delete' AS x
+sqlserver|un delete que sólo vive dentro de un literal|SELECT 'delete' AS x
+CASOS
+
+# Los dos chequeos van AL FINAL del recorrido: una sentencia que ya caía por
+# una regla existente conserva su motivo aunque también nombre una palabra de
+# escritura.
+while IFS='|' read -r dialecto motivo etiqueta sql; do
+  [ -z "$dialecto" ] && continue
+  assert_contains "$(veredicto "$dialecto" "$sql")" "\"motivo\":\"$motivo\"" \
+    "AC47 un rechazo existente no cambia de motivo: $etiqueta sigue siendo $motivo"
+done <<'CASOS'
+postgres|no_empieza_con_select_ni_with|un DELETE a secas|DELETE FROM t
+postgres|comilla_de_dolar|una comilla de dólar con INTO|SELECT $$x$$ INTO t
+sqlserver|ejecucion_de_procedimiento|un EXEC con INSERT|SELECT 1 EXEC dbo.p INSERT
+sqlserver|procedimiento_de_sistema|un sp_ con DELETE|SELECT * FROM sp_helpdb DELETE
+CASOS
 
 # ---------------------------------------------------------------------------
 # Uso

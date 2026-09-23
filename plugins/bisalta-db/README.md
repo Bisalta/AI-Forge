@@ -87,12 +87,16 @@ Las herramientas quedan disponibles como
 `mcp__plugin_bisalta-db_bisalta-db__consultar` y
 `mcp__plugin_bisalta-db_bisalta-db__listar_conexiones`. `/mcp` las lista.
 
-## Las cinco capas, y la primera no es este código
+## Las cinco capas, y la primera está en el motor — el plugin la comprueba
 
 0. **El endpoint.** Las entradas de Postgres apuntan al endpoint de réplica de
    lectura de Aurora (`cluster-ro-`), que rechaza las escrituras **en el
-   motor**. Es la única capa que no depende de que nada de este repo esté bien
-   escrito.
+   motor**. Pero Aurora apunta ese endpoint **al writer** cuando el cluster se
+   queda sin réplicas, así que el endpoint solo no alcanza: desde v16 el plugin
+   **comprueba en cada consulta** que la sesión llegó a una réplica —una guarda
+   con `pg_is_in_recovery()` que corre en la misma conexión y antes del SQL del
+   consumidor— y, si no, se niega con `no_es_replica` (código 9) sin ejecutar
+   ese SQL.
 1. **El rol** de base es de solo lectura (`claude_lectura`, miembro de
    `pg_read_all_data`). Lo crea el runbook de `aprovisionamiento/`. Un solo
    rol: NEO no abre ninguna conexión Postgres (lee Odoo por XML-RPC), así
@@ -100,7 +104,10 @@ Las herramientas quedan disponibles como
 2. **La sesión** se abre en `default_transaction_read_only=on`, con
    `statement_timeout=120000`.
 3. **La lista blanca** exige que *cada* sentencia empiece con `SELECT` o
-   `WITH`, después de quitar comentarios y literales.
+   `WITH` **y** que no contenga una escritura embebida (`INSERT`, `UPDATE`,
+   `DELETE`, `MERGE` o `INTO` como palabra; en `postgres`, además,
+   `set_config`), después de quitar comentarios y literales. Es la **primera**
+   barrera, no la única: detrás están la réplica, la sesión y el rol.
 4. **El catálogo**: `ambiente` admite `dev` y `qa` **y nada más**. Producción
    es irrepresentable, no rechazada por nombre — rechazar por nombre es red,
    no barrera.
@@ -113,6 +120,19 @@ principio** de la sentencia: la versión laxa (buscar `SELECT` en cualquier
 posición) pasaba once de los doce tests originales, y el caso que la mató fue
 `DELETE ... WHERE id IN (SELECT ...)`.
 
+**Y empezar con `SELECT` o `WITH` no alcanza** (contract v16). Un `WITH`
+puede llevar una escritura adentro —`WITH x AS (DELETE ... RETURNING *) SELECT
+...` en Postgres, `WITH c AS (SELECT ...) DELETE FROM c` en SQL Server—,
+`SELECT ... INTO nueva` crea una tabla, y `SELECT set_config(...)` cambia un
+parámetro de la sesión desde dentro de una lectura. Medido el 23-sep-2026:
+todas esas formas **se aceptaban**. Por eso, además del ancla, cada sentencia
+ya normalizada se rechaza si nombra una de esas palabras (motivo
+`escritura_embebida`, y `funcion_prohibida` para `set_config`). Rechaza de
+más, a sabiendas: `SELECT ... FOR UPDATE` —toma locks de fila, y una
+herramienta de solo lectura no los necesita— y un identificador entre
+comillas dobles con uno de esos nombres, porque la normalización no quita
+comillas dobles. Falla cerrado.
+
 Si de verdad hace falta escribir, **no se amplía la lista blanca**: se corre a
 mano en DBeaver, donde una persona ve lo que va a pasar antes de que pase.
 
@@ -121,6 +141,8 @@ mano en DBeaver, donde una persona ve lo que va a pasar antes de que pase.
 | | `postgres` | `sqlserver` |
 |---|---|---|
 | Ancla `SELECT`/`WITH` por sentencia | sí | sí |
+| Palabra de escritura (`INSERT`, `UPDATE`, `DELETE`, `MERGE`, `INTO`) en cualquier posición | **rechazada** | **rechazada** |
+| `set_config` | **rechazada** | n/a |
 | Varias sentencias separadas por `;` | **aceptadas** | **rechazadas**: cualquier `;` que quede tras quitar comentarios y literales |
 | Apertura de comilla de dólar (`$$`, `$tag$`) | **rechazada** | n/a |
 | `EXEC`, `EXECUTE`, identificador `sp_`/`xp_` | n/a | **rechazados** |
@@ -134,21 +156,22 @@ la barrera es el texto.
 | | Postgres (`dev`/`qa`) | SQL Server (`Dev SQL`) |
 |---|---|---|
 | Rol de solo lectura | sí — **condicional** (v15): `pg_read_all_data` no escribe, pero un `GRANT` futuro sí puede; en PG 14 `public` traía `CREATE` para `PUBLIC` y el rol creaba tablas propias hasta que se revocó el 22-sep-2026 | sí — **y es la única barrera**, literalmente, desde v10. **Condicional**: se sostiene mientras nadie conceda escritura |
-| Sesión abierta en solo lectura | sí, `default_transaction_read_only=on` — **condicional** (v15): es un valor por omisión de la sesión y el rol lo apaga con un `SET`, medido el 22-sep-2026 | **no existe equivalente** |
+| Sesión abierta en solo lectura | sí, `default_transaction_read_only=on` — **condicional**: el plugin no la comprueba. Dentro de una llamada no se puede apagar (medido el 23-sep-2026: `transaction read-write mode must be set before any query`), y el rol la tiene además fijada por `ALTER ROLE`. | **no existe equivalente** |
 | `DENY` de escritura sobre el rol | no aplica | **no** — `db_denydatawriter` se quitó en v10 por decisión de Patrick Ocampo. Sin él no queda un `DENY` explícito, así que un `GRANT` de escritura concedido por error no tendría nada que lo anule |
-| Motor que rechaza escrituras | sí (endpoint `cluster-ro-`) — **la única incondicional** (v15): la escritura la rechaza el motor y no hay `SET` que lo apague | **no hay réplica** |
+| Motor que rechaza escrituras | sí, endpoint `cluster-ro-` de Aurora — **incondicional desde v16, porque el plugin lo comprueba en cada consulta** (guarda de réplica): Aurora apunta ese endpoint al writer si el cluster se queda sin réplicas, y entonces el plugin se niega con `no_es_replica` | **no hay réplica** |
 | Alcance del permiso | `pg_read_all_data`, de cluster — alcanza las 29 bases del cluster de dev/qa desde que el rol existe, no sólo las del catálogo | `db_datareader`, **por base**: una base nueva no queda cubierta sola |
 
 Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que
 evita que alguien asuma que todas las conexiones son igual de seguras.
 
-**Y las garantías tampoco son iguales entre sí** (contract v15). Cada una
-declara su `nivel`, y `listar_conexiones` lo devuelve:
+**Y las garantías tampoco son iguales entre sí** (contract v15; criterio
+cerrado en v16). Cada una declara su `nivel`, y `listar_conexiones` lo
+devuelve:
 
 | Nivel | Qué significa | Cuáles |
 |---|---|---|
-| `incondicional` | nada que el consumidor pueda hacer la levanta | `endpoint-replica-lectura` — el motor rechaza la escritura contra una réplica; no hay `SET` que lo apague |
-| `condicional` | se sostiene mientras se cumpla la `condicion` que la propia entrada declara | `rol-solo-lectura` y `sesion-read-only` |
+| `incondicional` | el plugin la comprueba **en cada consulta, en la misma sesión y antes de ejecutar el SQL del consumidor**, y se niega a ejecutarlo si no se cumple | `endpoint-replica-lectura` — la guarda de réplica comprueba `pg_is_in_recovery()` y, si la sesión cayó en el writer, responde `no_es_replica`. Si esa guarda se quita, la garantía deja de ser incondicional: el nivel sigue a la verificación, no a la intuición sobre el mecanismo |
+| `condicional` | cualquier otra: se sostiene mientras se cumpla la `condicion` que la propia entrada declara | `rol-solo-lectura` y `sesion-read-only` en Postgres; `rol-solo-lectura`, la única que hay, en SQL Server |
 
 No es una distinción teórica: el 22-sep-2026 Patrick Ocampo midió el peor caso
 y `sesion-read-only` **se apaga con un `SET`** —es un valor por omisión de la
@@ -214,8 +237,10 @@ Dos precisiones sobre estos valores:
   sola réplica** — con los nombres de instancia cruzados, la que se llama
   `…-reader` es hoy el writer, huella de que ya hubo un failover. **Aurora
   apunta el endpoint de lectura al writer cuando el cluster se queda sin
-  réplicas**, así que esta garantía depende de que exista al menos una. Cómo se
-  clasifica eso está pendiente de decisión (review de v15, `ESCALATE`).
+  réplicas**, así que el endpoint solo no sostiene la garantía. Desde v16 la
+  sostiene la guarda de réplica: si el cluster se queda sin réplicas, la
+  consulta responde `no_es_replica` (código 9) en vez de correr contra el
+  writer.
 
 ## La credencial
 
@@ -264,6 +289,7 @@ plugin al equipo, no algo que este código controle.
 | Conexión rechazada o caída | 6 | `conexion_fallida`, con el mensaje del cliente, sin la credencial |
 | `statement_timeout` (120 s) | 7 | `tiempo_agotado` |
 | Binario del cliente ausente | 8 | `cliente_ausente`, nombrando el binario |
+| La conexión Postgres no llegó a una réplica de lectura (v16) | 9 | `no_es_replica`, con el nombre de la conexión. **El SQL del consumidor no se ejecutó** |
 
 El catálogo ilegible o inválido también sale con código 2 (`catalogo_invalido`):
 es un error de configuración, del mismo lado que el uso incorrecto.

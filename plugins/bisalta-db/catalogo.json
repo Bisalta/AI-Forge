@@ -21,7 +21,7 @@
       {
         "nombre": "sesion-read-only",
         "nivel": "condicional",
-        "condicion": "el rol puede apagarla con un SET: es un valor por omisión de la sesión, no un candado. Medido el 22-sep-2026."
+        "condicion": "el plugin no la comprueba: la pide al abrir la sesión y no verifica que rija. Dentro de una llamada no se puede apagar (medido el 23-sep-2026: 'transaction read-write mode must be set before any query'), y el rol la tiene además fijada por ALTER ROLE."
       }
     ]
   },
@@ -47,7 +47,7 @@
       {
         "nombre": "sesion-read-only",
         "nivel": "condicional",
-        "condicion": "el rol puede apagarla con un SET: es un valor por omisión de la sesión, no un candado. Medido el 22-sep-2026."
+        "condicion": "el plugin no la comprueba: la pide al abrir la sesión y no verifica que rija. Dentro de una llamada no se puede apagar (medido el 23-sep-2026: 'transaction read-write mode must be set before any query'), y el rol la tiene además fijada por ALTER ROLE."
       }
     ]
   },
@@ -73,7 +73,7 @@
       {
         "nombre": "sesion-read-only",
         "nivel": "condicional",
-        "condicion": "el rol puede apagarla con un SET: es un valor por omisión de la sesión, no un candado. Medido el 22-sep-2026."
+        "condicion": "el plugin no la comprueba: la pide al abrir la sesión y no verifica que rija. Dentro de una llamada no se puede apagar (medido el 23-sep-2026: 'transaction read-write mode must be set before any query'), y el rol la tiene además fijada por ALTER ROLE."
       }
     ]
   },
@@ -99,7 +99,7 @@
       {
         "nombre": "sesion-read-only",
         "nivel": "condicional",
-        "condicion": "el rol puede apagarla con un SET: es un valor por omisión de la sesión, no un candado. Medido el 22-sep-2026."
+        "condicion": "el plugin no la comprueba: la pide al abrir la sesión y no verifica que rija. Dentro de una llamada no se puede apagar (medido el 23-sep-2026: 'transaction read-write mode must be set before any query'), y el rol la tiene además fijada por ALTER ROLE."
       }
     ]
   },
@@ -125,7 +125,7 @@
       {
         "nombre": "sesion-read-only",
         "nivel": "condicional",
-        "condicion": "el rol puede apagarla con un SET: es un valor por omisión de la sesión, no un candado. Medido el 22-sep-2026."
+        "condicion": "el plugin no la comprueba: la pide al abrir la sesión y no verifica que rija. Dentro de una llamada no se puede apagar (medido el 23-sep-2026: 'transaction read-write mode must be set before any query'), y el rol la tiene además fijada por ALTER ROLE."
       }
     ]
   },
@@ -151,7 +151,7 @@
       {
         "nombre": "sesion-read-only",
         "nivel": "condicional",
-        "condicion": "el rol puede apagarla con un SET: es un valor por omisión de la sesión, no un candado. Medido el 22-sep-2026."
+        "condicion": "el plugin no la comprueba: la pide al abrir la sesión y no verifica que rija. Dentro de una llamada no se puede apagar (medido el 23-sep-2026: 'transaction read-write mode must be set before any query'), y el rol la tiene además fijada por ALTER ROLE."
       }
     ]
   },

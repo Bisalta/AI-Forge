@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SDD/tests/test_catalogo.sh — plugins/bisalta-db/scripts/catalogo.js y el
 # empaquetado del plugin. AC11-AC14 y AC36 del contract
-# SDD/contracts/2026-09-18-bisalta-db-mcp.md v3.
+# SDD/contracts/2026-09-18-bisalta-db-mcp.md v3, y AC45b/AC45c de la v16.
 #
 # 🔴 PRODUCCIÓN ES IRREPRESENTABLE, NO RECHAZADA POR NOMBRE. `ambiente` admite
 # `dev` y `qa` y nada más. Una lista de nombres prohibidos es red; esto es
@@ -142,44 +142,69 @@ assert_eq "$([ $? -ne 0 ] && echo distinto-de-cero || echo cero)" "distinto-de-c
   "AC14 el validador rechaza una garantía que no está en la lista cerrada"
 
 # ---------------------------------------------------------------------------
-# AC45 — el nivel de cada garantía (contract v15)
+# AC45b — el validador rechaza cada forma mal escrita de una garantía (v16)
 #
 # Declarar las tres garantías de Postgres al mismo nivel era una afirmación que
 # no se sostiene: medido el 22-sep-2026, el rol apaga `sesion-read-only` con un
-# SET y en PG 14 el esquema `public` traía CREATE para PUBLIC. La única
-# incondicional es el endpoint de réplica. Estos asserts son las barreras que
-# impiden volver a la afirmación plana.
+# SET y en PG 14 el esquema `public` traía CREATE para PUBLIC. Estos asserts son
+# las barreras que impiden volver a la afirmación plana.
+#
+# 🔴 CADA CLÁUSULA TIENE UN ASSERT QUE SÓLO ELLA SATISFACE. En v15 el rechazo
+# de la cadena suelta se afirmaba mirando que el mensaje nombrara `nivel`, y
+# otra regla también lo nombra: quitar el chequeo de objeto dejaba el test
+# verde (medido por la review de v15). Por eso cada mensaje se busca por el
+# texto propio de su regla.
 # ---------------------------------------------------------------------------
 ruta="$(fixture garantia-cadena.json "c[0].garantias=['rol-solo-lectura']")"
 salida="$(node "$VALIDADOR" "$ruta" 2>&1)"; ec=$?
 assert_eq "$([ "$ec" -ne 0 ] && echo distinto-de-cero || echo cero)" "distinto-de-cero" \
-  "AC45 el validador rechaza una garantía declarada como cadena suelta"
-assert_contains "$salida" "nivel" "AC45 el rechazo de la cadena suelta nombra el nivel que falta"
+  "AC45b (1) el validador rechaza una garantía declarada como cadena suelta"
+assert_contains "$salida" "tiene que ser un objeto" "AC45b (1) el rechazo de la cadena suelta dice que tiene que ser un objeto"
 
 ruta="$(fixture nivel-invalido.json "c[0].garantias=[{nombre:'rol-solo-lectura',nivel:'mas-o-menos'}]")"
-node "$VALIDADOR" "$ruta" >/dev/null 2>&1
-assert_eq "$([ $? -ne 0 ] && echo distinto-de-cero || echo cero)" "distinto-de-cero" \
-  "AC45 el validador rechaza un nivel fuera del enum cerrado"
+salida="$(node "$VALIDADOR" "$ruta" 2>&1)"; ec=$?
+assert_eq "$([ "$ec" -ne 0 ] && echo distinto-de-cero || echo cero)" "distinto-de-cero" \
+  "AC45b (2) el validador rechaza un nivel fuera del enum cerrado"
+assert_contains "$salida" '`nivel` tiene que ser uno de' "AC45b (2) el rechazo del nivel inválido nombra el enum de nivel"
 
 ruta="$(fixture condicional-sin-condicion.json "c[0].garantias=[{nombre:'rol-solo-lectura',nivel:'condicional'}]")"
 salida="$(node "$VALIDADOR" "$ruta" 2>&1)"; ec=$?
 assert_eq "$([ "$ec" -ne 0 ] && echo distinto-de-cero || echo cero)" "distinto-de-cero" \
-  "AC45 una garantía condicional sin declarar de qué depende se rechaza"
-assert_contains "$salida" "condicion" "AC45 el rechazo nombra la condicion ausente"
+  "AC45b (3) una garantía condicional sin declarar de qué depende se rechaza"
+assert_contains "$salida" "condicion" "AC45b (3) el rechazo nombra la condicion ausente"
 
 ruta="$(fixture incondicional-con-condicion.json "c[0].garantias=[{nombre:'endpoint-replica-lectura',nivel:'incondicional',condicion:'algo'}]")"
-node "$VALIDADOR" "$ruta" >/dev/null 2>&1
-assert_eq "$([ $? -ne 0 ] && echo distinto-de-cero || echo cero)" "distinto-de-cero" \
-  "AC45 una garantía incondicional que declara una condicion se contradice y se rechaza"
+salida="$(node "$VALIDADOR" "$ruta" 2>&1)"; ec=$?
+assert_eq "$([ "$ec" -ne 0 ] && echo distinto-de-cero || echo cero)" "distinto-de-cero" \
+  "AC45b (4) una garantía incondicional que declara una condicion se contradice y se rechaza"
+assert_contains "$salida" 'no lleva `condicion`' "AC45b (4) el rechazo dice que una incondicional no lleva condicion"
 
 ruta="$(fixture garantia-campo-extra.json "c[0].garantias=[{nombre:'rol-solo-lectura',nivel:'condicional',condicion:'x',comentario:'y'}]")"
-node "$VALIDADOR" "$ruta" >/dev/null 2>&1
-assert_eq "$([ $? -ne 0 ] && echo distinto-de-cero || echo cero)" "distinto-de-cero" \
-  "AC45 el validador rechaza un campo desconocido dentro de una garantía"
+salida="$(node "$VALIDADOR" "$ruta" 2>&1)"; ec=$?
+assert_eq "$([ "$ec" -ne 0 ] && echo distinto-de-cero || echo cero)" "distinto-de-cero" \
+  "AC45b (5) el validador rechaza un campo desconocido dentro de una garantía"
+assert_contains "$salida" "campo desconocido: comentario" "AC45b (5) el rechazo nombra el campo desconocido"
 
-# El catálogo que se distribuye declara exactamente UNA incondicional por cada
-# entrada de Postgres, y es el endpoint de réplica. Derivado del catálogo real,
-# no de una cifra copiada.
+# ---------------------------------------------------------------------------
+# AC45c — los niveles del catálogo que se distribuye (v16)
+# ---------------------------------------------------------------------------
+# Cada entrada de Postgres declara exactamente UNA incondicional, y es el
+# endpoint de réplica (incondicional porque AC46 la comprueba en cada
+# consulta); ninguna de SQL Server declara una. Derivado del catálogo real, no
+# de una cifra copiada.
+#
+# Control primero: los dos recorridos de abajo afirman AUSENCIAS sobre un
+# conjunto ("ninguna entrada mal"), y un conjunto vacío las cumple sin mirar
+# nada. Si el filtro por dialecto dejara de encontrar entradas, los dos
+# pasarían igual.
+conjuntos="$(node -e "
+  const c=require('$CATALOGO_REAL'); const l=Array.isArray(c)?c:c.conexiones;
+  const pg=l.filter(e=>e.dialecto==='postgres').length;
+  const sq=l.filter(e=>e.dialecto==='sqlserver').length;
+  process.stdout.write((pg>0&&sq>0)?'ok':'vacio:postgres='+pg+',sqlserver='+sq);
+")"
+assert_eq "$conjuntos" "ok" \
+  "AC45c (control) el catálogo real tiene conexiones Postgres y SQL Server que recorrer"
 incondicionales="$(node -e "
   const c=require('$CATALOGO_REAL'); const l=Array.isArray(c)?c:c.conexiones;
   const pg=l.filter(e=>e.dialecto==='postgres');
@@ -190,7 +215,7 @@ incondicionales="$(node -e "
   process.stdout.write(malas.length===0?'ok':'mal:'+malas.map(e=>e.nombre).join(','));
 ")"
 assert_eq "$incondicionales" "ok" \
-  "AC45 cada conexión Postgres declara el endpoint de réplica como su única garantía incondicional"
+  "AC45c cada conexión Postgres declara el endpoint de réplica como su única garantía incondicional"
 
 sqlserver_condicionales="$(node -e "
   const c=require('$CATALOGO_REAL'); const l=Array.isArray(c)?c:c.conexiones;
@@ -199,7 +224,7 @@ sqlserver_condicionales="$(node -e "
   process.stdout.write(malas.length===0?'ok':'mal:'+malas.map(e=>e.nombre).join(','));
 ")"
 assert_eq "$sqlserver_condicionales" "ok" \
-  "AC45 ninguna conexión SQL Server declara una garantía incondicional"
+  "AC45c ninguna conexión SQL Server declara una garantía incondicional"
 
 # ---------------------------------------------------------------------------
 # Resto del contrato de datos

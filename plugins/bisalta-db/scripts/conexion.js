@@ -42,6 +42,20 @@ const SEPARADOR_SQLSERVER = String.fromCharCode(31);
 // archivo dispararía el propio gate 9 (secret-scan) contra sí mismo.
 const VARIABLE_CREDENCIAL_SQLSERVER = 'SQLCMD' + 'PASSWORD';
 
+// Guarda de réplica (contract v16, AC46). Es el PRIMER `--command` de toda
+// consulta Postgres: corre en la misma conexión que el SQL del consumidor —o
+// sea contra la misma instancia— y, con ON_ERROR_STOP=1, si falla psql
+// termina sin ejecutar el segundo. Hace falta porque Aurora apunta el
+// endpoint `cluster-ro-` al writer cuando el cluster se queda sin réplicas
+// (medido el 23-sep-2026: una sola réplica). Es lo que hace INCONDICIONAL a
+// la garantía `endpoint-replica-lectura`: el nivel sigue a la verificación.
+// El literal es el del contract, carácter por carácter.
+const GUARDA_REPLICA = "DO $guarda$ BEGIN IF NOT pg_is_in_recovery() THEN RAISE EXCEPTION 'bisalta-db: la conexion no llego a una replica de lectura'; END IF; END $guarda$";
+// El texto que se reconoce en el stderr de psql para responder `no_es_replica`.
+// Es el mensaje del RAISE de arriba: si uno cambia sin el otro, la guarda
+// sigue cortando pero la respuesta degrada a `conexion_fallida`.
+const MENSAJE_NO_REPLICA = 'bisalta-db: la conexion no llego a una replica de lectura';
+
 function fallo(codigo, error, mensaje) {
   const e = new Error(mensaje);
   e.codigo = codigo;
@@ -131,14 +145,17 @@ function resolverCredencial(entrada) {
  * hoy hay uno solo — pero sigue sirviendo para atribuir la sesión al rol
  * que la abrió. Si se agrega un segundo consumidor real, vuelve a
  * distinguir quién corrió qué (D53).
+ * AC46 (v16): `--quiet` y DOS `--command`, en este orden — la guarda de
+ * réplica y después el SQL del consumidor. Sin `--quiet`, psql imprime `DO`
+ * como primera línea del CSV (medido).
  */
 function construirComandoPostgres(entrada, usuario, rutaPassfile, sql) {
   const conninfo = 'postgresql://' + encodeURIComponent(usuario) + '@' +
     entrada.host + ':' + entrada.puerto + '/' + encodeURIComponent(entrada.base);
   return {
     comando: 'psql',
-    args: ['--no-psqlrc', '--pset=pager=off', '--csv', '--variable=ON_ERROR_STOP=1',
-      '--command', sql, conninfo],
+    args: ['--no-psqlrc', '--pset=pager=off', '--csv', '--quiet', '--variable=ON_ERROR_STOP=1',
+      '--command', GUARDA_REPLICA, '--command', sql, conninfo],
     env: {
       PGPASSFILE: rutaPassfile,
       PGOPTIONS: '-c default_transaction_read_only=on' +
@@ -238,7 +255,7 @@ function parsearSalidaSqlserver(texto) {
 /**
  * Corre la consulta y devuelve las filas. La lista blanca ya la validó: acá
  * no se decide qué SQL es aceptable.
- * @throws error con `.codigo` 5, 6, 7 u 8.
+ * @throws error con `.codigo` 5, 6, 7, 8 o 9.
  */
 function ejecutarConsulta(entrada, sql) {
   const credencial = resolverCredencial(entrada);
@@ -275,10 +292,18 @@ function ejecutarConsulta(entrada, sql) {
     if (r.error && r.error.code === 'ENOENT') {
       throw fallo(8, 'cliente_ausente', 'falta el binario `' + plan.comando + '` en el PATH');
     }
+    const salidaError = redactar(r.stderr, sensibles);
+    // 🔴 LA GUARDA DE RÉPLICA SE CLASIFICA PRIMERO (AC46), antes del tiempo
+    // agotado y del genérico `conexion_fallida`: si la sesión cayó en el
+    // writer, lo que el consumidor tiene que saber es eso, y el SQL suyo no
+    // llegó a ejecutarse.
+    if (entrada.dialecto === 'postgres' && r.status !== 0 && salidaError.indexOf(MENSAJE_NO_REPLICA) !== -1) {
+      throw fallo(9, 'no_es_replica',
+        'la conexión `' + entrada.nombre + '` no llegó a una réplica de lectura; la consulta no se ejecutó');
+    }
     if (r.error && (r.error.code === 'ETIMEDOUT' || r.signal !== null)) {
       throw fallo(7, 'tiempo_agotado', 'la consulta superó los ' + TIMEOUT_SENTENCIA_MS + ' ms');
     }
-    const salidaError = redactar(r.stderr, sensibles);
     if (/statement timeout|Timeout expired|query_canceled/i.test(salidaError)) {
       throw fallo(7, 'tiempo_agotado', 'la consulta superó los ' + TIMEOUT_SENTENCIA_MS + ' ms');
     }

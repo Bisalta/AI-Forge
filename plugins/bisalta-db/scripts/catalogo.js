@@ -37,14 +37,19 @@ const AMBIENTES = ['dev', 'qa'];
 // parte del scope reabierto de R1").
 const GARANTIAS = ['rol-solo-lectura', 'sesion-read-only', 'endpoint-replica-lectura', 'deny-escritura'];
 
-// Nivel de cada garantía (contract v15). Las tres garantías de Postgres no son
-// igual de fuertes y declararlas al mismo nivel era una afirmación que no se
-// sostiene: medido el 22-sep-2026, el rol puede apagar `sesion-read-only` con
-// un SET, y en PG 14 el esquema `public` traía CREATE concedido a PUBLIC. La
-// única incondicional es el endpoint `cluster-ro-`: ahí la escritura la
-// rechaza el motor y no hay SET que lo apague.
-//   incondicional -> nada que el consumidor pueda hacer la levanta.
-//   condicional   -> se sostiene mientras se cumpla `condicion`.
+// Nivel de cada garantía (contract v15; criterio cerrado en v16, "Cambios
+// v15 → v16" punto 1). Las tres garantías de Postgres no son igual de fuertes
+// y declararlas al mismo nivel era una afirmación que no se sostiene.
+//   incondicional -> el plugin la comprueba en cada consulta, en la misma
+//                    sesión y antes de ejecutar el SQL del consumidor, y se
+//                    niega a ejecutarlo si no se cumple.
+//   condicional   -> cualquier otra; declara en `condicion` de qué depende.
+// Con ese criterio la única incondicional es `endpoint-replica-lectura`,
+// PORQUE la guarda de AC46 (conexion.js) la comprueba: Aurora apunta el
+// endpoint `cluster-ro-` al writer cuando el cluster se queda sin réplicas, y
+// sin la guarda el endpoint solo no alcanzaría. Si la guarda se quita, la
+// garantía deja de ser incondicional: el nivel sigue a la verificación, no a
+// la intuición sobre el mecanismo.
 const NIVELES = ['incondicional', 'condicional'];
 const CAMPOS_GARANTIA = ['nombre', 'nivel', 'condicion'];
 

@@ -18,6 +18,17 @@
 // Una lista blanca por dialecto: un mismo patrón estaría mal en alguna
 // dirección (contract v3, decisión 3).
 //
+// 🔴 EMPEZAR CON SELECT O WITH NO ALCANZA (contract v16, AC47). Un `WITH`
+// puede llevar una escritura adentro (`WITH x AS (DELETE ... RETURNING *)
+// SELECT ...` en Postgres; `WITH c AS (SELECT ...) DELETE FROM c` en SQL
+// Server), `SELECT ... INTO nueva` crea una tabla, y `set_config` apaga la
+// sesión de solo lectura desde un SELECT. Medido el 23-sep-2026: las tres
+// formas se ACEPTABAN. Por eso, además del ancla, cada sentencia ya
+// normalizada se rechaza si nombra una palabra de escritura. Rechaza de más a
+// sabiendas —`SELECT ... FOR UPDATE`, y un identificador entre comillas
+// dobles con uno de esos nombres, porque la normalización no quita comillas
+// dobles—: falla cerrado.
+//
 // Uso como CLI (el SQL entra por stdin, nunca por argv):
 //   printf '%s' "SELECT 1" | node lista-blanca.js postgres
 // Exit: 0 = aceptado · 4 = rechazado (tabla de errores del contract) ·
@@ -37,6 +48,12 @@ const COMILLA_DOLAR = /\$([A-Za-z_][A-Za-z_0-9]*)?\$/;
 // Reglas propias de SQL Server.
 const EJECUCION_SQLSERVER = /(^|[^A-Za-z0-9_])(EXEC|EXECUTE)([^A-Za-z0-9_]|$)/i;
 const PROCEDIMIENTO_SQLSERVER = /(^|[^A-Za-z0-9_])(sp_|xp_)/i;
+
+// Reglas de los dos dialectos (contract v16, AC47): una palabra de escritura
+// en cualquier posición de la sentencia normalizada, y —sólo en postgres— la
+// función que cambia un parámetro de la sesión desde dentro de un SELECT.
+const ESCRITURA_EMBEBIDA = /(^|[^A-Za-z0-9_])(INSERT|UPDATE|DELETE|MERGE|INTO)([^A-Za-z0-9_]|$)/i;
+const FUNCION_PROHIBIDA_POSTGRES = /(^|[^A-Za-z0-9_])set_config([^A-Za-z0-9_]|$)/i;
 
 /**
  * Quita comentarios de bloque, comentarios de línea y literales de texto.
@@ -117,6 +134,17 @@ function validarSql(sql, dialecto) {
       if (PROCEDIMIENTO_SQLSERVER.test(sentencia)) {
         return rechazo('procedimiento_de_sistema', sentencia);
       }
+    }
+
+    // 🔴 ESTOS DOS VAN AL FINAL, DESPUÉS DE TODOS LOS DEMÁS (AC47): así
+    // ningún rechazo que ya existía cambia de motivo. Y miran `sentencia`,
+    // que ya está normalizada — sobre el SQL crudo, `SELECT 'delete' AS x`
+    // se rechazaría por una palabra que vive dentro de un literal.
+    if (ESCRITURA_EMBEBIDA.test(sentencia)) {
+      return rechazo('escritura_embebida', sentencia);
+    }
+    if (dialecto === 'postgres' && FUNCION_PROHIBIDA_POSTGRES.test(sentencia)) {
+      return rechazo('funcion_prohibida', sentencia);
     }
   }
 

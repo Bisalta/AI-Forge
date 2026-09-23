@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SDD/tests/test_servidor_mcp.sh — plugins/bisalta-db/scripts/servidor-mcp.js
 # y conexion.js. AC23-AC37 del contract
-# SDD/contracts/2026-09-18-bisalta-db-mcp.md v3.
+# SDD/contracts/2026-09-18-bisalta-db-mcp.md v3, AC45a (v16) y AC46 (v16).
 #
 # No hay base ni cuenta de AWS acá, y no hace falta: los binarios externos
 # (`aws`, `psql`, `sqlcmd`) se sustituyen por stubs al frente del PATH que
@@ -89,6 +89,10 @@ cat > "$BIN_DIR/psql" <<'STUB'
 #!/usr/bin/env bash
 {
   printf 'ARGS %s\n' "$*"
+  # Una línea por argumento, además de la de arriba: `ARGS` pega todo con
+  # espacios y no deja ver dónde termina un `--command` y empieza el
+  # siguiente. AC46 necesita el orden exacto de los dos.
+  for arg in "$@"; do printf 'ARG %s\n' "$arg"; done
   printf 'PGOPTIONS %s\n' "${PGOPTIONS:-(vacio)}"
   printf 'PGAPPNAME %s\n' "${PGAPPNAME:-(vacio)}"
   if [ -n "${PGPASSFILE:-}" ] && [ -f "$PGPASSFILE" ]; then
@@ -130,6 +134,10 @@ case "${BISALTA_STUB_PSQL_MODO:-normal}" in
   timeout)
     printf 'ERROR:  canceling statement due to statement timeout\n' >&2
     exit 3
+    ;;
+  no-replica)
+    printf 'ERROR:  bisalta-db: la conexion no llego a una replica de lectura\n' >&2
+    exit 1
     ;;
 esac
 STUB
@@ -213,8 +221,8 @@ assert_contains "$cuerpo" '"garantias"' "AC35 listar_conexiones devuelve las gar
 # El nivel viaja con la garantía en la proyección pública: si se quedara sólo en
 # el catálogo, quien llama a listar_conexiones volvería a ver tres garantías
 # planas — que es justo lo que v15 vino a corregir.
-assert_contains "$cuerpo" '"nivel"' "AC45 listar_conexiones propaga el nivel de cada garantía"
-assert_contains "$cuerpo" '"incondicional"' "AC45 listar_conexiones distingue la garantía incondicional"
+assert_contains "$cuerpo" '"nivel"' "AC45a listar_conexiones propaga el nivel de cada garantía"
+assert_contains "$cuerpo" '"incondicional"' "AC45a listar_conexiones distingue la garantía incondicional"
 assert_contains "$cuerpo" '"ambiente":"dev"' "AC35 listar_conexiones devuelve el ambiente"
 for campo in '"host"' '"puerto"' '"secret_id"' '"region"'; do
   case "$cuerpo" in
@@ -321,6 +329,46 @@ assert_eq "$en_claro" "no" "AC30 la bitácora NO guarda el texto de la consulta"
 
 lineas_bitacora="$(wc -l < "$BISALTA_DB_BITACORA" | tr -d ' ')"
 assert_eq "$lineas_bitacora" "1" "AC30 la bitácora escribe una línea por invocación"
+
+# ---------------------------------------------------------------------------
+# AC46 — la guarda de réplica (contract v16)
+# ---------------------------------------------------------------------------
+# Aurora apunta el endpoint `cluster-ro-` al writer cuando el cluster se queda
+# sin réplicas. La guarda es el PRIMER `--command`: corre en la misma conexión
+# que el SQL del consumidor y, con ON_ERROR_STOP=1, si falla psql no ejecuta
+# el segundo. El literal esperado es el del contract, copiado tal cual: un
+# heredoc con comillas no interpreta ni `$` ni comillas simples.
+GUARDA_ESPERADA="$(cat <<'GUARDA'
+DO $guarda$ BEGIN IF NOT pg_is_in_recovery() THEN RAISE EXCEPTION 'bisalta-db: la conexion no llego a una replica de lectura'; END IF; END $guarda$
+GUARDA
+)"
+SQL_CONSUMIDOR='SELECT 42 AS valor_del_consumidor'
+reiniciar_registros
+servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' "$SQL_CONSUMIDOR")" "$PATH_CON_STUBS" >/dev/null
+if grep -qx 'ARG --quiet' "$TMP_DIR/psql-invocado.log"; then quiet=si; else quiet=no; fi
+assert_eq "$quiet" "si" "AC46 el comando lleva --quiet (sin él psql imprime DO como primera línea del CSV)"
+# El valor que sigue a cada `--command`, en el orden en que psql los recibe.
+comandos="$(awk '$0 == "ARG --command" { if ((getline siguiente) > 0) { sub(/^ARG /, "", siguiente); print siguiente } }' "$TMP_DIR/psql-invocado.log")"
+cantidad="$(printf '%s\n' "$comandos" | grep -c .)"
+assert_eq "$cantidad" "2" "AC46 el comando lleva exactamente dos --command"
+assert_eq "$(printf '%s\n' "$comandos" | sed -n '1p')" "$GUARDA_ESPERADA" "AC46 el primer --command es exactamente la guarda de réplica"
+assert_eq "$(printf '%s\n' "$comandos" | sed -n '2p')" "$SQL_CONSUMIDOR" "AC46 el segundo --command es el SQL del consumidor"
+
+# (d) El stub escribe el mensaje de la guarda en stderr y sale 1, que es lo
+# que psql hace contra el writer.
+BISALTA_STUB_PSQL_MODO=no-replica
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+salida="$(servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS")"
+cuerpo="$(cuerpos "$salida")"
+assert_contains "$cuerpo" '"codigo":9' "AC46 si la guarda falla, la respuesta tiene código 9"
+assert_contains "$cuerpo" '"error":"no_es_replica"' "AC46 si la guarda falla, el error es no_es_replica"
+assert_contains "$cuerpo" 'proveedores-dev' "AC46 el error no_es_replica nombra la conexión"
+assert_contains "$(cat "$BISALTA_DB_BITACORA" 2>/dev/null)" '"codigo":9' "AC46 la bitácora registra el código 9"
+env PATH="$PATH_CON_STUBS" TMPDIR="$SYSTMP" "$NODE_BIN" "$SERVIDOR" --consultar 'proveedores-dev' --sql 'SELECT 1' >/dev/null 2>&1
+assert_exit 9 "$?" "AC46 el proceso sale 9 cuando la conexión no llegó a una réplica"
+BISALTA_STUB_PSQL_MODO=normal
+export BISALTA_STUB_PSQL_MODO
 
 # ---------------------------------------------------------------------------
 # AC25 — ni la bitácora, ni la respuesta, ni los errores llevan la credencial
