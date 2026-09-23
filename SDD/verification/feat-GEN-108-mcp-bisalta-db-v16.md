@@ -556,3 +556,24 @@ if arbol_limpio; then echo "Árbol al terminar: limpio"; else echo "Árbol al te
 echo "Triples rotos: $ROTOS"
 [ "$ROTOS" -eq 0 ]
 ```
+
+---
+
+# Sección del planner — `AC29` a través del plugin **instalado** (no lo escribió `AGENT_r2`)
+
+El addendum de arriba verifica `AC29` con el servidor **del repo**. El contract pide además la verificación a través del plugin **instalado**, en una sesión arrancada después de instalar. Se corrió el 23-sep-2026 con la herramienta MCP `consultar` de una sesión de Claude Code reiniciada tras reinstalar `bisalta-db` desde el marketplace local.
+
+**Qué código corría**: la copia instalada tenía el código de v15 (la reinstalación fue antes de v16). La línea que fija `PGAPPNAME` **no cambió** entre `5e29179` (v15) y `6412b86`: `git diff 5e29179 HEAD -- plugins/bisalta-db/scripts/conexion.js` no tiene ninguna línea `+`/`-` con `PGAPPNAME`. Por eso esta verificación vale para el árbol de v16 en lo que `AC29` afirma; **no** verifica la guarda de `AC46` a través del plugin instalado, que se verificó con el servidor del repo (addendum, §3.1).
+
+**Una corrección del propio planner**: la primera vez se afirmó "las seis" con cinco medidas — `smartfleet-dev` se había consultado antes del fix y sólo para contar tablas. Se midió después, y es la sexta de abajo.
+
+Respuestas literales, campo `filas`:
+
+- `proveedores-dev` → `{"app": "claude_lectura", "rol": "claude_lectura", "solo_lectura": "on", "replica": "t"}`
+- `proveedores-qa` → `{"base": "proveedores_qa", "app": "claude_lectura"}`
+- `smartcheck-dev` → `{"base": "smartcheck_dev", "app": "claude_lectura"}`
+- `smartcheck-qa` → `{"base": "smartcheck_qa", "app": "claude_lectura"}`
+- `smartfleet-qa` → `{"base": "smartfleet_qa", "app": "claude_lectura"}`
+- `smartfleet-dev` → `{"base": "smartfleet_dev", "app": "claude_lectura"}` (medida después; ver la corrección de arriba)
+
+Consultas: `SELECT current_setting('application_name') AS app, …`, con `current_database()` en las cinco últimas. Antes del fix de v15, la misma consulta devolvía `psql`.
