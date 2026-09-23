@@ -221,6 +221,7 @@ postgres|escritura_embebida|un CTE con UPDATE|WITH x AS (UPDATE t SET a = 1 RETU
 postgres|escritura_embebida|un SELECT INTO|SELECT * INTO nueva FROM t
 postgres|funcion_prohibida|un set_config que apaga la sesión de solo lectura|SELECT set_config('default_transaction_read_only','off',false)
 postgres|funcion_prohibida|un set_config calificado con pg_catalog|SELECT pg_catalog.set_config('a','b',false)
+postgres|funcion_prohibida|un SET_CONFIG en mayúsculas|SELECT SET_CONFIG('a','b',false)
 sqlserver|escritura_embebida|un CTE seguido de DELETE|WITH c AS (SELECT * FROM t) DELETE FROM c
 sqlserver|escritura_embebida|un CTE seguido de UPDATE|WITH c AS (SELECT * FROM t) UPDATE c SET a = 1
 sqlserver|escritura_embebida|un CTE seguido de INSERT|WITH c AS (SELECT * FROM t) INSERT INTO u SELECT * FROM c

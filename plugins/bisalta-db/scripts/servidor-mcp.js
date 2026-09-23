@@ -221,13 +221,18 @@ const HERRAMIENTAS = [
   {
     name: 'consultar',
     description: 'Corre una consulta de SOLO LECTURA contra una conexión del catálogo y devuelve las filas. ' +
-      'Rechaza cualquier sentencia que no empiece con SELECT o WITH, antes de conectar. ' +
-      'Tope de ' + LIMITE_FILAS + ' filas y ' + LIMITE_BYTES + ' bytes.',
+      'Rechaza, antes de conectar, toda sentencia que no empiece con SELECT o WITH, y también las que ' +
+      'llevan una escritura embebida: INSERT, UPDATE, DELETE, MERGE o INTO en cualquier posición ' +
+      '(un WITH con escritura adentro, SELECT ... INTO) y, en Postgres, set_config. ' +
+      'En Postgres, si la conexión no llegó a una réplica de lectura, se niega con no_es_replica sin ' +
+      'ejecutar el SQL. Tope de ' + LIMITE_FILAS + ' filas y ' + LIMITE_BYTES + ' bytes.',
     inputSchema: {
       type: 'object',
       properties: {
         conexion: { type: 'string', description: 'Nombre de la conexión, tal como lo devuelve listar_conexiones.' },
-        sql: { type: 'string', description: 'SQL de solo lectura (SELECT o WITH).' }
+        sql: { type: 'string', description: 'SQL de solo lectura: cada sentencia empieza con SELECT o WITH y no lleva ' +
+          'INSERT, UPDATE, DELETE, MERGE ni INTO en ninguna posición (se rechaza SELECT ... INTO y un WITH con ' +
+          'escritura adentro); en Postgres tampoco set_config.' }
       },
       required: ['conexion', 'sql']
     }
