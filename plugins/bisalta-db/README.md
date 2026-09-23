@@ -364,3 +364,41 @@ python3 -c "import json;print(sorted({e['secret_id'] for e in json.load(open('CA
 ```
 
 sobre el catálogo del repo y sobre el de `~/.claude/plugins/cache/ai-forge/bisalta-db/<version>/`.
+
+### Reinstalar no alcanza: hay que reiniciar, y la forma de un cambio decide qué se rompe
+
+Medido el 23-sep-2026, al reinstalar para tomar el contract v15. Tres cosas que no son obvias:
+
+**1. `remove` no borra la copia.** `/plugin marketplace remove ai-forge` saca el marketplace y el
+plugin del registro, pero deja la carpeta `cache/ai-forge/bisalta-db/<version>/` en el disco. Un
+`grep` sobre esa carpeta después del `remove` sigue encontrando el código viejo — y eso no dice
+que la reinstalación falló, dice que todavía no hubo reinstalación.
+
+**2. El código se carga una vez; el catálogo, en cada llamada.** El servidor MCP carga sus scripts
+al arrancar y relee `catalogo.json` en cada invocación. Después de reinstalar, un servidor que ya
+estaba corriendo queda con **código viejo leyendo datos nuevos**. Qué pasa depende de qué cambió:
+
+| Qué cambió | Efecto sobre una sesión abierta que no se reinició |
+|---|---|
+| **Valores** del catálogo (un `secret_id`, un `host`, una base nueva) | se toma en la próxima llamada, sin reiniciar |
+| **Forma** del catálogo (un campo nuevo, un tipo distinto — como `garantias` pasando de nombres a objetos en v15) | **se rompe**: el validador viejo rechaza el catálogo nuevo con `catalogo_invalido`, código 2 |
+| **Código** (`conexion.js`, `lista-blanca.js`, `servidor-mcp.js`) | **no se toma** hasta reiniciar, y no avisa: la sesión sigue funcionando con el comportamiento viejo |
+
+La tercera fila es la peligrosa, porque no falla. La segunda al menos falla **cerrada**: rechaza el
+catálogo entero, no se conecta a nada y no valida a medias — el rechazo del 23-sep mostró cada
+garantía como `[object Object]`, que es el síntoma de esta mezcla y no un catálogo roto.
+
+**3. Cada sesión tiene su propio servidor.** Claude Code levanta un proceso del servidor MCP por
+sesión. Reiniciar una no arregla las otras: toda sesión abierta sigue con su código viejo hasta que
+se reinicie. Para ver cuáles quedaron atrás, comparar la hora de arranque de cada proceso contra la
+hora de la reinstalación:
+
+```
+ps -eo pid,lstart,command | grep '[b]isalta-db.*servidor-mcp'
+```
+
+Todo proceso que arrancó antes de reinstalar corre código viejo.
+
+**Orden completo**: `remove` → `add` → `install` → **reiniciar cada sesión que use el plugin** →
+confirmar con algo que el cambio nuevo haga observable. Una verificación que el código viejo
+también pasaría no confirma nada.
