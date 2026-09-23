@@ -261,7 +261,7 @@ Nombres literales, tal como los imprime el harness. Las cantidades de asserts po
 | AC | Archivo | Asserts |
 |---|---|---|
 | AC29 (harness, sin cambios en v16) | `SDD/tests/test_servidor_mcp.sh` | "AC29 el comando lleva el usuario del secreto en PGAPPNAME" · "AC29 PGOPTIONS no lleva application_name (psql le gana al -c)" |
-| AC29 (`manual-only`, v16) | — | §3.2 de este addendum, **con el servidor del repo** |
+| AC29 (`manual-only`, v16) | — | **"Sección del planner" al final de este report** — a través del plugin **instalado**, que es lo que el AC pide. §3.2 queda como evidencia complementaria, con el servidor del repo. (Fila corregida por el planner tras la review de ronda 2.) |
 | AC45a | `SDD/tests/test_servidor_mcp.sh` | "AC45a listar_conexiones propaga el nivel de cada garantía" · "AC45a listar_conexiones distingue la garantía incondicional" |
 | AC45b (1) | `SDD/tests/test_catalogo.sh` | "AC45b (1) el validador rechaza una garantía declarada como cadena suelta" · "AC45b (1) el rechazo de la cadena suelta dice que tiene que ser un objeto" |
 | AC45b (2) | `SDD/tests/test_catalogo.sh` | "AC45b (2) el validador rechaza un nivel fuera del enum cerrado" · "AC45b (2) el rechazo del nivel inválido nombra el enum de nivel" |
@@ -567,13 +567,15 @@ El addendum de arriba verifica `AC29` con el servidor **del repo**. El contract 
 
 **Una corrección del propio planner**: la primera vez se afirmó "las seis" con cinco medidas — `smartfleet-dev` se había consultado antes del fix y sólo para contar tablas. Se midió después, y es la sexta de abajo.
 
-Respuestas literales, campo `filas`:
+Respuestas literales de la herramienta `consultar`, completas (la review de ronda 2 marcó que antes sólo estaba el campo `filas`), en el orden en que se corrieron — `smartfleet-dev` al final, por la corrección de arriba:
 
-- `proveedores-dev` → `{"app": "claude_lectura", "rol": "claude_lectura", "solo_lectura": "on", "replica": "t"}`
-- `proveedores-qa` → `{"base": "proveedores_qa", "app": "claude_lectura"}`
-- `smartcheck-dev` → `{"base": "smartcheck_dev", "app": "claude_lectura"}`
-- `smartcheck-qa` → `{"base": "smartcheck_qa", "app": "claude_lectura"}`
-- `smartfleet-qa` → `{"base": "smartfleet_qa", "app": "claude_lectura"}`
-- `smartfleet-dev` → `{"base": "smartfleet_dev", "app": "claude_lectura"}` (medida después; ver la corrección de arriba)
+```
+{"conexion":"proveedores-dev","dialecto":"postgres","filas":[{"app":"claude_lectura","rol":"claude_lectura","solo_lectura":"on","replica":"t"}],"filas_devueltas":1,"truncado":false,"motivo_truncado":null}
+{"conexion":"proveedores-qa","dialecto":"postgres","filas":[{"base":"proveedores_qa","app":"claude_lectura"}],"filas_devueltas":1,"truncado":false,"motivo_truncado":null}
+{"conexion":"smartcheck-dev","dialecto":"postgres","filas":[{"base":"smartcheck_dev","app":"claude_lectura"}],"filas_devueltas":1,"truncado":false,"motivo_truncado":null}
+{"conexion":"smartcheck-qa","dialecto":"postgres","filas":[{"base":"smartcheck_qa","app":"claude_lectura"}],"filas_devueltas":1,"truncado":false,"motivo_truncado":null}
+{"conexion":"smartfleet-qa","dialecto":"postgres","filas":[{"base":"smartfleet_qa","app":"claude_lectura"}],"filas_devueltas":1,"truncado":false,"motivo_truncado":null}
+{"conexion":"smartfleet-dev","dialecto":"postgres","filas":[{"base":"smartfleet_dev","app":"claude_lectura"}],"filas_devueltas":1,"truncado":false,"motivo_truncado":null}
+```
 
 Consultas: `SELECT current_setting('application_name') AS app, …`, con `current_database()` en las cinco últimas. Antes del fix de v15, la misma consulta devolvía `psql`.

@@ -36,7 +36,7 @@ Y dos que decidiste vos el 23-sep: la réplica **se comprueba en cada consulta**
 
 🟡 **La cuenta de producción no está enumerada** (`D43`). Ninguna entrada del catálogo apunta ahí, pero "producción es irrepresentable" descansa en eso, no en un inventario.
 
-✅ **Postgres probado de punta a punta contra la base real (23-sep-2026).** Las seis conexiones de Postgres responden a través del plugin instalado, las seis con `application_name = claude_lectura`. La sesión en solo lectura y la conexión contra la réplica se verificaron en `proveedores-dev`. La guarda de `AC46` se verificó con el servidor del repo: contra el endpoint de escritura se niega con código 9, y contra la réplica devuelve filas.
+✅ **Postgres probado de punta a punta contra la base real (23-sep-2026).** Las seis conexiones de Postgres responden a través del plugin instalado, las seis con `application_name = claude_lectura` — **la copia instalada tenía el código de v15**, sin la guarda de `AC46`; lo que `AC29` afirma no cambió entre v15 y v16. La sesión en solo lectura y la conexión contra la réplica se verificaron en `proveedores-dev`. La guarda de `AC46` se verificó con el servidor del repo: contra el endpoint de escritura se niega con código 9, y contra la réplica devuelve filas.
 
 ✅ **La prueba en vivo encontró un defecto que la suite no veía.** `AC29` estaba verde en los tests y la sesión real se llamaba `psql`: el test miraba cómo se armaba el comando, no qué efecto tenía (`RT48`). Corregido en v15.
 
