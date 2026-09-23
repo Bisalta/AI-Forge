@@ -1,22 +1,22 @@
 # Gates run — generado por sdd-run-gates.sh v0.12.0
 
-- **Branch**: `feat-GEN-108-mcp-bisalta-db` · **Commit**: `ef47e82` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-09-23T18:19:27Z
-- Tree: `3f078fec326c2afb26b1f1cc3de511e1be446c2e` — LIMPIO
+- **Branch**: `feat-GEN-108-mcp-bisalta-db` · **Commit**: `7516bad` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-09-23T18:31:38Z
+- Tree: `7fb66beb5424730a62001558202d166257fdc270` — LIMPIO
 - Este archivo lo escribió el runner, no un modelo. Editarlo a mano invalida la evidencia.
 
 | # | Gate | Comando | Exit | Timestamp UTC | Resultado |
 |---|---|---|---|---|---|
-| 1 | format / style | — | — | 2026-09-23T18:18:28Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
-| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-09-23T18:18:28Z | verde |
-| 3 | type-check | — | — | 2026-09-23T18:18:29Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
-| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-09-23T18:18:29Z | verde |
-| 5 | integration | — | — | 2026-09-23T18:18:57Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
-| 6 | build | — | — | 2026-09-23T18:18:57Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
-| 7 | e2e | — | — | 2026-09-23T18:18:57Z | [SKIPPED] sin comando en el doc (N/A) |
-| 8 | cobertura del diff | — | — | 2026-09-23T18:18:57Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
-| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-09-23T18:18:57Z | verde |
-| 10 | smoke manual | — | — | 2026-09-23T18:18:58Z | [SKIPPED] sin comando en el doc (N/A) |
-| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-09-23T18:18:58Z | verde |
+| 1 | format / style | — | — | 2026-09-23T18:30:38Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
+| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-09-23T18:30:38Z | verde |
+| 3 | type-check | — | — | 2026-09-23T18:30:39Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
+| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-09-23T18:30:39Z | verde |
+| 5 | integration | — | — | 2026-09-23T18:31:08Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
+| 6 | build | — | — | 2026-09-23T18:31:08Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
+| 7 | e2e | — | — | 2026-09-23T18:31:08Z | [SKIPPED] sin comando en el doc (N/A) |
+| 8 | cobertura del diff | — | — | 2026-09-23T18:31:08Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
+| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-09-23T18:31:08Z | verde |
+| 10 | smoke manual | — | — | 2026-09-23T18:31:09Z | [SKIPPED] sin comando en el doc (N/A) |
+| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-09-23T18:31:09Z | verde |
 
 ## Output por gate (últimas 15 líneas)
 
@@ -49,7 +49,7 @@ PASS  test_usage_summary.sh
 ### Gate 9 — security (exit 0)
 
 ```
-secret-scan: sin hallazgos sobre 166 archivos versionados (1 excluido: self)
+secret-scan: sin hallazgos sobre 167 archivos versionados (1 excluido: self)
 ```
 
 ### Gate — — suite completa (exit 0)
@@ -77,21 +77,21 @@ PASS  test_usage_summary.sh
 
 # Addendum de AGENT_r2 — contract v16 (NO lo escribió el runner)
 
-Todo lo que sigue a esta línea lo escribió `AGENT_r2` (implementing agent, tier `opus`). Lo de arriba es del runner (`sdd-run-gates.sh --full`, exit 0, commit `ef47e82`, árbol `3f078fec` LIMPIO) y no se tocó.
+Todo lo que sigue a esta línea lo escribió `AGENT_r2` (implementing agent, tier `opus`). Lo de arriba es del runner (`sdd-run-gates.sh --full`, exit 0, commit `7516bad`, árbol `7fb66beb` LIMPIO) y no se tocó.
 
-- **Brief**: `SDD/briefs/R2-v16-guarda-replica-y-escritura-embebida.md` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v16** · ACs: AC29 (parte `manual-only`), AC45a, AC45b, AC45c, AC46, AC47.
-- **Commit de la implementación**: `ef47e82`. Este addendum y el reporte del runner van en un commit posterior, así que **quedan fuera del árbol que el runner selló** (misma situación que `D34`/`D35`).
+- **Brief**: `SDD/briefs/R2-v16-guarda-replica-y-escritura-embebida.md` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v16 con la enmienda del planner `164d91e`** (AC47: `set_config` sin distinguir mayúsculas, con el caso `SELECT SET_CONFIG('a','b',false)`; las descripciones que lee el modelo dicen la regla) · ACs: AC29 (parte `manual-only`), AC45a, AC45b, AC45c, AC46, AC47.
+- **Commits**: `ef47e82` (implementación de v16) y `7516bad` (enmienda: el caso `SET_CONFIG` en el test, la `description` de `consultar` y de su parámetro `sql` en `servidor-mcp.js`, y la `description` de `plugin.json`). Este report **reemplaza** al de la primera corrida (`a3a5238`, que selló `ef47e82`): la escalera y el script se volvieron a correr sobre `7516bad`. Este addendum y el reporte del runner van en un commit posterior, así que **quedan fuera del árbol que el runner selló** (misma situación que `D34`/`D35`).
 
-## 1. Triples de mutación — salida literal del script, corrido una vez el 23-sep-2026
+## 1. Triples de mutación — salida literal del script, corrido una vez sobre `7516bad` el 23-sep-2026
 
 Cubre las trece mutaciones que el contract declara: AC45b (1)-(5), AC45c (a)-(b), AC46 (a)-(c), AC47 (a)-(c). Por cada una el script imprime el exit code de las tres corridas del archivo de test, el conteo `ok`/`FAIL` de los asserts de ese AC y el nombre de cada assert que cae. Aborta si una mutación no se aplicó (`git diff --quiet -- <archivo>` sale 0); la línea "mutación aplicada" muestra ese exit code (`1`) y las líneas tocadas. Restaura con `git checkout -- <archivo>` y al final exige árbol limpio.
 
-Antes de la corrida medida hubo **una corrida en seco** (`SOLO_VERIFICAR=1`, el mismo script): no corre tests ni muta, sólo cuenta cuántas veces aparece el texto a mutar. Las trece dieron `1`. Se hizo para no gastar la única corrida medida en un patrón mal escrito.
+Es la segunda corrida medida del ciclo: la primera fue sobre `ef47e82` (en el report de `a3a5238`), con los trece triples en OK; el planner pidió repetirla entera sobre el árbol con la enmienda. Antes de esta corrida medida hubo **una corrida en seco** (`SOLO_VERIFICAR=1`, el mismo script): no corre tests ni muta, sólo cuenta cuántas veces aparece el texto a mutar. Las trece dieron `1`. Se hizo para no gastar la única corrida medida en un patrón mal escrito.
 
 Comando: `bash mutaciones-v16.sh` desde la raíz del repo (el script está en el §6). Exit del script: **0**.
 
 ```
-HEAD: ef47e82
+HEAD: 7516bad
 
 ### AC45b (1) — se quita el chequeo de que la garantía sea un objeto
 - verde (árbol real):  exit=0 ok=10 fail=0
@@ -184,9 +184,9 @@ HEAD: ef47e82
 - triple: OK (verde -> rojo -> verde)
 
 ### AC47 (a) — se quita el chequeo de palabras de escritura
-- verde (árbol real):  exit=0 ok=32 fail=0
+- verde (árbol real):  exit=0 ok=34 fail=0
   (mutación aplicada: git diff --quiet -- plugins/bisalta-db/scripts/lista-blanca.js salió 1; +0 -3 líneas)
-- rojo  (mutado):      exit=1 ok=12 fail=20
+- rojo  (mutado):      exit=1 ok=14 fail=20
     FAIL  AC47 rechaza en postgres un CTE con INSERT (exit 4) — esperado [4], obtenido [0]
     FAIL  AC47 el rechazo en postgres de un CTE con INSERT tiene motivo escritura_embebida — no encontré ["motivo":"escritura_embebida"] en la salida
     FAIL  AC47 rechaza en postgres un CTE con DELETE (exit 4) — esperado [4], obtenido [0]
@@ -207,27 +207,29 @@ HEAD: ef47e82
     FAIL  AC47 el rechazo en sqlserver de un SELECT INTO tiene motivo escritura_embebida — no encontré ["motivo":"escritura_embebida"] en la salida
     FAIL  AC47 rechaza en postgres un SELECT FOR UPDATE (rechazo de más, a sabiendas) (exit 4) — esperado [4], obtenido [0]
     FAIL  AC47 el rechazo en postgres de un SELECT FOR UPDATE (rechazo de más, a sabiendas) tiene motivo escritura_embebida — no encontré ["motivo":"escritura_embebida"] en la salida
-- verde (restaurado):  exit=0 ok=32 fail=0
+- verde (restaurado):  exit=0 ok=34 fail=0
 - triple: OK (verde -> rojo -> verde)
 
 ### AC47 (b) — se quita el chequeo de set_config
-- verde (árbol real):  exit=0 ok=32 fail=0
+- verde (árbol real):  exit=0 ok=34 fail=0
   (mutación aplicada: git diff --quiet -- plugins/bisalta-db/scripts/lista-blanca.js salió 1; +0 -3 líneas)
-- rojo  (mutado):      exit=1 ok=28 fail=4
+- rojo  (mutado):      exit=1 ok=28 fail=6
     FAIL  AC47 rechaza en postgres un set_config que apaga la sesión de solo lectura (exit 4) — esperado [4], obtenido [0]
     FAIL  AC47 el rechazo en postgres de un set_config que apaga la sesión de solo lectura tiene motivo funcion_prohibida — no encontré ["motivo":"funcion_prohibida"] en la salida
     FAIL  AC47 rechaza en postgres un set_config calificado con pg_catalog (exit 4) — esperado [4], obtenido [0]
     FAIL  AC47 el rechazo en postgres de un set_config calificado con pg_catalog tiene motivo funcion_prohibida — no encontré ["motivo":"funcion_prohibida"] en la salida
-- verde (restaurado):  exit=0 ok=32 fail=0
+    FAIL  AC47 rechaza en postgres un SET_CONFIG en mayúsculas (exit 4) — esperado [4], obtenido [0]
+    FAIL  AC47 el rechazo en postgres de un SET_CONFIG en mayúsculas tiene motivo funcion_prohibida — no encontré ["motivo":"funcion_prohibida"] en la salida
+- verde (restaurado):  exit=0 ok=34 fail=0
 - triple: OK (verde -> rojo -> verde)
 
 ### AC47 (c) — el chequeo de palabras corre sobre el SQL sin normalizar
-- verde (árbol real):  exit=0 ok=32 fail=0
+- verde (árbol real):  exit=0 ok=34 fail=0
   (mutación aplicada: git diff --quiet -- plugins/bisalta-db/scripts/lista-blanca.js salió 1; +1 -1 líneas)
-- rojo  (mutado):      exit=1 ok=30 fail=2
+- rojo  (mutado):      exit=1 ok=32 fail=2
     FAIL  AC47 acepta en postgres un delete que sólo vive dentro de un literal (exit 0) — esperado [0], obtenido [4]
     FAIL  AC47 acepta en sqlserver un delete que sólo vive dentro de un literal (exit 0) — esperado [0], obtenido [4]
-- verde (restaurado):  exit=0 ok=32 fail=0
+- verde (restaurado):  exit=0 ok=34 fail=0
 - triple: OK (verde -> rojo -> verde)
 
 Árbol al terminar: limpio
@@ -247,14 +249,14 @@ script exit=0
 | AC46 (b) quitar `--quiet` | (a) | sólo (a) |
 | AC46 (c) cambiar el texto reconocido | (d) | los cinco asserts de (d); la respuesta cae a `conexion_fallida` (el CLI sale `6`) |
 | AC47 (a) quitar el chequeo de palabras | el caso del CTE con `INSERT` | ese y todos los de `escritura_embebida` (20 asserts) |
-| AC47 (b) quitar el chequeo de `set_config` | su caso | los dos casos de `set_config` (4 asserts) |
+| AC47 (b) quitar el chequeo de `set_config` | su caso | los tres casos de `set_config`, **incluido el nuevo en mayúsculas** `SELECT SET_CONFIG('a','b',false)` (6 asserts), como pidió el planner |
 | AC47 (c) chequeo sobre SQL sin normalizar | `SELECT 'delete' AS x` | ese caso en los dos dialectos, y nada más |
 
 **Cómo se aplicaron las dos mutaciones de AC45c**: la (a) cambia `nivel` a `condicional` **y agrega** una `condicion`; la (b) cambia `nivel` a `incondicional` **y quita** la `condicion`. Sin eso, el validador rechazaría el catálogo entero y caería también "el catálogo real que se distribuye con el plugin es válido", que no es lo que la mutación mide. La salida muestra que en los dos casos cayó un único assert.
 
 ## 2. Binding AC ↔ test
 
-Nombres literales, tal como los imprime el harness. Las cantidades de asserts por AC salen de la columna `ok=` de la corrida verde del §1 (AC45b 10, AC45c 3, AC46 9, AC47 32).
+Nombres literales, tal como los imprime el harness. Las cantidades de asserts por AC salen de la columna `ok=` de la corrida verde del §1 (AC45b 10, AC45c 3, AC46 9, AC47 34).
 
 | AC | Archivo | Asserts |
 |---|---|---|
@@ -272,12 +274,15 @@ Nombres literales, tal como los imprime el harness. Las cantidades de asserts po
 | AC46 (c) | `SDD/tests/test_servidor_mcp.sh` | "AC46 el segundo --command es el SQL del consumidor" |
 | AC46 (d) | `SDD/tests/test_servidor_mcp.sh` | "AC46 si la guarda falla, la respuesta tiene código 9" · "AC46 si la guarda falla, el error es no_es_replica" · "AC46 el error no_es_replica nombra la conexión" · "AC46 la bitácora registra el código 9" · "AC46 el proceso sale 9 cuando la conexión no llegó a una réplica (exit 9)" |
 | AC46 (`manual-only`) | — | §3.1 de este addendum |
-| AC47 rechazados, `postgres` | `SDD/tests/test_lista_blanca.sh` | por cada caso, dos asserts: "AC47 rechaza en postgres <caso> (exit 4)" y "AC47 el rechazo en postgres de <caso> tiene motivo <motivo>". Casos: "un CTE con INSERT", "un CTE con DELETE", "un CTE con UPDATE", "un SELECT INTO" (`escritura_embebida`); "un set_config que apaga la sesión de solo lectura", "un set_config calificado con pg_catalog" (`funcion_prohibida`); "un SELECT FOR UPDATE (rechazo de más, a sabiendas)" (`escritura_embebida`) |
+| AC47 rechazados, `postgres` | `SDD/tests/test_lista_blanca.sh` | por cada caso, dos asserts: "AC47 rechaza en postgres <caso> (exit 4)" y "AC47 el rechazo en postgres de <caso> tiene motivo <motivo>". Casos: "un CTE con INSERT", "un CTE con DELETE", "un CTE con UPDATE", "un SELECT INTO" (`escritura_embebida`); "un set_config que apaga la sesión de solo lectura", "un set_config calificado con pg_catalog", "un SET_CONFIG en mayúsculas" (`funcion_prohibida`); "un SELECT FOR UPDATE (rechazo de más, a sabiendas)" (`escritura_embebida`) |
 | AC47 rechazados, `sqlserver` | `SDD/tests/test_lista_blanca.sh` | mismos dos asserts por caso. Casos: "un CTE seguido de DELETE", "un CTE seguido de UPDATE", "un CTE seguido de INSERT", "un CTE seguido de MERGE", "un SELECT INTO" (`escritura_embebida`) |
 | AC47 aceptados | `SDD/tests/test_lista_blanca.sh` | "AC47 acepta en postgres el CTE de lectura de AC19 (exit 0)" · "AC47 acepta en sqlserver el CTE de lectura de AC19 (exit 0)" · "AC47 acepta en postgres un delete que sólo vive dentro de un literal (exit 0)" · "AC47 acepta en sqlserver un delete que sólo vive dentro de un literal (exit 0)" |
+| AC47 "lo que el modelo lee también dice la regla" (enmienda) | — | **sin test, a propósito**: ningún test assertea el texto de esas descripciones (`grep -ln` de `description`, `anclada`, `Rechaza cualquier` y `SELECT o WITH` sobre `SDD/tests/*.sh`: cero archivos), y el planner indicó no agregar uno. El cambio está en `7516bad` |
 | AC47 "al final del recorrido" | `SDD/tests/test_lista_blanca.sh` | "AC47 un rechazo existente no cambia de motivo: un DELETE a secas sigue siendo no_empieza_con_select_ni_with" · "… una comilla de dólar con INTO sigue siendo comilla_de_dolar" · "… un EXEC con INSERT sigue siendo ejecucion_de_procedimiento" · "… un sp_ con DELETE sigue siendo procedimiento_de_sistema" |
 
-## 3. Verificación contra el motor (`manual-only`) — 23-sep-2026, 18:22 UTC
+## 3. Verificación contra el motor (`manual-only`) — 23-sep-2026, 18:22 UTC, **de la corrida anterior, sobre `ef47e82`**
+
+**No se repitió sobre `7516bad`**, por indicación del planner: la enmienda no toca `conexion.js` ni la guarda — en `servidor-mcp.js` sólo cambian dos cadenas de `description`, y en `plugin.json` sólo `description`. Todo lo de esta sección es literal de esa corrida.
 
 **Con el servidor del repo, no con el plugin instalado**: `node plugins/bisalta-db/scripts/servidor-mcp.js` por stdio, sobre el commit `ef47e82`, alimentado con tramas JSON-RPC `tools/call` como las de `test_servidor_mcp.sh`. La verificación a través del plugin **instalado** (la que AC29 pide textualmente) la agrega el planner.
 
@@ -357,36 +362,35 @@ Consumidores de cada símbolo cambiado, por `grep` sobre `plugins/` y `SDD/tests
 | `validarSql` (`lista-blanca.js`) | dos chequeos al final del recorrido | `servidor-mcp.js::manejarConsultar` y el CLI del mismo archivo | AC47; AC15-AC22 siguen verdes con el mismo motivo (los cuatro asserts de "no cambia de motivo") |
 | `catalogo.json` | texto de `condicion` de `sesion-read-only` (6 entradas) | `catalogo.js`, `servidor-mcp.js`, `test_catalogo.sh`, `test_servidor_mcp.sh` (copia el catálogo), README, `aprovisionamiento/RUNBOOK.md` (lo nombra, no lo parsea) | "el catálogo real que se distribuye con el plugin es válido"; AC45a/AC45c |
 | comentario de `catalogo.js`, README | prosa | lectura humana | sin test — es prosa |
+| `HERRAMIENTAS[0]` de `servidor-mcp.js` (enmienda) | sólo la `description` de `consultar` y la de su parámetro `sql` | `tools/list`, que la devuelve al cliente MCP; el harness sólo mira los nombres (AC34), no el texto | AC34 sigue verde; el texto sin test (ver binding) |
+| `plugin.json` (enmienda) | sólo `description`; `version` sin tocar | Claude Code al mostrar el plugin; `test_catalogo.sh` lee `name` y `version` (AC36), no `description` | AC36 sigue verde |
 
 **Rojos preexistentes**: ninguno medido. Antes de tocar nada corrí las tres suites del plugin sobre `5e13ef7`: `test_lista_blanca.sh` exit 0 (42 ok), `test_catalogo.sh` exit 0 (37 ok), `test_servidor_mcp.sh` exit 0 (98 ok). La suite completa no la corrí sobre la base: el único registro de la suite entera es el del runner, arriba, ya con los cambios.
 
-**Piso bash 3.2** (el heredoc dentro de `$(...)` que arma `GUARDA_ESPERADA` es el punto frágil en 3.2): las tres suites del plugin corridas con `/bin/bash`, después del commit `ef47e82`:
+**Piso bash 3.2** (el heredoc dentro de `$(...)` que arma `GUARDA_ESPERADA` es el punto frágil en 3.2): las tres suites del plugin corridas con `/bin/bash`, sobre `7516bad`:
 
 ```
 GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
-test_lista_blanca (bash 3.2) exit=0 ok=74 fail=0
+test_lista_blanca (bash 3.2) exit=0 ok=76 fail=0
 test_catalogo (bash 3.2) exit=0 ok=41 fail=0
 test_servidor_mcp (bash 3.2) exit=0 ok=107 fail=0
   ok    AC46 el primer --command es exactamente la guarda de réplica
+  ok    AC47 rechaza en postgres un SET_CONFIG en mayúsculas (exit 4)
 ```
 
 ## 5. Decisiones de lectura que el reviewer tiene que ver
 
-Ninguna reabre el contract, pero en las cuatro primeras elegí una lectura, y lo digo:
-
-1. **`set_config` sin distinguir mayúsculas.** AC47 dice "sin distinguir mayúsculas" en la oración de `INSERT`/`UPDATE`/…; para `set_config` sólo dice "la palabra". Lo implementé **sin distinguir mayúsculas** (`/i`): un identificador sin comillas en Postgres no distingue mayúsculas, así que `SELECT SET_CONFIG(...)` es la misma llamada, y una barrera que distinguiera mayúsculas se saltaría con cambiarlas. **No agregué un caso de test para la mayúscula**, porque el contract no lo enumera. Si el planner quiere fijarlo, es un caso más en `test_lista_blanca.sh`.
+1. **`set_config` sin distinguir mayúsculas** — **cerrado por el planner** en `164d91e`: era la lectura correcta, y el AC ahora enumera `SELECT SET_CONFIG('a','b',false)`. El caso está en `test_lista_blanca.sh` y la mutación (b) lo tumba (§1).
 2. **"Como palabra"** = delimitada por un carácter fuera de `[A-Za-z0-9_]` o por el borde. Es el mismo criterio que ya usaba la regla de `EXEC` del mismo archivo; no introduje uno nuevo.
 3. **La clasificación de `no_es_replica`** exige `entrada.dialecto === 'postgres'` y `r.status !== 0`, además del mensaje en stderr: es la condición del AC ("si psql sale distinto de cero y su stderr contiene…"), y psql sólo se usa en Postgres. Va antes de los dos chequeos de tiempo agotado y del genérico, como pide el brief.
-4. **El literal de la guarda y el texto reconocido son dos constantes distintas** (`GUARDA_REPLICA` y `MENSAJE_NO_REPLICA`), las dos copiadas del contract. Así la mutación (c) cambia **sólo** el texto reconocido, y no la guarda (si compartieran constante, la (c) pondría rojo también el (b)). Comparación carácter por carácter contra el bloque de código del contract: `conexion.js == contract` y `test == contract`.
+4. **El literal de la guarda y el texto reconocido son dos constantes distintas** (`GUARDA_REPLICA` y `MENSAJE_NO_REPLICA`), las dos copiadas del contract. Así la mutación (c) cambia **sólo** el texto reconocido, y no la guarda (si compartieran constante, la (c) pondría rojo también el (b)). La comparación carácter por carácter contra el bloque de código del contract se hizo en la primera corrida: `conexion.js == contract` y `test == contract`; la enmienda no tocó ninguno de los dos literales.
 5. **Asserts agregados más allá del mínimo del brief**, todos para que el AC quede cubierto entero: el mensaje en AC45b (2), (4) y (5) (el AC exige "un mensaje que nombra la regla" y antes sólo se miraba el exit); el control de conjunto no vacío en AC45c (sin él, un filtro por dialecto roto dejaría los dos asserts verdes sin mirar nada); "exactamente dos `--command`" y el exit 9 del proceso en AC46; el motivo de cada rechazo en AC47, los cuatro de "no cambia de motivo" (la cláusula "al final del recorrido") y el `FOR UPDATE` que el AC declara como rechazo de más.
+6. **Las descripciones que lee el modelo** — **cerrado por el planner** en `164d91e`, que amplió la lista de archivos con exactamente esos dos. El texto nuevo, tal como lo imprime `node -e` sobre `HERRAMIENTAS[0]`:
+   - `consultar`: *"Corre una consulta de SOLO LECTURA contra una conexión del catálogo y devuelve las filas. Rechaza, antes de conectar, toda sentencia que no empiece con SELECT o WITH, y también las que llevan una escritura embebida: INSERT, UPDATE, DELETE, MERGE o INTO en cualquier posición (un WITH con escritura adentro, SELECT ... INTO) y, en Postgres, set_config. En Postgres, si la conexión no llegó a una réplica de lectura, se niega con no_es_replica sin ejecutar el SQL. Tope de 1000 filas y 1048576 bytes."*
+   - parámetro `sql`: *"SQL de solo lectura: cada sentencia empieza con SELECT o WITH y no lleva INSERT, UPDATE, DELETE, MERGE ni INTO en ninguna posición (se rechaza SELECT ... INTO y un WITH con escritura adentro); en Postgres tampoco set_config."*
+   - `plugin.json` (`description`, en ASCII como el resto del campo): agrega *"que ademas rechaza escrituras embebidas (INSERT, UPDATE, DELETE, MERGE o INTO en cualquier posicion, incluido SELECT ... INTO y un WITH con escritura adentro)"*. No nombra `no_es_replica`: el AC lo pide "para `consultar`". `version` sin tocar.
 
-**Fuera de mi lista de archivos, para el planner** (barrido por concepto del T5, `grep` de "incondicional", "empieza con", "SELECT o WITH" y "lista blanca" en `plugins/bisalta-db/`):
-
-- `plugins/bisalta-db/scripts/servidor-mcp.js:224` — la descripción de la herramienta `consultar` que ve el modelo dice *"Rechaza cualquier sentencia que no empiece con SELECT o WITH"*, y la del parámetro `sql` (línea 230), *"SQL de solo lectura (SELECT o WITH)"*. No es falso —es una condición necesaria— pero **no menciona el rechazo de escrituras embebidas**, y es el texto que le dice al consumidor qué puede mandar.
-- `plugins/bisalta-db/.claude-plugin/plugin.json:4` — la descripción dice *"lista blanca por dialecto anclada al principio de cada sentencia"*. Misma situación.
-- `aprovisionamiento/*`: las apariciones de "incondicional" hablan del `DROP LOGIN` del inverso, no de niveles de garantía. No aplican.
-
-Ninguno de los dos primeros está en la tabla "Files" del brief, así que no los toqué.
+**Cambio en el script respecto de la primera corrida**: la condición de árbol limpio se acotó a `plugins/` y `SDD/tests/` (`git diff --quiet HEAD -- plugins SDD/tests` y `git status --porcelain -- plugins SDD/tests`). En esta segunda corrida el report del runner ya es un archivo trackeado, recién reescrito por el runner, así que la condición sobre todo el repo habría abortado antes de medir. Los cuatro archivos que el script muta están todos bajo `plugins/`.
 
 ## 6. El script, para re-correrlo
 
@@ -395,7 +399,8 @@ Desde la raíz del repo, con el árbol limpio. `SOLO_VERIFICAR=1` hace la corrid
 ```bash
 #!/usr/bin/env bash
 # Triples de mutación del contract v16: AC45b (1)-(5), AC45c (a)-(b),
-# AC46 (a)-(c), AC47 (a)-(c). Cada mutación: verde -> rojo -> verde.
+# AC46 (a)-(c), AC47 (a)-(c) — v16 con la enmienda del planner (164d91e).
+# Cada mutación: verde -> rojo -> verde.
 #
 # Reglas (review de v15):
 #  - cada mutación la aplica python3 con reemplazo EXACTO y exige una sola
@@ -417,8 +422,12 @@ CAT=plugins/bisalta-db/catalogo.json
 SALIDA="$(mktemp -t mutaciones-v16)"
 ROTOS=0
 
+# Limpio = nada modificado ni sin trackear bajo plugins/ y SDD/tests/, que es
+# donde viven los cuatro archivos que se mutan. Se acota ahí a propósito: el
+# report del runner (SDD/verification/) ya está reescrito cuando este script
+# corre, y el addendum con esta salida se le pega después.
 arbol_limpio() {
-  git diff --quiet HEAD -- && [ -z "$(git status --porcelain -- plugins SDD/tests)" ]
+  git diff --quiet HEAD -- plugins SDD/tests && [ -z "$(git status --porcelain -- plugins SDD/tests)" ]
 }
 
 if ! arbol_limpio; then
