@@ -168,7 +168,7 @@
       {
         "nombre": "rol-solo-lectura",
         "nivel": "condicional",
-        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48)."
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48). El rechazo de una escritura es por privilegio (Msg 262: CREATE TABLE permission denied in database, medido por Patrick Ocampo conectado como el login el 23-sep-2026), y el consumidor no lo puede apagar — a diferencia de Postgres, donde el primer freno es un parámetro de sesión que el rol sí apaga con un SET (contract v17, punto 4)."
       }
     ]
   },
@@ -185,7 +185,7 @@
       {
         "nombre": "rol-solo-lectura",
         "nivel": "condicional",
-        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48)."
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48). El rechazo de una escritura es por privilegio (Msg 262: CREATE TABLE permission denied in database, medido por Patrick Ocampo conectado como el login el 23-sep-2026), y el consumidor no lo puede apagar — a diferencia de Postgres, donde el primer freno es un parámetro de sesión que el rol sí apaga con un SET (contract v17, punto 4)."
       }
     ]
   },
@@ -202,7 +202,7 @@
       {
         "nombre": "rol-solo-lectura",
         "nivel": "condicional",
-        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48)."
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48). El rechazo de una escritura es por privilegio (Msg 262: CREATE TABLE permission denied in database, medido por Patrick Ocampo conectado como el login el 23-sep-2026), y el consumidor no lo puede apagar — a diferencia de Postgres, donde el primer freno es un parámetro de sesión que el rol sí apaga con un SET (contract v17, punto 4)."
       }
     ]
   },
@@ -219,7 +219,7 @@
       {
         "nombre": "rol-solo-lectura",
         "nivel": "condicional",
-        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48)."
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48). El rechazo de una escritura es por privilegio (Msg 262: CREATE TABLE permission denied in database, medido por Patrick Ocampo conectado como el login el 23-sep-2026), y el consumidor no lo puede apagar — a diferencia de Postgres, donde el primer freno es un parámetro de sesión que el rol sí apaga con un SET (contract v17, punto 4)."
       }
     ]
   },
@@ -236,7 +236,7 @@
       {
         "nombre": "rol-solo-lectura",
         "nivel": "condicional",
-        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48)."
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48). El rechazo de una escritura es por privilegio (Msg 262: CREATE TABLE permission denied in database, medido por Patrick Ocampo conectado como el login el 23-sep-2026), y el consumidor no lo puede apagar — a diferencia de Postgres, donde el primer freno es un parámetro de sesión que el rol sí apaga con un SET (contract v17, punto 4)."
       }
     ]
   },
@@ -253,7 +253,7 @@
       {
         "nombre": "rol-solo-lectura",
         "nivel": "condicional",
-        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48)."
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48). El rechazo de una escritura es por privilegio (Msg 262: CREATE TABLE permission denied in database, medido por Patrick Ocampo conectado como el login el 23-sep-2026), y el consumidor no lo puede apagar — a diferencia de Postgres, donde el primer freno es un parámetro de sesión que el rol sí apaga con un SET (contract v17, punto 4)."
       }
     ]
   }

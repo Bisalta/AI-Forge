@@ -62,6 +62,18 @@
 --
 -- Tolerante a que el user o el login no existan: correrlo sobre una
 -- instancia ya revertida, o dos veces seguidas, sale sin error.
+--
+-- AC48 / DENY VIEW ANY DATABASE — nada que revertir acá (revisado contract
+-- v17): este script no tiene guarda de instancia (a diferencia de
+-- sqlserver-parte-a.sql/-b.sql, que sí la tienen), así que no hay ningún
+-- `SET NOEXEC ON` ni rama condicional que salte el bloque final. El cursor
+-- de arriba recorre TODO `sys.databases` y, para cada base NO ONLINE, sólo
+-- hace `PRINT` y sigue — nunca corta la ejecución del batch. El
+-- `IF EXISTS (...) DROP LOGIN` de más abajo es, por lo tanto, el ÚNICO
+-- camino de salida del script y SIEMPRE se alcanza. Como el `DENY VIEW ANY
+-- DATABASE` es un permiso de servidor otorgado al login (no a un user de
+-- base), se va con el login cuando el `DROP LOGIN` corre: no queda ningún
+-- `DENY` huérfano que revertir a mano.
 
 DECLARE @db_name SYSNAME;
 DECLARE @sql NVARCHAR(MAX);

@@ -164,22 +164,17 @@ corregido ahí también.
 - Acceso de `sysadmin` a la instancia `Dev SQL` (`10.24.40.137`).
 - Red desde la máquina que ejecuta hacia la VPC de dev/qa y hacia
   `10.24.40.137`.
-- **Medir `SERVERPROPERTY('MachineName')` contra Dev SQL ANTES de correr
-  `sqlserver-parte-a.sql` o `sqlserver-parte-b.sql` (contract v13, AC44)**:
-  conectado con `sysadmin` a `10.24.40.137`, correr
-  `SELECT SERVERPROPERTY('MachineName');`. El valor que hoy llevan los dos
-  scripts (`EC2AMAZ-2RGHL0C`) sale de un registro de SSM, no de esta
-  medición — está **sin confirmar**. Si el valor medido no coincide con
-  `EC2AMAZ-2RGHL0C`, el valor medido manda (Patrick Ocampo, textual: "si no
-  coincide, el valor manda sobre el mío"): actualizar la constante
-  `@esperada` en los dos scripts antes de ejecutarlos. Esta medición no se
-  hizo durante esta ronda porque **de este lado nadie tiene conexión a esa
-  instancia**, no porque falte el login nuevo: `SERVERPROPERTY('MachineName')`
-  **la contesta cualquier conexión a ese SQL Server** y no necesita
-  `bisalta_lectura` (corrección de Patrick Ocampo, 22-sep-2026 — una versión
-  anterior de esta nota atribuía la falta de medición al login ausente, y era
-  falso). Es la primera acción de quien ejecute el runbook, con cualquier
-  login `sysadmin` que ya tenga acceso.
+- **`SERVERPROPERTY('MachineName')` ya está medido (contract v17, "Cambios
+  v16 → v17" punto 1, AC44)**: Patrick Ocampo lo corrió el 23-sep-2026 vía
+  SSM contra la instancia de Dev SQL aprovisionada:
+  `SELECT SERVERPROPERTY('MachineName');` → `EC2AMAZ-2RGHL0C`, que **coincide**
+  con la constante `@esperada` que ya llevan `sqlserver-parte-a.sql` y
+  `sqlserver-parte-b.sql`. No hace falta remedirlo para correr los scripts
+  contra esta misma instancia. Si en el futuro se apunta a una instancia
+  distinta de Dev SQL, medirlo de nuevo ahí y actualizar `@esperada` en los
+  dos scripts antes de ejecutar — el valor medido siempre manda sobre la
+  constante (Patrick Ocampo, textual: "si no coincide, el valor manda sobre
+  el mío").
 - Clientes CLI instalados: `psql` (Postgres) y `sqlcmd` (SQL Server). Medido
   el 18-sep-2026 en la máquina de referencia de este repo: `psql` 14.18
   presente, `sqlcmd` ausente — instalarlo antes de correr los scripts de
@@ -202,13 +197,17 @@ corregido ahí también.
 4. **Verificar AC1** contra `proveedores_dev` (ver abajo) antes de seguir.
 5. `postgres-parte-b.sql` conectado al resto de las bases del catálogo
    (`proveedores_qa`, y cualquier base que se agregue después).
-6. **Antes de correr nada de SQL Server**: medir `SERVERPROPERTY('MachineName')`
-   contra `Dev SQL` (ver "Prerequisitos" arriba) y confirmar o corregir
-   `@esperada` en `sqlserver-parte-a.sql` y `sqlserver-parte-b.sql`.
+6. **Antes de correr nada de SQL Server**: `SERVERPROPERTY('MachineName')`
+   ya está medido contra `Dev SQL` y coincide con `@esperada` (ver
+   "Prerequisitos" arriba, contract v17). Si se apunta a una instancia
+   distinta de la ya aprovisionada, medir ahí y corregir `@esperada` en
+   `sqlserver-parte-a.sql` y `sqlserver-parte-b.sql` antes de seguir.
 7. `sqlserver-parte-a.sql` contra la instancia `Dev SQL`. **Verificar AC44**
    (ver abajo): si la instancia no coincide con `@esperada`, el script
    tiene que abortar sin crear el login — confirmar esto primero contra
-   una instancia de prueba antes de confiar en la corrida real.
+   una instancia de prueba antes de confiar en la corrida real. El mismo
+   script aplica el `DENY VIEW ANY DATABASE` de **AC48** (ver abajo),
+   fuera del bloque que crea el login.
 8. `sqlserver-parte-b.sql` contra la misma instancia (recorre la lista
    explícita declarada al principio del script, otorgando `db_datareader`
    —y nada más, desde v10— a cada base nombrada ahí). Lleva la misma
@@ -217,7 +216,9 @@ corregido ahí también.
    salida por líneas `AUSENTE:` / `NO ONLINE:` / `RECHAZADA` antes de
    seguir**: cada una nombra una base de la lista que quedó sin el user
    en esta corrida.
-9. **Verificar AC5** contra `EXACTUS` y **AC42** (ver abajo).
+9. **Verificar AC5** contra `EXACTUS`, **AC42** (ver abajo) y **AC48** (ver
+   abajo) — AC42 y AC48 verifican cosas distintas: AC42 mide membresía, AC48
+   mide qué ve el login conectado como tal.
 10. Crear los dos secretos en Secrets Manager (ver "Forma del secreto" y
     "Política IAM" abajo) y verificar AC8. **Este paso no depende de los
     anteriores**: puede correrse en cualquier momento, incluso primero. Si
@@ -646,6 +647,12 @@ sqlcmd -S 10.24.40.137 -E -Q "DROP DATABASE zz_scratch_ac6;"
 
 ### AC7 — el user existe exactamente en las bases de la lista y en ninguna otra
 
+**Nota (contract v17, "Cambios v16 → v17" punto 2)**: esta verificación mide
+**membresía** — dónde el login tiene un `user` propio en
+`sys.database_principals` —, no **visibilidad**. El login puede ver nombres
+de bases donde no tiene ningún user (entra a `master` por `guest`); lo que
+el login ve lo verifica `AC48`, no esta sección.
+
 **Estado de arranque de la instancia de prueba** (aplica a los dos pasos
 de abajo, "Lista vacía" y "Mutación declarada"): el paso de lista vacía
 sólo mide lo que declara si la instancia de prueba **nunca fue
@@ -818,6 +825,11 @@ abajo).
 
 ### AC42 — el user tiene `db_datareader` y ninguna otra membresía en cada base de la lista
 
+**Nota (contract v17, "Cambios v16 → v17" punto 2)**: esta verificación mide
+**membresía** — qué rol tiene el `user` dentro de cada base —, no
+**visibilidad**. Lo que el login ve sin tener membresía en ningún lado
+(nombres de base vía `master`/`guest`) lo verifica `AC48`, no esta sección.
+
 `AC42` cambió de propiedad en v10 (decisión de Patrick Ocampo): ya no
 afirma que un `DENY` le gane a un `GRANT` — afirma que el user **no tiene
 ninguna otra membresía** además de `db_datareader`: ni `db_denydatawriter`
@@ -925,6 +937,13 @@ sqlcmd -S 10.24.40.137 -E -d EXACTUS -Q "DROP TABLE zz_scratch_ac42;"
 
 ### AC43 — el inverso revoca por enumeración, no lee `@bases_permitidas`
 
+**Nota (contract v17, "Cambios v16 → v17" punto 2)**: esta verificación mide
+**membresía** — si el `user` sigue existiendo en `sys.database_principals`
+de cada base tras correr el inverso —, no **visibilidad**. Lo que el login
+ve lo verifica `AC48`, no esta sección; el inverso no lo toca (`DENY VIEW
+ANY DATABASE` se va con el login al `DROP LOGIN` final, ver comentario de
+cabecera de `sqlserver-inverso.sql`).
+
 `AC43` (contract v11) es el AC propio que le faltaba a la decisión central
 de v10: hasta ahora, que `sqlserver-inverso.sql` revoca por enumeración en
 vez de leer la lista sólo tenía cobertura **incidental** (el verde de
@@ -1018,19 +1037,16 @@ mantenía en Dev SQL era quién escribía la cadena de conexión. Importa
 porque hay otro SQL Server en juego: NEO lee `BD-PRINCIPAL`, que es
 producción, y el script no sabía distinguirlas.
 
-**Valor sin confirmar**: la guarda compara `SERVERPROPERTY('MachineName')`
-contra `EC2AMAZ-2RGHL0C`, que sale de un registro de SSM. Patrick Ocampo
-pidió medirlo contra la instancia real antes de confiar en él — "si no
-coincide, el valor manda sobre el mío" — y esa medición **no se hizo en
-esta ronda** porque el login que permitiría conectar es justamente lo que
-este script crea (dependencia circular: hace falta el login para medir, y
-hace falta medir antes de crear el login). Es la primera acción de
-"Prerequisitos" arriba: correr `SELECT SERVERPROPERTY('MachineName');`
-contra `10.24.40.137` con cualquier login `sysadmin` existente, **antes**
-de la comprobación real de abajo. Si no coincide con `EC2AMAZ-2RGHL0C`,
-corregir `@esperada` en `sqlserver-parte-a.sql` **y** en
-`sqlserver-parte-b.sql` (ver sección "AC44 en la parte B" más abajo) antes
-de seguir.
+**Valor medido (contract v17)**: la guarda compara `SERVERPROPERTY('MachineName')`
+contra `EC2AMAZ-2RGHL0C`. Patrick Ocampo lo midió el 23-sep-2026 vía SSM
+contra la instancia real de Dev SQL ya aprovisionada, y **coincide** con el
+valor que llevan los dos scripts — la precondición que este AC dejaba
+abierta (dependencia circular: hacía falta el login para medir, y medir
+antes de crear el login) queda cerrada; no hace falta remedirlo para correr
+contra esta misma instancia. Si en el futuro se apunta a una instancia
+distinta, medirlo de nuevo ahí y corregir `@esperada` en
+`sqlserver-parte-a.sql` **y** en `sqlserver-parte-b.sql` (ver sección "AC44
+en la parte B" más abajo) antes de seguir.
 
 **Comprobación real (verde), contra `Dev SQL` con el nombre correcto ya
 confirmado**:
@@ -1080,6 +1096,47 @@ forma directa — un daño más inmediato que crear un login sin usar. El
 mismo triple de arriba (real → mutado → real) aplica igual si se quiere
 ejercitar la guarda de la parte B específicamente; no es un AC nuevo, es
 la misma guarda repetida por el mismo argumento.
+
+### AC48 — el login no enumera las bases del servidor
+
+`AC48` (contract v17, "Cambios v16 → v17" punto 2) nace porque Patrick
+Ocampo, verificando `AC7`/`AC42`/`AC43` **como administrador**, no vio que
+`bisalta_lectura` podía listar los 36 nombres de base del servidor: esas
+tres verificaciones miran `sys.database_principals` — dónde el login **tiene
+usuario** —, y la enumeración entra por `master`, vía `guest`, sin crear
+ningún usuario ahí. La pregunta correcta es otra: qué ve el login, no dónde
+tiene membresía. Por eso este AC se verifica **conectado como el login**,
+nunca como administrador, y es el único de los cuatro que contesta esa
+pregunta.
+
+`sqlserver-parte-a.sql` aplica `DENY VIEW ANY DATABASE TO [bisalta_lectura]`
+después de crear el login y fuera de su bloque condicional (`DENY` es
+idempotente, así que cada corrida lo reaplica).
+
+**Comprobación real (verde), conectado como el login**:
+
+```
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -Q "SELECT name FROM sys.databases ORDER BY name;"
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d COMPRAS -Q "SELECT TOP 1 * FROM sys.tables;"
+```
+
+Esperado: la primera consulta devuelve **exactamente** `master` y `tempdb`
+(nunca las bases de negocio ni las de sistema restantes); la segunda sigue
+devolviendo filas — el `DENY` restringe qué metadatos se ven, no la
+lectura ya concedida por `AC42`.
+
+**Mutación declarada** (contract v17, AC48): sin el `DENY`, la misma
+consulta como el login lista todas las bases del servidor. **Evidencia
+mínima aceptada** (no hay instancia de prueba para volver al rojo sin tocar
+`Dev SQL` en vivo): el par antes/después que Patrick Ocampo midió el
+23-sep-2026 — **36** nombres de base antes de aplicar el `DENY`, `master` y
+`tempdb` después —, que cubre la mitad rojo → verde del triple. La mitad
+verde → rojo exigiría quitar el `DENY` en la instancia real, y no hay
+instancia de prueba para SQL Server (ver "Prerequisitos" arriba, sandbox
+`N/A`). El par vive hoy en Slack (Patrick Ocampo, 23-sep-2026 13:04 y
+13:05); pegarlo textual en el verification report de R1 es parte de `D61`.
+
+`manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
 
 ### AC8 — cada secreto existe, tiene los dos campos, y es legible con la política IAM
 

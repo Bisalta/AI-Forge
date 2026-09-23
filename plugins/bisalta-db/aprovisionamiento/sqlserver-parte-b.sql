@@ -113,13 +113,13 @@
 -- profundidad, con el mismo criterio que `@bases_prohibidas` más abajo:
 -- el criterio real es otro (la lista, o el login existente), pero la
 -- guarda de instancia no cuesta nada repetir y cierra la misma clase de
--- hueco. Mismo valor sin confirmar que sqlserver-parte-a.sql — ver su
--- comentario.
+-- hueco. Mismo valor, ya medido (contract v17) — ver el comentario de
+-- sqlserver-parte-a.sql.
 
 SET NOCOUNT ON;
 
 DECLARE @maquina  sysname = CAST(SERVERPROPERTY('MachineName') AS sysname);
-DECLARE @esperada sysname = N'EC2AMAZ-2RGHL0C';   -- Dev SQL, 10.24.40.137 — SIN CONFIRMAR, ver sqlserver-parte-a.sql
+DECLARE @esperada sysname = N'EC2AMAZ-2RGHL0C';   -- Dev SQL, 10.24.40.137 — MEDIDO, ver sqlserver-parte-a.sql
 
 IF @maquina <> @esperada
 BEGIN

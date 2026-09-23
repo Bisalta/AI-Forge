@@ -41,22 +41,29 @@
 -- `SET NOEXEC ON` — nada corre después, ni siquiera el CREATE LOGIN de
 -- abajo.
 --
--- VALOR SIN CONFIRMAR: `EC2AMAZ-2RGHL0C` sale de un registro de SSM, no de
--- una medición contra la instancia. Patrick Ocampo pidió explícitamente
--- confirmarlo corriendo `SELECT SERVERPROPERTY('MachineName')` conectado a
--- Dev SQL antes de fijarlo — textual: "si no coincide, el valor manda
--- sobre el mío". No se pudo medir en esta ronda porque el login todavía no
--- existe en esa instancia (dependencia circular: hace falta el login para
--- conectar, y el login es justamente lo que este script crea). RUNBOOK.md,
--- sección "Prerequisitos", manda medirlo como PRIMER PASO, antes de correr
--- este script contra Dev SQL — si la medición no coincide con el valor de
--- abajo, el valor medido manda y hay que actualizar esta línea antes de
--- ejecutar.
+-- VALOR MEDIDO (contract v17, "Cambios v16 → v17" punto 1): `EC2AMAZ-2RGHL0C`
+-- salió primero de un registro de SSM, y Patrick Ocampo lo MIDIÓ el
+-- 23-sep-2026 corriendo `SELECT SERVERPROPERTY('MachineName')` vía SSM
+-- contra la instancia de Dev SQL ya aprovisionada. Coincide con el valor de
+-- abajo. La precondición que pedía confirmarlo antes de fijarlo (nota de
+-- v13, ya no aplica) queda cerrada.
+--
+-- DENY DE ENUMERACIÓN (contract v17, AC48): Patrick aprovisionó y, conectado
+-- COMO EL LOGIN (no como administrador), encontró que `bisalta_lectura`
+-- podía listar los 36 nombres de base del servidor vía `sys.databases` —
+-- entra a `master` por `guest`, no por un user propio, así que ninguna
+-- verificación de membresía (AC7/AC42/AC43) lo veía. Lo cerró con
+-- `DENY VIEW ANY DATABASE TO [bisalta_lectura]`, abajo, DESPUÉS del bloque
+-- que crea el login y FUERA de su condicional: el `DENY` es idempotente, así
+-- que cada corrida de este script lo vuelve a aplicar aunque el login ya
+-- exista. No es una garantía del catálogo (`garantias` mide qué frena una
+-- escritura; esto restringe qué metadatos se ven) — vive como fila propia
+-- en "Garantías por motor" del contract y en README.md.
 
 SET NOCOUNT ON;
 
 DECLARE @maquina  sysname = CAST(SERVERPROPERTY('MachineName') AS sysname);
-DECLARE @esperada sysname = N'EC2AMAZ-2RGHL0C';   -- Dev SQL, 10.24.40.137 — SIN CONFIRMAR, ver comentario de arriba
+DECLARE @esperada sysname = N'EC2AMAZ-2RGHL0C';   -- Dev SQL, 10.24.40.137 — MEDIDO 23-sep-2026 por Patrick Ocampo vía SSM, coincide (contract v17)
 
 IF @maquina <> @esperada
 BEGIN
@@ -69,4 +76,11 @@ IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = 'bisalta_lectura
 BEGIN
   CREATE LOGIN bisalta_lectura WITH PASSWORD = '<PASSWORD_LECTURA_SQL>', CHECK_POLICY = ON;
 END
+GO
+
+-- AC48 — fuera del IF de arriba, a propósito: DENY es idempotente, así que
+-- cada corrida de este script lo vuelve a aplicar exista o no el login de
+-- antes. Sin esto, la enumeración de bases vuelve sola si el login se
+-- recrea (DROP LOGIN + CREATE LOGIN, ver sqlserver-inverso.sql).
+DENY VIEW ANY DATABASE TO [bisalta_lectura];
 GO
