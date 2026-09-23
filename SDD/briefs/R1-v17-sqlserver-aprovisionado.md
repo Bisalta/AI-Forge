@@ -63,6 +63,3 @@ Vos no podés leer Slack: estas cifras vienen del planner, y en el report se cit
 
 El último bloque es el JSON `sdd.result` (`plugins/sdd-flow/standards/orchestration.md` §2).
 
-## Execution Report
-
-(lo llenás vos)
