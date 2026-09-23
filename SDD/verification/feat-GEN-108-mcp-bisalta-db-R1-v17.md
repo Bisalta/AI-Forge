@@ -295,3 +295,26 @@ Ninguna de estas cifras fue medida por `AGENT_r1`: llegan del planner citando a 
 
 Ninguno — la suite completa corrió 17/17 verde (ver tabla del runner arriba) sobre el árbol limpio en el commit `6371ac9`.
 
+
+---
+
+# Sección del planner — `AC44` y `AC48` a través del plugin **instalado** (no lo escribió `AGENT_r1`)
+
+Corrido el 23-sep-2026 con la herramienta MCP `consultar` en una sesión de Claude Code reiniciada **después** de reinstalar el plugin. Qué código corría, medido antes de consultar: la copia instalada es de las 14:29:47, tiene la guarda de v16 (`no_es_replica` aparece 2 veces en su `conexion.js`) y el catálogo de v17 (`Msg 262` aparece en las 6 entradas de SQL Server); los cuatro procesos del servidor MCP arrancaron entre 14:30:14 y 14:30:34, o sea después de la copia.
+
+Es la **primera consulta a SQL Server** a través del plugin. Respuestas literales, completas:
+
+**`AC44` desde el consumidor** — la instancia a la que llega el login es la que la guarda espera:
+
+```
+{"conexion":"compras","dialecto":"sqlserver","filas":[{"login":"bisalta_lectura","base":"COMPRAS","maquina":"EC2AMAZ-2RGHL0C"}],"filas_devueltas":1,"truncado":false,"motivo_truncado":null}
+```
+
+**`AC48` desde el consumidor** — `SELECT name FROM sys.databases ORDER BY name`:
+
+```
+{"conexion":"compras","dialecto":"sqlserver","filas":[{"name":"COMPRAS"},{"name":"master"},{"name":"tempdb"}],"filas_devueltas":3,"truncado":false,"motivo_truncado":null}
+{"conexion":"exactus","dialecto":"sqlserver","filas":[{"name":"EXACTUS"},{"name":"master"},{"name":"tempdb"}],"filas_devueltas":3,"truncado":false,"motivo_truncado":null}
+```
+
+**Esto contradijo el texto de `AC48`**, que decía "exactamente `master` y `tempdb`". La propiedad se cumple —el login no enumera las otras bases del servidor, ni siquiera las otras cinco que tiene concedidas—, pero cada conexión se ve también a sí misma. El texto venía del reporte de Patrick, medido desde `master` (la base por omisión del login, donde la lista sí es `master` y `tempdb`), y se volvió normativo sin ese contexto. Enmendado dentro de v17 en el contract, el README y el runbook: la propiedad es "`master`, `tempdb` y la base de la propia conexión, y ninguna otra".

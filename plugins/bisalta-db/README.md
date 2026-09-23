@@ -159,7 +159,7 @@ la barrera es el texto.
 | Sesión abierta en solo lectura | sí, `default_transaction_read_only=on` — **condicional**: el plugin no la comprueba. Dentro de una llamada no se puede apagar (medido el 23-sep-2026: `transaction read-write mode must be set before any query`), y el rol la tiene además fijada por `ALTER ROLE`. | **no existe equivalente** |
 | `DENY` de escritura sobre el rol | no aplica | **no** — `db_denydatawriter` se quitó en v10 por decisión de Patrick Ocampo. Sin él no queda un `DENY` explícito, así que un `GRANT` de escritura concedido por error no tendría nada que lo anule |
 | Motor que rechaza escrituras | sí, endpoint `cluster-ro-` de Aurora — **incondicional desde v16, porque el plugin lo comprueba en cada consulta** (guarda de réplica): Aurora apunta ese endpoint al writer si el cluster se queda sin réplicas, y entonces el plugin se niega con `no_es_replica` | **no hay réplica** |
-| Enumeración de los nombres de base (v17, `AC48`) | **visibles**: `pg_database` es legible por todo rol; ocultarla rompe clientes (conocido, no medido) — riesgo aceptado | **cerrada** con `DENY VIEW ANY DATABASE`: el login ve sólo `master` y `tempdb` |
+| Enumeración de los nombres de base (v17, `AC48`) | **visibles**: `pg_database` es legible por todo rol; ocultarla rompe clientes (conocido, no medido) — riesgo aceptado | **cerrada** con `DENY VIEW ANY DATABASE`: el login ve `master`, `tempdb` y la base de su propia conexión, y ninguna otra |
 | Alcance del permiso | `pg_read_all_data`, de cluster — alcanza las 29 bases del cluster de dev/qa desde que el rol existe, no sólo las del catálogo | `db_datareader`, **por base**: una base nueva no queda cubierta sola |
 
 Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que

@@ -1121,7 +1121,12 @@ SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d
 ```
 
 Esperado: la primera consulta devuelve **exactamente** `master` y `tempdb`
-(nunca las bases de negocio ni las de sistema restantes); la segunda sigue
+(nunca las bases de negocio ni las de sistema restantes). **Esto vale porque va
+sin `-d`**: la sesión arranca en la base por omisión del login, que es `master`.
+Conectado a otra base, la lista suma **esa** base y ninguna más — medido el
+23-sep a través del plugin: desde `COMPRAS` se ven `COMPRAS`, `master` y
+`tempdb`; desde `EXACTUS`, `EXACTUS`, `master` y `tempdb`. La propiedad es
+"`master`, `tempdb` y la base propia", no una lista fija; la segunda sigue
 devolviendo filas — el `DENY` restringe qué metadatos se ven, no la
 lectura ya concedida por `AC42`.
 
