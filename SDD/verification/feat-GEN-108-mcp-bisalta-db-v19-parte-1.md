@@ -226,3 +226,31 @@ Revisión de cada aparición contra v19:
 ## Rojos preexistentes
 
 Ninguno. La suite completa (`bash SDD/tests/run.sh`) corrió en verde antes de empezar esta tarea (commit `ba4ff79`, HEAD de partida) y después de terminarla (commit `b5e9239`): `17 passed, 0 failed (17 total)` en las dos corridas.
+
+---
+
+# Sección del planner — `AC28`, `AC49` y `AC50` contra el motor (no lo escribió `AGENT_r1`)
+
+Corrido el 23-sep-2026 con el servidor **del repo** (`node plugins/bisalta-db/scripts/servidor-mcp.js` por stdio), sobre `f3d15ca`. No con el plugin instalado: esa copia todavía manda `statement_timeout=120000` y no sirve para verificar `AC28`. Sólo lecturas.
+
+Consulta, en las seis conexiones Postgres del catálogo:
+
+```
+SELECT current_database() AS base, current_setting('default_transaction_read_only') AS ro, current_setting('statement_timeout') AS stmt, current_setting('idle_in_transaction_session_timeout') AS idle, current_setting('lock_timeout') AS lock, has_schema_privilege('public','CREATE') AS crea_en_public
+```
+
+Respuestas literales, campo `filas`:
+
+- `proveedores-dev` → `{"base":"proveedores_dev","ro":"on","stmt":"1min","idle":"30s","lock":"5s","crea_en_public":"f"}`
+- `proveedores-qa` → `{"base":"proveedores_qa","ro":"on","stmt":"1min","idle":"30s","lock":"5s","crea_en_public":"f"}`
+- `smartcheck-dev` → `{"base":"smartcheck_dev","ro":"on","stmt":"1min","idle":"30s","lock":"5s","crea_en_public":"f"}`
+- `smartcheck-qa` → `{"base":"smartcheck_qa","ro":"on","stmt":"1min","idle":"30s","lock":"5s","crea_en_public":"f"}`
+- `smartfleet-dev` → `{"base":"smartfleet_dev","ro":"on","stmt":"1min","idle":"30s","lock":"5s","crea_en_public":"f"}`
+- `smartfleet-qa` → `{"base":"smartfleet_qa","ro":"on","stmt":"1min","idle":"30s","lock":"5s","crea_en_public":"f"}`
+
+**Qué prueba:**
+- `AC28` — **efecto**, no sólo la forma del comando: sin `statement_timeout` en `PGOPTIONS`, rige el del rol (`1min` = 60 s). Con la copia instalada de v18, que todavía lo manda, la misma consulta devolvía `2min` (medido el 23-sep).
+- `AC49` — los cuatro valores del rol vigentes cuando el cliente no manda ninguno.
+- `AC50` — `claude_lectura` no tiene `CREATE` en `public` en ninguna de las seis. Se verificó con `has_schema_privilege`, **sin intentar crear nada**: prueba el privilegio sin una escritura.
+
+**Qué NO prueba:** lo aplicado hoy en el motor es lo que Patrick hizo **a mano** (el `ALTER ROLE` y el `REVOKE CREATE` del 22-sep). Coincide con lo que `postgres-parte-a.sql` y `postgres-parte-b.sql` ahora mandan, pero **los scripts nuevos no los corrió nadie**. Su primera corrida real —otro cluster, o recrear el rol— es la que va a probar que el script reproduce el estado.
