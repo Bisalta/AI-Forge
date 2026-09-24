@@ -110,7 +110,7 @@ La mutación vuelve a la normalización anterior a v19, sacada de `dffb83a`. Com
   - Los casos 0 a 3 de la primera tanda y el 9 de la segunda caen por la normalización misma. Es lo que la mutación mide: la función vieja no ve lo mismo que el motor.
   - Los casos 12 a 16, que son de construcción sin cerrar, en sus dos asserts, caen **sólo** por el adaptador: la función vieja no detecta construcciones sin cerrar, así que el adaptador siempre devuelve `sinCerrar: null`.
 - **Esa separación está medida, no inferida** (review de la mutación (a), ronda 1, MINOR 3). Los controles de abajo aplican cada mitad por separado. Con sólo el adaptador caen 10 asserts, los de los casos 12 a 16. Con sólo la normalización vieja caen 5: los casos 0 a 3 de la primera tanda y el 9 de la segunda. Los dos conjuntos no se superponen, y la (a) completa tira exactamente su unión, 15.
-- Con esto, las cuatro mutaciones declaradas en `AC51` están corridas sobre el árbol actual. Caen (a), (b) y (d). La (c) cae sólo en parte (`D64`).
+- Con esto, las cuatro mutaciones declaradas en `AC51` están corridas: la (a) sobre el árbol actual; (b), (c) y (d) sobre `76f258e` (report de v23, §2), y después de ese commit el único cambio en `SDD/tests/` es la descripción del caso 13. Caen (a), (b) y (d). La (c) cae sólo en parte (`D64`).
 
 ### El script
 

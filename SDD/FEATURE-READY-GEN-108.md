@@ -2,7 +2,7 @@
 
 **Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v23** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
 **Quién hizo qué**: `AGENT_r1` (infra) y `AGENT_r2` (third-party-integration) hasta v19 · **v20 lo escribió Patrick Ocampo** (casos y función de normalización), Ian los pegó y lo integró el planner · v21 y v22 los hizo el planner a pedido de Ian, porque ningún agente pudo tocar esa parte (ver "Dónde está el riesgo") · v19 a v22 **en review**: ronda 1 `REJECTED` (`E19`), ronda 2 `REJECTED` sólo por documentos, **ronda 3 `APPROVED`**
-**Feature Ready: APROBADO por Ian Vargas, 24-sep-2026** sobre v22, con las mutaciones (b) y (c) abiertas y su evidencia pendiente (`D63`–`D65`). **Después de aprobar**, v23 cerró la (b) con seis casos de Patrick y corrió (b), (c) y (d) sobre el árbol actual; por ser una corrección posterior a `APPROVED`, volvió a review (§7.5) y quedó `APPROVED` en la ronda 2. Después, el caso 13 pasó a nombrar su tipo (`D67`, `e0a70bb`); su review escaló en la ronda 3 por falta de la escalera sellada sobre ese árbol, y el planner la ratificó corriendo el runner (`E20`).
+**Feature Ready: APROBADO por Ian Vargas, 24-sep-2026** sobre v22, con las mutaciones (b) y (c) abiertas y su evidencia pendiente (`D63`–`D65`). **Después de aprobar**, v23 cerró la (b) con seis casos de Patrick y corrió (b), (c) y (d) sobre su árbol (`76f258e`); la (a) se corrió después, sobre el árbol actual; por ser una corrección posterior a `APPROVED`, volvió a review (§7.5) y quedó `APPROVED` en la ronda 2. Después, el caso 13 pasó a nombrar su tipo (`D67`, `e0a70bb`); su review escaló en la ronda 3 por falta de la escalera sellada sobre ese árbol, y el planner la ratificó corriendo el runner (`E20`).
 **Gates**: suite 17/17 · secret-scan exit 0 · shellcheck exit 0 · linter de closure exit 0 · 48 de 48 casos adversariales de Patrick · escalera del árbol actual sellada por el runner en `SDD/verification/feat-GEN-108-mcp-bisalta-db-v23-D67.md`
 
 ---
@@ -49,7 +49,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 
 1. **`plugins/bisalta-db/scripts/lista-blanca.js`** — la normalización de v20 es la de Patrick, con sus límites escritos en el comentario de la función.
 2. **`SDD/tests/fixtures/`** — los dos archivos de casos de Patrick, que el test recorre sin copiar sus consultas.
-3. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-v23.md`** — la escalera sellada sobre el árbol actual, los 48 casos agrupados, el binding y las mutaciones (b), (c) y (d) corridas sobre este árbol. El de v22 trae la verificación en vivo con el plugin instalado.
+3. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-v23-D67.md`** — la escalera sellada sobre el árbol actual y la mutación (a) con sus controles. **`…-v23.md`** trae los 48 casos agrupados, el binding y las mutaciones (b), (c) y (d), corridas sobre `76f258e`. El de v22 trae la verificación en vivo con el plugin instalado.
 4. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-v19-parte-1.md`** — el timeout, el `ALTER ROLE` y el esquema `public`, verificados contra el motor.
 5. **`plugins/bisalta-db/aprovisionamiento/APROBACIONES.md`** — quién autorizó qué, y la diferencia entre lo que la aprobación enumera y lo que el acceso alcanza.
 
