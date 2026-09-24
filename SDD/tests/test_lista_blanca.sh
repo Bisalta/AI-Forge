@@ -273,55 +273,61 @@ CASOS
 # Dos veredictos parecen errores y no lo son: el comentario de bloque anidado
 # se ACEPTA (para el motor es sólo la lectura que lo precede), y la sección
 # "límite conocido" se acepta a propósito (contract v19, "Riesgos").
-CASOS_ADVERSARIALES="$REPO_ROOT/SDD/tests/fixtures/casos-adversariales-lista-blanca.js"
-
-# Índice, dialecto, veredicto esperado (0 = aceptar, 4 = rechazar) y motivo de
-# cada caso, uno por línea y separados por tabulador. Un caso mal formado sale
-# con dialecto `invalido` para que el assert lo marque, no para saltearlo.
-listar_casos_adversariales() {
-  node -e '
-    var casos = require(process.argv[1]).CASOS;
+# Recorre un archivo de casos de Patrick Ocampo: <archivo> <export> <prefijo>.
+# El prefijo va en el nombre de cada assert; el de la primera tanda es el que
+# cita el binding de v19, así que no cambia. Las consultas nunca pasan por
+# bash: node las lee del archivo y las escribe directo en el stdin del
+# validador.
+recorrer_casos_adversariales() {
+  local archivo="$1" export_nombre="$2" prefijo="$3"
+  local lista indice dialecto esperado motivo estados ec
+  # Índice, dialecto, veredicto esperado (0 = aceptar, 4 = rechazar) y motivo
+  # de cada caso, uno por línea y separados por tabulador. Un caso mal
+  # formado sale con dialecto `invalido` para que el assert lo marque, no para
+  # saltearlo.
+  lista="$(node -e '
+    var casos = require(process.argv[1])[process.argv[2]];
     for (var i = 0; i < casos.length; i += 1) {
       var c = casos[i];
       var bien = Array.isArray(c) && typeof c[1] === "string" && typeof c[2] === "boolean";
       var motivo = String(c && c[3]).replace(/[\t\r\n]+/g, " ");
       process.stdout.write(i + "\t" + (bien ? c[0] : "invalido") + "\t" + (c[2] === true ? 0 : 4) + "\t" + motivo + "\n");
     }
-  ' "$CASOS_ADVERSARIALES"
-}
+  ' "$archivo" "$export_nombre" 2>/dev/null)"
+  # 🔴 UN RECORRIDO QUE NO RECORRE NADA ES UNA MEDICIÓN MUERTA. Si el archivo
+  # no carga, o no exporta casos, el while de abajo no itera y el bloque
+  # quedaría verde sin haber mirado nada. No se congela el total: los
+  # archivos son de Patrick y pueden crecer.
+  assert_eq "$?" "0" "$prefijo el archivo de casos adversariales carga"
+  if [ -n "$lista" ]; then
+    assert_eq "vacio=no" "vacio=no" "$prefijo el archivo de casos adversariales trae casos"
+  else
+    assert_eq "vacio=si" "vacio=no" "$prefijo el archivo de casos adversariales trae casos"
+  fi
 
-# Escribe en stdout la consulta del caso <índice>, sin pasar por bash.
-consulta_adversarial() {
-  node -e 'process.stdout.write(require(process.argv[1]).CASOS[Number(process.argv[2])][1]);' \
-    "$CASOS_ADVERSARIALES" "$1"
-}
-
-# 🔴 UN RECORRIDO QUE NO RECORRE NADA ES UNA MEDICIÓN MUERTA. Si el archivo no
-# carga, o no exporta casos, el while de abajo no itera y el bloque quedaría
-# verde sin haber mirado nada. No se congela el total: el archivo es de
-# Patrick y puede crecer.
-LISTA_CASOS="$(listar_casos_adversariales 2>/dev/null)"
-assert_eq "$?" "0" "AC51/AC52 el archivo de casos adversariales carga"
-if [ -n "$LISTA_CASOS" ]; then
-  assert_eq "vacio=no" "vacio=no" "AC51/AC52 el archivo de casos adversariales trae casos"
-else
-  assert_eq "vacio=si" "vacio=no" "AC51/AC52 el archivo de casos adversariales trae casos"
-fi
-
-while IFS="$(printf '\t')" read -r indice dialecto esperado motivo; do
-  [ -z "$indice" ] && continue
-  # 🔴 LOS DOS ESTADOS DEL PIPE, NO EL DEL PIPE. Si la consulta no se pudo
-  # leer, el validador recibe stdin vacío y sale 4 (`sin_sentencias`): un caso
-  # de rechazo pasaría sin haber mirado su consulta. Con `pipefail` ese 4 es
-  # lo que devolvería `$?`, así que el productor se comprueba aparte.
-  consulta_adversarial "$indice" | node "$LISTA_BLANCA" "$dialecto" >/dev/null 2>&1
-  estados="${PIPESTATUS[0]} ${PIPESTATUS[1]}"
-  ec="${estados#* }"
-  [ "${estados%% *}" = "0" ] || ec="consulta_ilegible"
-  assert_exit "$esperado" "$ec" "AC51/AC52 caso $indice ($dialecto): $motivo"
-done <<EOF
-$LISTA_CASOS
+  while IFS="$(printf '\t')" read -r indice dialecto esperado motivo; do
+    [ -z "$indice" ] && continue
+    # 🔴 LOS DOS ESTADOS DEL PIPE, NO EL DEL PIPE. Si la consulta no se pudo
+    # leer, el validador recibe stdin vacío y sale 4 (`sin_sentencias`): un
+    # caso de rechazo pasaría sin haber mirado su consulta. Con `pipefail`
+    # ese 4 es lo que devolvería `$?`, así que el productor se comprueba
+    # aparte.
+    node -e 'process.stdout.write(require(process.argv[1])[process.argv[2]][Number(process.argv[3])][1]);' \
+      "$archivo" "$export_nombre" "$indice" | node "$LISTA_BLANCA" "$dialecto" >/dev/null 2>&1
+    estados="${PIPESTATUS[0]} ${PIPESTATUS[1]}"
+    ec="${estados#* }"
+    [ "${estados%% *}" = "0" ] || ec="consulta_ilegible"
+    assert_exit "$esperado" "$ec" "$prefijo caso $indice ($dialecto): $motivo"
+  done <<EOF
+$lista
 EOF
+}
+
+# Primera tanda (contract v19, AC51 y AC52).
+recorrer_casos_adversariales "$REPO_ROOT/SDD/tests/fixtures/casos-adversariales-lista-blanca.js" CASOS "AC51/AC52"
+# Segunda tanda (contract v20, AC51): literales E'…', corchetes, N'…' como
+# control, y construcciones sin cerrar.
+recorrer_casos_adversariales "$REPO_ROOT/SDD/tests/fixtures/casos-adversariales-v20.js" CASOS_V20 "AC51 v20"
 
 # ---------------------------------------------------------------------------
 # Uso

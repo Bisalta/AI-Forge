@@ -78,70 +78,100 @@ const ESCRITURA_EMBEBIDA_SQLSERVER = /(^|[^A-Za-z0-9_])(INSERT|UPDATE|DELETE|MER
  *     `--`, un `/*` o una comilla simple no abren nada;
  *   - comentario de línea → se quita hasta el salto de línea, que se queda;
  *   - comentario de bloque, ANIDADO en los dos motores → un espacio.
- * Un literal o un bloque SIN CERRAR deja el resto del texto a la vista, sin
- * normalizar —lo mismo que hacían los reemplazos anteriores, que no
- * encontraban el cierre—: el motor lo rechaza por sintaxis y no ejecuta nada,
- * así que ocultarlo no le sirve a ninguna consulta legítima y dejarlo visible
- * falla cerrado.
+ * Reglas propias de cada dialecto (contract v20, `AC51`):
+ *   - postgres: literal de escape con prefijo `E`/`e` pegado a la comilla,
+ *     donde la barra invertida escapa el carácter siguiente;
+ *   - sqlserver: identificador entre corchetes, con `]]` como escape adentro
+ *     → se copia tal cual.
+ * Una construcción SIN CERRAR —literal, identificador o comentario de
+ * bloque abierto al final del texto— no se normaliza a medias: la función
+ * devuelve cuál quedó abierta en `sinCerrar`, y `validarSql()` rechaza antes
+ * de partir en sentencias, con el tipo en el motivo. Ese texto no es SQL
+ * válido para ningún motor, así que el rechazo no pierde ninguna consulta
+ * legítima.
+ *
+ * Implementación de referencia de Patrick Ocampo (Slack, 23-sep-2026), que
+ * él mismo revisó antes de entregarla. Límites que dejó escritos: el literal
+ * común asume `standard_conforming_strings = on` (el valor por omisión; si
+ * estuviera en `off`, el validador vería más texto, no menos: falla
+ * cerrado); el contenido de un identificador se copia tal cual, así que uno
+ * que se llame como una palabra de escritura se rechaza de más, a propósito.
+ *
+ * @returns {{texto: string, sinCerrar: (null|'literal'|'identificador'|'comentario')}}
  */
-function normalizar(sql) {
-  const texto = String(sql);
-  const largo = texto.length;
-  let salida = '';
-  let i = 0;
-  while (i < largo) {
-    const c = texto.charAt(i);
-    const siguiente = texto.charAt(i + 1);
-    if (c === "'") {
-      const inicio = i;
-      let cerrado = false;
+function normalizar(sql, dialecto) {
+  const s = String(sql); const n = s.length;
+  let out = '', i = 0, sinCerrar = null;
+
+  const literal = (escapaConBarra) => {        // i apunta a la comilla de apertura
+    i += 1;
+    let cerrado = false;
+    while (i < n) {
+      const ch = s[i];
+      if (escapaConBarra && ch === '\\') { i += 2; continue; }
+      if (ch === "'") {
+        if (s[i + 1] === "'") { i += 2; continue; }
+        i += 1; cerrado = true; break;
+      }
       i += 1;
-      while (i < largo) {
-        if (texto.charAt(i) === "'") {
-          if (texto.charAt(i + 1) === "'") {
-            i += 2;
-            continue;
-          }
-          i += 1;
-          cerrado = true;
-          break;
+    }
+    if (!cerrado) sinCerrar = sinCerrar || 'literal';
+    out += "''";
+  };
+
+  while (i < n) {
+    const c = s[i], c2 = s[i + 1];
+
+    // Postgres: E'...' -> la barra invertida escapa el caracter siguiente
+    if (dialecto === 'postgres' && (c === 'E' || c === 'e') && c2 === "'"
+        && (i === 0 || !/[A-Za-z0-9_$]/.test(s[i - 1]))) {
+      out += c; i += 1; literal(true); continue;
+    }
+    if (c === "'") { literal(false); continue; }
+
+    // SQL Server: identificador entre corchetes, con ]] como escape
+    if (dialecto === 'sqlserver' && c === '[') {
+      out += c; i += 1;
+      let cerrado = false;
+      while (i < n) {
+        out += s[i];
+        if (s[i] === ']') {
+          if (s[i + 1] === ']') { out += s[i + 1]; i += 2; continue; }
+          i += 1; cerrado = true; break;
         }
         i += 1;
       }
-      salida += cerrado ? "''" : texto.slice(inicio);
-    } else if (c === '"') {
-      // `""` dentro del identificador se copia igual: cerrar y reabrir
-      // produce el mismo texto que la comilla escapada.
-      let fin = texto.indexOf('"', i + 1);
-      fin = fin === -1 ? largo : fin + 1;
-      salida += texto.slice(i, fin);
-      i = fin;
-    } else if (c === '-' && siguiente === '-') {
-      const salto = texto.indexOf('\n', i);
-      i = salto === -1 ? largo : salto;
-    } else if (c === '/' && siguiente === '*') {
-      const inicio = i;
-      let profundidad = 1;
-      i += 2;
-      while (i < largo && profundidad > 0) {
-        const par = texto.substr(i, 2);
-        if (par === '/*') {
-          profundidad += 1;
-          i += 2;
-        } else if (par === '*/') {
-          profundidad -= 1;
-          i += 2;
-        } else {
-          i += 1;
-        }
-      }
-      salida += profundidad === 0 ? ' ' : texto.slice(inicio);
-    } else {
-      salida += c;
-      i += 1;
+      if (!cerrado) sinCerrar = sinCerrar || 'identificador';
+      continue;
     }
+    if (c === '"') {
+      out += c; i += 1;
+      let cerrado = false;
+      while (i < n) {
+        out += s[i];
+        if (s[i] === '"') {
+          if (s[i + 1] === '"') { out += s[i + 1]; i += 2; continue; }
+          i += 1; cerrado = true; break;
+        }
+        i += 1;
+      }
+      if (!cerrado) sinCerrar = sinCerrar || 'identificador';
+      continue;
+    }
+    if (c === '-' && c2 === '-') { while (i < n && s[i] !== '\n') i += 1; continue; }
+    if (c === '/' && c2 === '*') {
+      let p = 1; i += 2;
+      while (i < n && p > 0) {
+        if (s[i] === '/' && s[i + 1] === '*') { p += 1; i += 2; continue; }
+        if (s[i] === '*' && s[i + 1] === '/') { p -= 1; i += 2; continue; }
+        i += 1;
+      }
+      if (p > 0) sinCerrar = sinCerrar || 'comentario';
+      out += ' '; continue;
+    }
+    out += c; i += 1;
   }
-  return salida;
+  return { texto: out, sinCerrar: sinCerrar };
 }
 
 /**
@@ -179,7 +209,14 @@ function validarSql(sql, dialecto) {
     return rechazo('dialecto_desconocido', String(dialecto));
   }
 
-  const normalizado = normalizar(sql);
+  const normalizada = normalizar(sql, dialecto);
+  // AC51 v20: una construcción sin cerrar se rechaza ANTES de partir en
+  // sentencias. El tipo va en el motivo para que quien lo lea no busque un
+  // problema de permisos que no existe (pedido de Patrick Ocampo).
+  if (normalizada.sinCerrar) {
+    return rechazo('construccion_sin_cerrar_' + normalizada.sinCerrar, String(sql).replace(/[\r\n]+/g, ' '));
+  }
+  const normalizado = normalizada.texto;
 
   // SQL Server: cualquier `;` que quede tras quitar comentarios y literales.
   // Un batch de T-SQL con varias sentencias no tiene equivalente de sesión de
