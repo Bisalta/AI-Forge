@@ -33,7 +33,7 @@ const CASOS_V20 = [
   // --- construcciones sin cerrar ---
   ['postgres',  "SELECT 'abc",                               false, 'literal sin cerrar'],
   ['postgres',  "SELECT 'a'' ",                              false,
-   'sin cerrar y dificil de ver: la comilla doblada NO cierra'],
+   'literal sin cerrar y dificil de ver: la comilla doblada NO cierra'],
   ['postgres',  "SELECT 1 AS \"abc",                         false, 'identificador sin cerrar'],
   ['postgres',  "SELECT 1 /* abc",                           false, 'bloque sin cerrar'],
   ['sqlserver', "SELECT 1 AS [abc",                          false, 'corchete sin cerrar'],
