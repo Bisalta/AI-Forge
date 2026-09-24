@@ -8,6 +8,8 @@ Patrick Ocampo explicó por qué la mutación (b) no caía: la regla de los lite
 
 **Agregado a v23 después de su review (24-sep, sin bump: no cambia ninguna condición de aprobación)**: en `e0a70bb` se agregó el tipo (`literal`) a la descripción del caso 13 de `casos-adversariales-v20.js`, que no lo nombraba (`D67`). La consulta no se tocó. El tipo se dedujo de la consulta y no del validador, porque el test compara uno contra el otro. Con esto, los cinco casos de construcción sin cerrar verifican el tipo exacto del motivo.
 
+**Segundo agregado a v23 (24-sep, sin bump: no cambia ninguna condición de aprobación)**: la mutación (a) se corrió sobre el árbol actual, con el adaptador que ya declara `AC51`, y cae (`D65`). La evidencia está en el addendum de `SDD/verification/feat-GEN-108-mcp-bisalta-db-v23-D67.md`. Las cuatro mutaciones de `AC51` quedan corridas sobre este árbol.
+
 ### Cambios v21 → v22 (el resto de la review de v19 y v20, 24-sep-2026)
 
 Se cierran los hallazgos de esa review que v21 dejó para una persona (`SDD/briefs/pendiente-humano-AC51.md`): en `AC51`, la autoría de los casos de v20, la mutación (a) declarada con adaptador, la (c) abierta en parte y la corrección del fixture declarada; un test nuevo verifica el tipo en el motivo de una construcción sin cerrar; y el README deja de presentar la lista blanca como barrera. La evidencia está en `SDD/verification/feat-GEN-108-mcp-bisalta-db-v22.md`. **Autoría**: v21 había reservado estos cambios para una persona; los hizo el planner, a pedido de Ian Vargas, y el filtro no los cortó. Lo que sí quedó para una persona es la evidencia de las mutaciones sobre el árbol de v22 (§3 de ese report).
