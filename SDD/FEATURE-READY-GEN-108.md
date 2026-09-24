@@ -1,7 +1,7 @@
 # Feature Ready — `bisalta-db` v0.1.0 · consulta de solo lectura sin credencial en contexto
 
 **Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v22** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
-**Quién hizo qué**: `AGENT_r1` (infra) y `AGENT_r2` (third-party-integration) hasta v19 · **v20 lo escribió Patrick Ocampo** (casos y función de normalización), Ian los pegó y lo integró el planner, porque ningún agente pudo tocar esa parte (ver "Dónde está el riesgo") · v19 a v22 **en review**: ronda 1 `REJECTED` (`E19`), ronda 2 `REJECTED` sólo por documentos, ronda 3 pendiente
+**Quién hizo qué**: `AGENT_r1` (infra) y `AGENT_r2` (third-party-integration) hasta v19 · **v20 lo escribió Patrick Ocampo** (casos y función de normalización), Ian los pegó y lo integró el planner · v21 y v22 los hizo el planner a pedido de Ian, porque ningún agente pudo tocar esa parte (ver "Dónde está el riesgo") · v19 a v22 **en review**: ronda 1 `REJECTED` (`E19`), ronda 2 `REJECTED` sólo por documentos, **ronda 3 `APPROVED`**
 **Gates**: suite 17/17 · secret-scan exit 0 · shellcheck exit 0 · linter de closure exit 0 · 42 de 42 casos adversariales de Patrick
 
 ---
@@ -57,17 +57,17 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 | | |
 |---|---|
 | **Hasta v18** | Tres rondas de review sobre todo lo posterior al último `APPROVED`, ratificadas por el planner en v18 |
-| **v19** | Parte 1 (timeout, `ALTER ROLE`, esquema `public`) implementada por `AGENT_r1` y verificada contra el motor. Parte 2 (normalización, T-SQL sin separador) implementada por `AGENT_r2`. En review |
-| **v20 a v22** | Casos y función de Patrick, integración del planner; v21 y v22 cierran la ronda 1 de review. 42 de 42 casos. Mutaciones: (d) cae; **(b) abierta**; **(c) abierta en parte**; (a) declarada con adaptador. La evidencia de mutaciones sobre el árbol de v22, **pendiente** a cargo de una persona. En review |
+| **v19** | Parte 1 (timeout, `ALTER ROLE`, esquema `public`) implementada por `AGENT_r1` y verificada contra el motor. Parte 2 (normalización, T-SQL sin separador) implementada por `AGENT_r2`. `APPROVED` (ronda 3) |
+| **v20 a v22** | Casos y función de Patrick, integración del planner; v21 y v22 cierran la ronda 1 de review. 42 de 42 casos. Mutaciones: (d) cae; **(b) abierta**; **(c) abierta en parte**; (a) declarada con adaptador. La evidencia de mutaciones sobre el árbol de v22, **pendiente** a cargo de una persona. `APPROVED` (ronda 3), con las mutaciones abiertas registradas como deuda (`D63`–`D65`) |
 | **Aprovisionamiento** | Postgres ejecutado por Patrick el 22-sep y SQL Server el 23-sep, verificados desde el plugin. Parte de su evidencia vive en Slack (`D61`) |
 | **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep, **iniciales para probar la herramienta**, no definitivas |
-| **Deuda, retro y escalaciones del ciclo** | 31 ítems de deuda (22 abiertos), 32 entradas de retro hasta `RT54` y 11 escalaciones hasta `E19` |
+| **Deuda, retro y escalaciones del ciclo** | 36 ítems de deuda (27 abiertos), 32 entradas de retro hasta `RT54` y 11 escalaciones hasta `E19` |
 
 **Lo que este PR NO hace**: no crea ningún rol, no toca ninguna base, no carga ningún secreto. Es código y procedimientos. Lo que ya existe en AWS y en las bases lo hizo Patrick a mano.
 
 ## Siguiente paso
 
-1. **Ronda 3 de la review**, la última antes del cap, sobre los documentos que la ronda 2 marcó. El análisis adversarial y las mutaciones de la lista blanca no le tocan.
+1. ~~Review de v19 a v22~~ — tres rondas, `APPROVED` en la ronda 3. Quedan tres MINOR y lo abierto registrado como deuda (`D63`–`D67`).
 2. **Reinstalar** el plugin y verificar en vivo.
 3. **Tu gate de Feature Ready.** Se puede decidir con las mutaciones (b) y (c) abiertas y su evidencia pendiente, todo declarado, o esperar a Patrick.
 4. **Merge.** No habilita nada al equipo por sí solo.
