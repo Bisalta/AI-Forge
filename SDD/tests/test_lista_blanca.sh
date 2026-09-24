@@ -329,6 +329,37 @@ recorrer_casos_adversariales "$REPO_ROOT/SDD/tests/fixtures/casos-adversariales-
 # control, y construcciones sin cerrar.
 recorrer_casos_adversariales "$REPO_ROOT/SDD/tests/fixtures/casos-adversariales-v20.js" CASOS_V20 "AC51 v20"
 
+# AC51 v20: el rechazo de una construcción sin cerrar lleva el TIPO en el
+# motivo (`construccion_sin_cerrar_<tipo>`). El recorrido de arriba sólo mira
+# el exit code, así que esto lo verifica aparte. Para cada caso de la segunda
+# tanda cuya descripción dice "sin cerrar", el tipo esperado sale de esa
+# descripción (literal / identificador o corchete / bloque), no de índices
+# fijados a mano: el archivo es de Patrick y puede crecer. Se lee sólo el
+# campo `motivo`; la consulta nunca se imprime.
+SIN_CERRAR="$(node -e '
+  var casos = require(process.argv[1]).CASOS_V20;
+  var validar = require(process.argv[2]).validarSql;
+  var n = 0;
+  for (var i = 0; i < casos.length; i += 1) {
+    var d = String(casos[i][3]).toLowerCase();
+    if (d.indexOf("sin cerrar") === -1 || casos[i][2] !== false) continue;
+    n += 1;
+    var tipo = /literal/.test(d) ? "literal" : (/identificador|corchete/.test(d) ? "identificador" : (/bloque/.test(d) ? "comentario" : ""));
+    var motivo = String(validar(casos[i][1], casos[i][0]).motivo);
+    var esperado = "construccion_sin_cerrar_" + tipo;
+    var bien = tipo ? motivo === esperado : motivo.indexOf("construccion_sin_cerrar_") === 0;
+    process.stdout.write(i + "\t" + (tipo || "(tipo no deducible)") + "\t" + (bien ? "si" : "no:" + motivo) + "\n");
+  }
+  if (n === 0) process.exit(3);
+' "$REPO_ROOT/SDD/tests/fixtures/casos-adversariales-v20.js" "$LISTA_BLANCA" 2>/dev/null)"
+assert_eq "$?" "0" "AC51 v20 hay casos de construcción sin cerrar para verificar el motivo"
+while IFS="$(printf '\t')" read -r indice tipo resultado; do
+  [ -z "$indice" ] && continue
+  assert_eq "$resultado" "si" "AC51 v20 caso $indice: el motivo lleva el tipo ($tipo)"
+done <<EOF
+$SIN_CERRAR
+EOF
+
 # ---------------------------------------------------------------------------
 # Uso
 # ---------------------------------------------------------------------------
