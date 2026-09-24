@@ -180,3 +180,60 @@ Igual que el de v22 (§2 de aquel report), con una fila cambiada:
 | `AC51` v20, segunda tanda | `AC51 v20 caso <índice> (<dialecto>): <motivo>` — **27**, uno por caso de `casos-adversariales-v20.js`. Los índices 21 a 25 son los que matan la mutación (b); el 26 es su control |
 
 El test no cambió: recorre el archivo por índice, así que los casos nuevos entraron solos.
+
+## 4. El caso 13 nombra su tipo (`D67`, agregado después de la review de v23)
+
+En `e0a70bb` la descripción del caso 13 de `casos-adversariales-v20.js` pasó a nombrar su tipo (`literal`). Hasta ahí era el único de los cinco casos de construcción sin cerrar en el que el assert del tipo en el motivo verificaba sólo el prefijo `construccion_sin_cerrar_`. La consulta no se tocó. El tipo lo dedujo el planner de la consulta, que Ian leyó en el archivo, y no del validador: el test compara el motivo del validador contra la descripción, así que copiarlo del validador lo volvería circular.
+
+**Triple.** La mutación hace que un literal sin cerrar se informe como identificador. Se corre dos veces, con la descripción vieja del caso 13 (`933c527`) y con la nueva: el caso 13 cae sólo con la nueva. El caso 12, que ya nombraba su tipo, cae en las dos corridas.
+
+```
+### descripción del caso 13 de 933c527 (933c527)
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=1
+      FAIL  AC51 v20 caso 12
+- verde (restaurado): exit=0 fail=0
+
+### descripción del caso 13 de HEAD (e0a70bb)
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=2
+      FAIL  AC51 v20 caso 12
+      FAIL  AC51 v20 caso 13
+- verde (restaurado): exit=0 fail=0
+
+Árbol al terminar: limpio
+```
+
+### El script
+
+```bash
+#!/usr/bin/env bash
+# Mutación del tipo en el motivo: un literal sin cerrar se informa como
+# identificador. Se corre con la descripción del caso 13 de antes (commit
+# 933c527) y con la de ahora (HEAD), para mostrar que el assert endurecido
+# es el que la mata.
+set -u
+cd "$(git rev-parse --show-toplevel)"
+F=plugins/bisalta-db/scripts/lista-blanca.js; T=SDD/tests/test_lista_blanca.sh; X=SDD/tests/fixtures/casos-adversariales-v20.js
+V="'construccion_sin_cerrar_' + normalizada.sinCerrar"
+N="'construccion_sin_cerrar_' + (normalizada.sinCerrar === 'literal' ? 'identificador' : normalizada.sinCerrar)"
+correr() { local o ec; o="$(bash "$T" 2>&1)"; ec=$?; printf 'exit=%s fail=%s\n' "$ec" "$(grep -c '^  FAIL' <<<"$o")"; grep '^  FAIL' <<<"$o" | sed 's/:.*//; s/^/    /'; }
+mutar() { python3 - "$F" "$1" "$2" <<'PY'
+import sys
+p,v,n=sys.argv[1:4]; s=open(p).read(); assert s.count(v)==1,(v,s.count(v)); open(p,'w').write(s.replace(v,n))
+PY
+}
+for fx in 933c527 HEAD; do
+  echo "### descripción del caso 13 de $fx ($(git rev-parse --short $fx))"
+  git checkout -q "$fx" -- "$X"
+  printf -- '- verde (árbol real): '; correr
+  mutar "$V" "$N"; if git diff --quiet -- "$F"; then echo "- ABORTA: la mutación no se aplicó"; exit 1; fi
+  printf -- '- mutado:             '; correr
+  git checkout -q -- "$F"; if ! git diff --quiet -- "$F"; then echo "- ABORTA: no se restauró"; exit 1; fi
+  printf -- '- verde (restaurado): '; correr
+  git checkout -q HEAD -- "$X"; echo
+done
+echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio || echo SUCIO )"
+```
+
+**Binding**: la excepción que el report de v22 declaraba en la fila "tipo en el motivo" (un caso que verificaba sólo el prefijo) deja de existir. Los cinco asserts verifican el tipo exacto.

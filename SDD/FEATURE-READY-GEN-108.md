@@ -63,7 +63,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 | **v23** | Seis casos más de Patrick para la mutación (b), que ahora cae. 48 de 48 casos. Review §7.5: `APPROVED` en la ronda 2 |
 | **Aprovisionamiento** | Postgres ejecutado por Patrick el 22-sep y SQL Server el 23-sep, verificados desde el plugin. Parte de su evidencia vive en Slack (`D61`) |
 | **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep, **iniciales para probar la herramienta**, no definitivas |
-| **Deuda, retro y escalaciones del ciclo** | 36 ítems de deuda (26 abiertos), 32 entradas de retro hasta `RT54` y 11 escalaciones hasta `E19` |
+| **Deuda, retro y escalaciones del ciclo** | 36 ítems de deuda (25 abiertos), 32 entradas de retro hasta `RT54` y 11 escalaciones hasta `E19` |
 
 **Lo que este PR NO hace**: no crea ningún rol, no toca ninguna base, no carga ningún secreto. Es código y procedimientos. Lo que ya existe en AWS y en las bases lo hizo Patrick a mano.
 
@@ -72,7 +72,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 1. ~~Review de v19 a v22~~ — tres rondas, `APPROVED` en la ronda 3. Quedan tres MINOR y lo abierto registrado como deuda (`D63`–`D67`).
 2. ~~Reinstalar el plugin y verificar en vivo~~ — hecho el 24-sep sobre v22.
 3. ~~Tu gate de Feature Ready~~ — **aprobado el 24-sep sobre v22**. **No se reconfirma sobre v23**: v23 sólo agrega casos al fixture y cierra una deuda que la aprobación ya aceptaba abierta (`D63`); no cambia código, alcance ni riesgos. Si querés reconfirmarlo igual, es tu decisión. Estado actual de lo que se aprobó abierto: **(b) cerrada**; (c) abierta en parte (`D64`); la evidencia de (a) sobre el árbol actual, pendiente (`D65`).
-4. ~~Review §7.5 de v23~~ — ronda 1 `REJECTED`, sólo por documentos; **ronda 2 `APPROVED`**, sin hallazgos.
+4. ~~Review §7.5 de v23~~ — ronda 1 `REJECTED`, sólo por documentos; **ronda 2 `APPROVED`**, sin hallazgos. Después, el caso 13 de Patrick pasó a nombrar su tipo (`D67`, `e0a70bb`): sólo la descripción, con su triple en el report de v23, §4. Por ser posterior a `APPROVED`, tiene su propia ronda de review.
 5. **Merge.** Requiere la review de un code owner (`@Bisalta/construplaza-admin`). No habilita nada al equipo por sí solo.
 
 Para **habilitarlo al equipo** hace falta además la aprobación de Esteban o Sebastián.
