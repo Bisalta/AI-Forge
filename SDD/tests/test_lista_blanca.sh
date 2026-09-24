@@ -361,6 +361,28 @@ $SIN_CERRAR
 EOF
 
 # ---------------------------------------------------------------------------
+# AC51 mutación (c) — la regla de los corchetes de SQL Server
+# ---------------------------------------------------------------------------
+# Igual que la de los literales E'…' (mutación (b)), esta regla no está para
+# rechazar ataques sino para NO rechazar consultas legítimas: sin ella, una
+# comilla, una comilla doble o un /* dentro de un nombre entre corchetes se lee
+# como una construcción que nunca se cierra. Los casos de Patrick no traían
+# ninguno de esos, y por eso la mutación (c) caía en parte. Estos los escribió
+# el planner (24-sep); son T-SQL válido. El último es el control: un corchete
+# simple, que se acepta con la regla y sin ella.
+while IFS='|' read -r etiqueta sql; do
+  [ -z "$etiqueta" ] && continue
+  ec="$(validar sqlserver "$sql")"
+  assert_exit 0 "$ec" "AC51 (c) acepta en sqlserver $etiqueta"
+done <<'CASOS'
+un nombre entre corchetes con una comilla simple|SELECT 1 AS [it's]
+un nombre entre corchetes con una comilla doble|SELECT 1 AS [a"b]
+un nombre entre corchetes con un /*|SELECT 1 AS [a/*b]
+un nombre entre corchetes con ]] escapado y una comilla|SELECT 1 AS [a]]b's]
+un nombre entre corchetes simple (control)|SELECT [a] FROM t
+CASOS
+
+# ---------------------------------------------------------------------------
 # Uso
 # ---------------------------------------------------------------------------
 printf '%s' 'SELECT 1' | node "$LISTA_BLANCA" >/dev/null 2>&1
