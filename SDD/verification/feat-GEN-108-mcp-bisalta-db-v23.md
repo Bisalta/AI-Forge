@@ -194,7 +194,7 @@ En `e0a70bb` la descripción del caso 13 de `casos-adversariales-v20.js` pasó a
       FAIL  AC51 v20 caso 12
 - verde (restaurado): exit=0 fail=0
 
-### descripción del caso 13 de HEAD (e0a70bb)
+### descripción del caso 13 de e0a70bb (e0a70bb)
 - verde (árbol real): exit=0 fail=0
 - mutado:             exit=1 fail=2
       FAIL  AC51 v20 caso 12
@@ -210,7 +210,7 @@ En `e0a70bb` la descripción del caso 13 de `casos-adversariales-v20.js` pasó a
 #!/usr/bin/env bash
 # Mutación del tipo en el motivo: un literal sin cerrar se informa como
 # identificador. Se corre con la descripción del caso 13 de antes (commit
-# 933c527) y con la de ahora (HEAD), para mostrar que el assert endurecido
+# 933c527) y con la de `e0a70bb`, para mostrar que el assert endurecido
 # es el que la mata.
 set -u
 cd "$(git rev-parse --show-toplevel)"
@@ -223,7 +223,7 @@ import sys
 p,v,n=sys.argv[1:4]; s=open(p).read(); assert s.count(v)==1,(v,s.count(v)); open(p,'w').write(s.replace(v,n))
 PY
 }
-for fx in 933c527 HEAD; do
+for fx in 933c527 e0a70bb; do
   echo "### descripción del caso 13 de $fx ($(git rev-parse --short $fx))"
   git checkout -q "$fx" -- "$X"
   printf -- '- verde (árbol real): '; correr
@@ -235,5 +235,7 @@ for fx in 933c527 HEAD; do
 done
 echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio || echo SUCIO )"
 ```
+
+El script fija `e0a70bb` en vez de `HEAD`, para que re-correrlo reproduzca la salida pegada (review de v23, ronda 3, MINOR 2); la salida de arriba es la de esa versión.
 
 **Binding**: la excepción que el report de v22 declaraba en la fila "tipo en el motivo" (un caso que verificaba sólo el prefijo) deja de existir. Los cinco asserts verifican el tipo exacto.
