@@ -1,6 +1,10 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v21
+- **Versión**: v22
+
+### Cambios v21 → v22 (el resto de la review de v19 y v20, 24-sep-2026)
+
+Se cierran los hallazgos de esa review que v21 dejó para una persona (`SDD/briefs/pendiente-humano-AC51.md`): en `AC51`, la autoría de los casos de v20, la mutación (a) declarada con adaptador, la (c) abierta en parte y la corrección del fixture declarada; un test nuevo verifica el tipo en el motivo de una construcción sin cerrar; y el README deja de presentar la lista blanca como barrera. La evidencia está en `SDD/verification/feat-GEN-108-mcp-bisalta-db-v22.md`.
 
 ### Cambios v20 → v21 (review §7.5 de v19 y v20, ronda 1 `REJECTED`, 24-sep-2026)
 
