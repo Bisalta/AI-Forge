@@ -32,4 +32,6 @@ Sobre el árbol ya corregido, en un report nuevo, sin editar el de v20:
 
 ## Mientras tanto
 
+**Cerrado en v23 (24-sep)**: Patrick mandó seis casos, Ian los pegó en `casos-adversariales-v20.js` (`76f258e`) y la mutación (b) cae (report de v23, §2). Lo que sigue es el texto de antes de ese cierre.
+
 La mutación (b) sigue esperando el caso que Patrick va a mandar. Cuando llegue, entra en el mismo `casos-adversariales-v20.js` o en un archivo aparte de él, y se suma a la evidencia del punto 3.

@@ -83,8 +83,8 @@ La escalera de arriba se corrió sobre `6bf9fe7`, que es `76f258e` (los seis cas
 
 ```
 $ out="$(bash SDD/tests/test_lista_blanca.sh 2>&1)"; ec=$?
-$ for p in <cada prefijo de abajo>; do grep -cE "^  ok +$p" <<<"$out"; grep -cE "^  FAIL +$p" <<<"$out"; done
-$ grep -c '^  ok' <<<"$out"; grep -c '^  FAIL' <<<"$out"; echo "$ec"
+$ for p in 'AC51/AC52 caso [0-9]+ \(' 'AC51 v20 caso [0-9]+ \(' 'AC51 v20 caso [0-9]+: el motivo lleva el tipo' 'AC51/AC52 el archivo' 'AC51 v20 el archivo' 'AC51 v20 hay casos'; do printf '%-50s ok=%s FAIL=%s\n' "$p" "$(grep -cE "^  ok +$p" <<<"$out")" "$(grep -cE "^  FAIL +$p" <<<"$out")"; done
+$ echo "total del archivo: ok=$(grep -c '^  ok' <<<"$out") FAIL=$(grep -c '^  FAIL' <<<"$out") · exit=$ec"
 AC51/AC52 caso [0-9]+ \(                           ok=21 FAIL=0
 AC51 v20 caso [0-9]+ \(                            ok=27 FAIL=0
 AC51 v20 caso [0-9]+: el motivo lleva el tipo      ok=5 FAIL=0
@@ -94,7 +94,7 @@ AC51 v20 hay casos                                 ok=1 FAIL=0
 total del archivo: ok=134 FAIL=0 · exit=0
 ```
 
-Con v22 eran 21 casos en la segunda tanda y 128 asserts en el archivo; los seis casos nuevos suman seis asserts.
+El loop es el que se corrió: la salida es literal. (El report de v22 mostraba una plantilla del comando; ronda 1 de la review de v23, MINOR 7.) Con v22 eran 21 casos en la segunda tanda y 128 asserts en el archivo; los seis casos nuevos suman seis asserts.
 
 ## 2. Mutaciones de `AC51` sobre este árbol — salida literal del script
 

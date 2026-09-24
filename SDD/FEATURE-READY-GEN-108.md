@@ -59,19 +59,20 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 |---|---|
 | **Hasta v18** | Tres rondas de review sobre todo lo posterior al último `APPROVED`, ratificadas por el planner en v18 |
 | **v19** | Parte 1 (timeout, `ALTER ROLE`, esquema `public`) implementada por `AGENT_r1` y verificada contra el motor. Parte 2 (normalización, T-SQL sin separador) implementada por `AGENT_r2`. `APPROVED` (ronda 3) |
-| **v23** | Seis casos más de Patrick para la mutación (b), que ahora cae. 48 de 48 casos. **En review** (§7.5, corrección posterior a `APPROVED`) |
 | **v20 a v22** | Casos y función de Patrick, integración del planner; v21 y v22 cierran la ronda 1 de review. 42 de 42 casos. Mutaciones: (d) cae; **(b) abierta**; **(c) abierta en parte**; (a) declarada con adaptador. La evidencia de mutaciones sobre el árbol de v22, **pendiente** a cargo de una persona. `APPROVED` (ronda 3), con las mutaciones abiertas registradas como deuda (`D63`–`D65`) |
+| **v23** | Seis casos más de Patrick para la mutación (b), que ahora cae. 48 de 48 casos. **En review** (§7.5, corrección posterior a `APPROVED`) |
 | **Aprovisionamiento** | Postgres ejecutado por Patrick el 22-sep y SQL Server el 23-sep, verificados desde el plugin. Parte de su evidencia vive en Slack (`D61`) |
 | **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep, **iniciales para probar la herramienta**, no definitivas |
-| **Deuda, retro y escalaciones del ciclo** | 36 ítems de deuda (27 abiertos), 32 entradas de retro hasta `RT54` y 11 escalaciones hasta `E19` |
+| **Deuda, retro y escalaciones del ciclo** | 36 ítems de deuda (26 abiertos), 32 entradas de retro hasta `RT54` y 11 escalaciones hasta `E19` |
 
 **Lo que este PR NO hace**: no crea ningún rol, no toca ninguna base, no carga ningún secreto. Es código y procedimientos. Lo que ya existe en AWS y en las bases lo hizo Patrick a mano.
 
 ## Siguiente paso
 
 1. ~~Review de v19 a v22~~ — tres rondas, `APPROVED` en la ronda 3. Quedan tres MINOR y lo abierto registrado como deuda (`D63`–`D67`).
-2. **Reinstalar** el plugin y verificar en vivo.
-3. **Tu gate de Feature Ready.** Se puede decidir con las mutaciones (b) y (c) abiertas y su evidencia pendiente, todo declarado, o esperar a Patrick.
-4. **Merge.** No habilita nada al equipo por sí solo.
+2. ~~Reinstalar el plugin y verificar en vivo~~ — hecho el 24-sep sobre v22.
+3. ~~Tu gate de Feature Ready~~ — **aprobado el 24-sep sobre v22**. **No se reconfirma sobre v23**: v23 sólo agrega casos al fixture y cierra una deuda que la aprobación ya aceptaba abierta (`D63`); no cambia código, alcance ni riesgos. Si querés reconfirmarlo igual, es tu decisión. Estado actual de lo que se aprobó abierto: **(b) cerrada**; (c) abierta en parte (`D64`); la evidencia de (a) sobre el árbol actual, pendiente (`D65`).
+4. **Review §7.5 de v23** — en curso. Ronda 1 `REJECTED`, sólo por documentos; se corrigió y va la ronda 2.
+5. **Merge.** Requiere la review de un code owner (`@Bisalta/construplaza-admin`). No habilita nada al equipo por sí solo.
 
 Para **habilitarlo al equipo** hace falta además la aprobación de Esteban o Sebastián.
