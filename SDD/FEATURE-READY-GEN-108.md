@@ -2,6 +2,7 @@
 
 **Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v22** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
 **Quién hizo qué**: `AGENT_r1` (infra) y `AGENT_r2` (third-party-integration) hasta v19 · **v20 lo escribió Patrick Ocampo** (casos y función de normalización), Ian los pegó y lo integró el planner · v21 y v22 los hizo el planner a pedido de Ian, porque ningún agente pudo tocar esa parte (ver "Dónde está el riesgo") · v19 a v22 **en review**: ronda 1 `REJECTED` (`E19`), ronda 2 `REJECTED` sólo por documentos, **ronda 3 `APPROVED`**
+**Feature Ready: APROBADO por Ian Vargas, 24-sep-2026**, con las mutaciones (b) y (c) abiertas y la evidencia de mutaciones sobre el árbol de v22 pendiente, declaradas (`D63`–`D65`).
 **Gates**: suite 17/17 · secret-scan exit 0 · shellcheck exit 0 · linter de closure exit 0 · 42 de 42 casos adversariales de Patrick
 
 ---
