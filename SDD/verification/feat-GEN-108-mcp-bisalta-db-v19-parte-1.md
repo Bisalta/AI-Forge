@@ -254,3 +254,28 @@ Respuestas literales, campo `filas`:
 - `AC50` — `claude_lectura` no tiene `CREATE` en `public` en ninguna de las seis. Se verificó con `has_schema_privilege`, **sin intentar crear nada**: prueba el privilegio sin una escritura.
 
 **Qué NO prueba:** lo aplicado hoy en el motor es lo que Patrick hizo **a mano** (el `ALTER ROLE` y el `REVOKE CREATE` del 22-sep). Coincide con lo que `postgres-parte-a.sql` y `postgres-parte-b.sql` ahora mandan, pero **los scripts nuevos no los corrió nadie**. Su primera corrida real —otro cluster, o recrear el rol— es la que va a probar que el script reproduce el estado.
+
+---
+
+# Agregado del planner en v21 (24-sep-2026) — respuesta a la review de v19 y v20
+
+**Corrección a la sección anterior.** Decía que rigen "los cuatro valores del rol cuando el cliente no manda ninguno". No era exacto: el servidor manda `default_transaction_read_only=on` por `PGOPTIONS` (lo exige `AC28`), así que en esa lectura ese valor no distinguía rol de cliente. Medía tres de cuatro del lado del rol.
+
+**`AC49` — la configuración del rol, leída del catálogo** (a través del plugin, 24-sep):
+
+```
+SELECT r.rolname AS rol, s.setconfig FROM pg_db_role_setting s JOIN pg_roles r ON r.oid = s.setrole WHERE r.rolname = 'claude_lectura' AND s.setdatabase = 0
+→ {"rol":"claude_lectura","setconfig":"{default_transaction_read_only=on,statement_timeout=60s,idle_in_transaction_session_timeout=30s,lock_timeout=5s}"}
+```
+
+Los cuatro valores, configurados en el rol y no en la sesión.
+
+**`AC50` — la enumeración de dueños de la Parte B, corrida en lectura** contra `proveedores_dev`, 24-sep. Por dueño, antes del cambio de v21:
+
+```
+AurAwsDbMaster  superusuario=f  relaciones=0  funciones=1   tipos=2
+proveedores     superusuario=f  relaciones=8  funciones=0   tipos=4
+rdsadmin        superusuario=t  relaciones=0  funciones=41  tipos=2
+```
+
+Con sólo `pg_class` recibía el `GRANT` únicamente `proveedores`; el usuario maestro quedaba afuera. La consulta de v21 —relaciones, funciones y tipos, sin superusuarios— devuelve `AurAwsDbMaster` y `proveedores`. Se corrió **sólo la consulta de enumeración**, en lectura; el script completo sigue sin correrse contra ninguna base.

@@ -1,7 +1,7 @@
 # Feature Ready — `bisalta-db` v0.1.0 · consulta de solo lectura sin credencial en contexto
 
-**Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v20** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
-**Quién hizo qué**: `AGENT_r1` (infra) y `AGENT_r2` (third-party-integration) hasta v19 · **v20 lo escribió Patrick Ocampo** (casos y función de normalización) y lo integró el planner, porque ningún agente pudo tocar esa parte (ver "Dónde está el riesgo") · v19 y v20 **todavía sin review**
+**Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v21** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
+**Quién hizo qué**: `AGENT_r1` (infra) y `AGENT_r2` (third-party-integration) hasta v19 · **v20 lo escribió Patrick Ocampo** (casos y función de normalización), Ian los pegó y lo integró el planner, porque ningún agente pudo tocar esa parte (ver "Dónde está el riesgo") · v19 y v20 **todavía sin review**
 **Gates**: suite 17/17 · secret-scan exit 0 · shellcheck exit 0 · linter de closure exit 0 · 42 de 42 casos adversariales de Patrick
 
 ---
@@ -26,7 +26,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 
 🔴 **La aprobación de Esteban Fait o Sebastián sigue pendiente.** Patrick aprobó el login de Dev SQL sabiendo que son copias de producción; la política de uso de IA exige además la suya. **Es precondición de habilitar el plugin al equipo, no de mergearlo.**
 
-🟡 **La lista blanca es la capa que da un error temprano, no la barrera.** Patrick intentó romperla el 23-sep y encontró **doce formas de pasarla, ninguna brecha**: todas chocan después con el privilegio, que midió firme en los dos motores, o con la réplica. Se arreglaron las que eran baratas —un defecto de normalización que venía del código original de R2, y sentencias de SQL Server sin separador— y una regresión que introdujo el primer arreglo. Dos clases quedan como **límite conocido**, escritas en el contract: el SQL que viaja como texto a una función, y las funciones que escriben sin nombrar una escritura.
+🟡 **La lista blanca es la capa que da un error temprano, no la barrera.** Patrick intentó romperla el 23-sep y encontró **doce formas de pasarla, ninguna brecha**: todas chocan después con el privilegio, que midió firme en los dos motores, o con la réplica. Se arreglaron las que eran baratas —un defecto de normalización que venía del código original de R2, y sentencias de SQL Server sin separador— y dos regresiones que introdujo el primer arreglo. Dos clases quedan como **límite conocido**, escritas en el contract: el SQL que viaja como texto a una función, y las funciones que escriben sin nombrar una escritura.
 
 🟡 **Una mutación de v20 no cae.** Apagando la regla de los literales `E'…'` de Postgres, la suite sigue verde: la regla está implementada y los 42 casos coinciden, pero **hoy ningún caso la mata**. Se le pidió a Patrick el caso que falta. Es un hueco de prueba, no de la barrera; está declarado en el contract (`AC51`, mutación (b)).
 
@@ -34,7 +34,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 
 🟡 **El endpoint de réplica depende de que el cluster tenga réplicas, y tiene una sola** — con los nombres de instancia cruzados, huella de un failover anterior. Desde v16 el plugin lo comprueba en cada consulta y **se niega** (`no_es_replica`, código 9) si llegó al writer: una falla cerrada, y un riesgo de disponibilidad, no de seguridad.
 
-🟡 **Los scripts de aprovisionamiento nuevos no los corrió nadie.** v19 metió en los scripts el `ALTER ROLE` y el `REVOKE CREATE ON SCHEMA public` que Patrick aplicó a mano. Lo que está en el motor coincide con lo que los scripts mandan —verificado en seis de seis bases—, pero la primera corrida real de los scripts va a ser la prueba de que reproducen el estado.
+🟡 **Los scripts de aprovisionamiento nuevos no los corrió nadie.** v19 metió en los scripts el `ALTER ROLE` y el `REVOKE CREATE ON SCHEMA public` que Patrick aplicó a mano. Lo que está en el motor coincide con lo que los scripts mandan: la configuración del rol, leída del catálogo, y la falta de `CREATE` en `public` en seis de seis bases. Pero la primera corrida real de los scripts va a ser la prueba de que reproducen el estado.
 
 🟡 **En Postgres, `claude_lectura` ve los nombres de las bases del cluster**: `pg_database` es legible por todo rol, y ocultarla rompe clientes. Riesgo aceptado, confirmado por Patrick. En SQL Server el equivalente lo cerró él (`AC48`).
 

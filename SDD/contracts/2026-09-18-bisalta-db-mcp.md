@@ -1,6 +1,16 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v20
+- **Versión**: v21
+
+### Cambios v20 → v21 (review §7.5 de v19 y v20, ronda 1 `REJECTED`, 24-sep-2026)
+
+La review de v19 y v20 no encontró BLOCKER y marcó nueve MAJOR. Esta versión cierra los que tocan el aprovisionamiento y los documentos; **los que tocan `AC51` y su evidencia los corrige una persona** (`RT54`), y entran en una versión propia.
+
+**1. `AC49` es un valor producido, no una detección.** Afirma qué configura el script; §10.1 no le exige mutación. Su evidencia deja de ser "la lectura del 23-sep, citada": es la lectura de `pg_db_role_setting` del 24-sep, **pegada** en el report de v19 parte 1, que muestra los cuatro valores configurados **en el rol**, leídos del catálogo y no de la sesión. (La verificación anterior leía `current_setting` en una sesión donde el cliente también manda `default_transaction_read_only`, así que ese valor no distinguía rol de cliente: medía tres de cuatro.)
+
+**2. `AC50` declara su verificación y su evidencia mínima.** Se verifica con `has_schema_privilege('public','CREATE')` como `claude_lectura`, que prueba el privilegio sin intentar una escritura; evidencia mínima: el par de Patrick —el rol creaba tablas en `public` antes del `REVOKE`, y después falla con `permission denied for schema public` (22-sep)— más la medición de seis de seis bases en `f` (23-sep).
+
+**3. `AC50` enumera los dueños de relaciones, funciones y tipos, sin superusuarios.** Con sólo `pg_class`, un rol que en `public` tiene funciones o tipos pero ninguna tabla no recibía el `GRANT`: medido en `proveedores_dev`, el usuario maestro quedaba afuera. Y el superusuario interno de RDS, dueño de funciones de extensiones, queda excluido: no necesita el `GRANT` y concedérselo arriesga que el bloque aborte.
 
 ### Cambios v19 → v20 (ratificación del planner sobre el `BLOCKED` de `AGENT_r2`, 23-sep-2026)
 
@@ -653,11 +663,11 @@ Casos del test — rechazados: en `postgres`, `WITH x AS (INSERT INTO t VALUES (
 `manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
 **Mutación declarada**: sin el `DENY`, la misma consulta como el login lista todas las bases del servidor. **Evidencia mínima aceptada**: el par antes/después que Patrick midió el 23-sep —36 nombres antes, `master` y `tempdb` después, desde `master`—, más la verificación del planner a través del plugin desde `COMPRAS` y `EXACTUS`, y —desde v18— la lectura de una tabla real de `COMPRAS` después del `DENY`, que es la mitad rojo → verde del triple; la vuelta al rojo exigiría quitar el `DENY` en una instancia viva, y no hay instancia de prueba. El par vive hoy en Slack: pegarlo en el verification report de R1 es parte de `D61`.
 
-**AC49** (detección, `manual-only`) — `postgres-parte-a.sql` aplica `ALTER ROLE claude_lectura SET` con los cuatro valores que Patrick fijó a mano: `default_transaction_read_only = on`, `statement_timeout = '60s'`, `idle_in_transaction_session_timeout = '30s'`, `lock_timeout = '5s'`, **fuera** del bloque condicional que crea el rol, para que cada corrida los vuelva a aplicar. Verificado conectándose **como el rol**: `current_setting` de los cuatro devuelve esos valores cuando el cliente no manda ninguno.
-`manual-only: requiere el cluster; misma razón que AC1.` **Evidencia mínima aceptada**: la lectura de `pg_db_role_setting` del 23-sep, que ya muestra los cuatro valores sobre el rol.
+**AC49** (valor producido, `manual-only`; v21) — `postgres-parte-a.sql` aplica `ALTER ROLE claude_lectura SET` con los cuatro valores que Patrick fijó a mano: `default_transaction_read_only = on`, `statement_timeout = '60s'`, `idle_in_transaction_session_timeout = '30s'`, `lock_timeout = '5s'`, **fuera** del bloque condicional que crea el rol, para que cada corrida los vuelva a aplicar. Verificado leyendo `pg_db_role_setting` para el rol: los cuatro valores, configurados en el rol y no en la sesión.
+`manual-only: requiere el cluster; misma razón que AC1.` **Evidencia**: la lectura del 24-sep, pegada en el report de v19 parte 1.
 
-**AC50** (detección, `manual-only`) — `postgres-parte-b.sql`, en cada base que recorre: primero concede `CREATE ON SCHEMA public` al dueño de la base **y** a todo rol que ya tenga objetos en `public`, y **después** revoca `CREATE ON SCHEMA public FROM PUBLIC`. El orden es la condición: revocar primero rompe las migraciones de quien ya crea ahí. Verificado conectándose **como `claude_lectura`**: crear una tabla en `public` falla con `permission denied for schema public`.
-`manual-only: requiere el cluster.` El `REVOKE CONNECT` sobre la base `postgres` va al runbook como paso explícito, con su verificación.
+**AC50** (detección, `manual-only`) — `postgres-parte-b.sql`, en cada base que recorre: primero concede `CREATE ON SCHEMA public` al dueño de la base **y** a todo rol no superusuario que sea dueño de una relación, una función o un tipo en `public`, y **después** revoca `CREATE ON SCHEMA public FROM PUBLIC`. El orden es la condición: revocar primero rompe las migraciones de quien ya crea ahí. Verificado como `claude_lectura` con `has_schema_privilege('public','CREATE')` = `f`, sin intentar una escritura.
+`manual-only: requiere el cluster.` **Evidencia mínima aceptada** (v21): el par antes/después de Patrick (22-sep) y la medición de seis de seis bases en `f` (23-sep). El `REVOKE CONNECT` sobre la base `postgres` va al runbook como paso explícito, con su verificación.
 
 **AC51** (detección) — La normalización de la lista blanca es **un solo recorrido de izquierda a derecha** que conoce las reglas de comillado de cada dialecto, de modo que **el validador ve las mismas sentencias que ejecuta el motor**:
 - **en los dos dialectos**: literales entre comillas simples con `''` como escape; identificadores entre comillas dobles con `""` como escape (se copian tal cual); comentarios de línea (`--` hasta el fin de línea); comentarios de bloque **anidados**;
@@ -682,7 +692,7 @@ Casos de prueba: los 21 de la revisión de Patrick Ocampo (`SDD/tests/fixtures/c
 2. **Catálogo sin base**: el validador corre sobre archivos de fixture en `SDD/tests/.tmp/`.
 3. **Protocolo MCP sin base**: se alimenta stdin con las tramas JSON-RPC y se afirma sobre stdout.
 4. **Conexión real**: sólo los ACs marcados `manual-only`, cuando R1 esté ejecutado.
-5. **Mutación**: los veinte ACs de detección llevan su triple verde → rojo → verde, con comando literal y exit code de cada corrida.
+5. **Mutación**: los ACs de detección llevan su triple verde → rojo → verde, con comando literal y exit code de cada corrida — salvo los que declaran otra cosa en su propio texto (evidencia mínima aceptada, o una mutación abierta). La cantidad no se cita: se deriva del contract.
 
 ## Riesgos
 

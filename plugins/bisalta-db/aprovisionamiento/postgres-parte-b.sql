@@ -55,7 +55,8 @@ $$;
 -- ver "Cambios v14 → v15" punto 2). EL ORDEN ES LA CONDICIÓN: revocar
 -- primero rompería las migraciones de quien ya crea ahí, así que primero se
 -- concede CREATE explícito al dueño de la base y a todo rol que YA tenga
--- objetos en `public` — enumerados acá desde el catálogo (pg_class), nunca
+-- objetos en `public` — relaciones (pg_class), funciones (pg_proc) y tipos
+-- (pg_type), enumerados acá desde el catálogo, nunca
 -- escritos a mano, porque son distintos por base (INVENTARIO.md) — y recién
 -- después se revoca de PUBLIC. Idempotente: GRANT y REVOKE repetidos no
 -- fallan.
@@ -67,9 +68,26 @@ BEGIN
   EXECUTE format('GRANT CREATE ON SCHEMA public TO %I', duenio_base);
 
   FOR duenio_objeto IN
-    SELECT DISTINCT pg_catalog.pg_get_userbyid(c.relowner)
-    FROM pg_catalog.pg_class c
-    WHERE c.relnamespace = 'public'::regnamespace
+    -- Los tres catálogos de objetos con dueño en un esquema. Con sólo
+    -- pg_class, un rol que en `public` tiene funciones o tipos pero ninguna
+    -- tabla no recibía el GRANT, y su próxima migración fallaba (review de
+    -- v19 y v20, 24-sep-2026).
+    -- Se excluyen los superusuarios: no necesitan el GRANT y en RDS el
+    -- interno `rdsadmin` es dueño de funciones de extensiones en `public`;
+    -- concederle algo no suma nada y arriesga que el bloque aborte. Medido
+    -- en proveedores_dev el 24-sep: los dueños son `proveedores` (tablas y
+    -- tipos), el usuario maestro (una función y dos tipos, que con sólo
+    -- pg_class quedaba afuera) y `rdsadmin` (superusuario).
+    SELECT r.rolname
+      FROM pg_catalog.pg_roles r
+     WHERE NOT r.rolsuper
+       AND r.oid IN (
+         SELECT c.relowner FROM pg_catalog.pg_class c WHERE c.relnamespace = 'public'::regnamespace
+         UNION
+         SELECT f.proowner FROM pg_catalog.pg_proc f WHERE f.pronamespace = 'public'::regnamespace
+         UNION
+         SELECT t.typowner FROM pg_catalog.pg_type t WHERE t.typnamespace = 'public'::regnamespace
+       )
   LOOP
     EXECUTE format('GRANT CREATE ON SCHEMA public TO %I', duenio_objeto);
   END LOOP;

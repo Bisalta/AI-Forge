@@ -6,7 +6,7 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ### 0.1.0 — 2026-09-18
 
-Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v20).
+Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v21).
 Consulta de solo lectura a las bases de dev/qa de Bisalta desde Claude Code, **sin que
 ninguna credencial entre en el contexto de la sesión**. La credencial no desaparece: pasa de un
 archivo que hoy hay que leerle al modelo —y que queda archivado en el transcript— a un secreto de
@@ -104,11 +104,11 @@ aceptado.
 blanca y encontró doce formas de pasarla, **ninguna brecha** — todas chocan después con el privilegio
 o con la réplica. Con eso quedó medido lo que la lista blanca es: la capa que da un error temprano y
 claro, no la que impide el daño. Se arreglaron un defecto de normalización que venía del código
-original, las sentencias de SQL Server sin separador y una regresión que introdujo el primer arreglo;
+original, las sentencias de SQL Server sin separador y dos regresiones que introdujo el primer arreglo;
 dos clases quedan como límite conocido. v20 —la normalización que conoce el comillado de cada
 dialecto— la escribió Patrick, casos y función: ningún agente pudo hacer ese trabajo (`RT54`). También
 en v19: el límite de tiempo pasa al rol, y el `ALTER ROLE` y el esquema `public` que Patrick había
-configurado a mano entran a los scripts.
+configurado a mano entran a los scripts. Una de las mutaciones declaradas de v20 queda abierta, declarada en el contract.
 
 **Lo que dejó el kilometraje**: dos defectos que la suite encontró y que valen por separado. (1) El
 tope de bytes salía vacío porque `process.exit()` **corta lo que `process.stdout` todavía tiene en
