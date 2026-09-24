@@ -155,10 +155,13 @@ mano en DBeaver, donde una persona ve lo que va a pasar antes de que pase.
 | Varias sentencias separadas por `;` | **aceptadas** | **rechazadas**: cualquier `;` que quede tras quitar comentarios y literales |
 | Apertura de comilla de dólar (`$$`, `$tag$`) | **rechazada** | n/a |
 | `EXEC`, `EXECUTE`, identificador `sp_`/`xp_` | n/a | **rechazados** |
+| `TRUNCATE`, `DROP`, `CREATE`, `ALTER` en cualquier posición (v19, `AC52`) | n/a | **rechazadas** |
+| Literal, identificador o comentario de bloque sin cerrar (v20, `AC51`) | **rechazado**, con el tipo en el motivo | **rechazado**, con el tipo en el motivo |
 
 En `sqlserver` se manda **una sola sentencia y sin punto y coma**: no existe
-equivalente de sesión de solo lectura que contenga un batch de T-SQL, así que
-la barrera es el texto.
+equivalente de sesión de solo lectura que contenga un batch de T-SQL. La lista
+blanca es ahí la primera capa, la que rechaza temprano y con un mensaje claro;
+**la barrera es el rol** (ver la tabla de abajo).
 
 ## Garantías por motor (asimetría declarada, no disimulada)
 
