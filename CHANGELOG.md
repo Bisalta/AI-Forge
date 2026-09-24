@@ -6,7 +6,7 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ### 0.1.0 — 2026-09-18
 
-Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v22).
+Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v24).
 Consulta de solo lectura a las bases de dev/qa de Bisalta desde Claude Code, **sin que
 ninguna credencial entre en el contexto de la sesión**. La credencial no desaparece: pasa de un
 archivo que hoy hay que leerle al modelo —y que queda archivado en el transcript— a un secreto de
@@ -108,7 +108,7 @@ original, las sentencias de SQL Server sin separador y dos regresiones que intro
 dos clases quedan como límite conocido. v20 —la normalización que conoce el comillado de cada
 dialecto— la escribió Patrick, casos y función: ningún agente pudo hacer ese trabajo (`RT54`). También
 en v19: el límite de tiempo pasa al rol, y el `ALTER ROLE` y el esquema `public` que Patrick había
-configurado a mano entran a los scripts. Dos mutaciones de la lista blanca quedan abiertas —la de los literales `E'…'`, y en parte la de los corchetes—, declaradas en el contract.
+configurado a mano entran a los scripts. Las cuatro mutaciones declaradas de la lista blanca caen. Dos no caían —la de los literales `E'…'` y la de los corchetes— porque esas reglas existen para aceptar consultas legítimas y ningún caso lo era: la primera se cerró con seis casos de Patrick (v23), y la segunda con cinco que escribió el planner (v24).
 
 **Lo que dejó el kilometraje**: dos defectos que la suite encontró y que valen por separado. (1) El
 tope de bytes salía vacío porque `process.exit()` **corta lo que `process.stdout` todavía tiene en
