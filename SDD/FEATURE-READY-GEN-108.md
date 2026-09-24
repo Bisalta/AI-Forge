@@ -40,7 +40,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 
 🟡 **La cuenta de producción no está enumerada** (`D43`). Ninguna entrada del catálogo apunta ahí, pero "producción es irrepresentable" descansa en eso, no en un inventario.
 
-✅ **Postgres y SQL Server probados contra las bases reales.** Las seis conexiones de Postgres responden a través del plugin, con `application_name = claude_lectura`; desde v19, con el límite de tiempo del rol (medido con el servidor del repo: `1min`). SQL Server responde desde el plugin, en la instancia correcta, y el login ve sólo su propia base, `master` y `tempdb`.
+✅ **Postgres y SQL Server probados contra las bases reales.** Las seis conexiones de Postgres responden a través del plugin, con `application_name = claude_lectura`; desde v19, con el límite de tiempo del rol: `1min`, medido el 24-sep **a través del plugin instalado con v22**. SQL Server responde desde el plugin, en la instancia correcta, y el login ve sólo su propia base, `master` y `tempdb`.
 
 ✅ **`AC34` probado contra una sesión real de Claude Code (22-sep-2026).**
 

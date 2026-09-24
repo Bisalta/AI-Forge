@@ -115,3 +115,14 @@ verde:      exit=0 asserts_que_caen=0
 mutado:     exit=1 asserts_que_caen=5
 restaurado: exit=0 asserts_que_caen=0
 ```
+
+## 4. Verificación en vivo a través del plugin **instalado** (sección del planner, 24-sep-2026)
+
+Copia instalada a las 14:03:18, con el código de v22 (`sinCerrar` aparece 10 veces en su `lista-blanca.js`); los procesos del servidor MCP arrancaron desde las 14:03:48, después de la copia. Los dos plugins de `ai-forge` reinstalados. Sólo lecturas.
+
+```
+proveedores-dev → {"stmt":"1min","app":"claude_lectura","ro":"on","replica":"t","crea_en_public":"f"}
+exactus         → {"login":"bisalta_lectura","base":"EXACTUS","maquina":"EC2AMAZ-2RGHL0C"}
+```
+
+`AC28` visto desde el plugin instalado: rige el `statement_timeout` del rol (`1min`); con la copia de v18 la misma consulta daba `2min`. `AC29`, `AC46` y `AC50` en la misma lectura. SQL Server responde en la instancia de `AC44`.
