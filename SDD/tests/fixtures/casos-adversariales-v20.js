@@ -41,5 +41,19 @@ const CASOS_V20 = [
   ['postgres',  "SELECT 1 AS \"abc\"",                       true,  'control'],
   ['postgres',  "SELECT 1 /* abc */",                        true,  'control'],
   ['sqlserver', "SELECT 1 AS [abc]",                         true,  'control'],
+  // --- v20: la regla de E'...' se mata con consultas LEGITIMAS, no con ataques.
+  // Sin la rama de E, las cinco se rechazan como construccion_sin_cerrar_literal.
+  ['postgres',  "SELECT E'it\\'s' AS x",                 true,
+   'MATA AL MUTANTE: consulta honesta con comilla escapada'],
+  ['postgres',  "SELECT E'a\\'b' AS x, 1 AS y",          true,
+   'MATA AL MUTANTE: con texto valido despues del literal'],
+  ['postgres',  "SELECT E'\\'' AS comilla",              true,
+   'MATA AL MUTANTE: el literal es solo una comilla escapada'],
+  ['postgres',  "SELECT E'a\\'' AS x, 'b' AS y",         true,
+   'MATA AL MUTANTE: E-literal y literal normal en la misma consulta'],
+  ['postgres',  "SELECT e'it\\'s' AS y",                 true,
+   'MATA AL MUTANTE: cubre que la mutacion apague solo la mayuscula'],
+  ['postgres',  "SELECT 'it''s' AS x",                   true,
+   'control sano: literal normal con comilla doblada, NO depende de la rama de E'],
 ];
 module.exports = { CASOS_V20 };
