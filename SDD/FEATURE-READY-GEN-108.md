@@ -1,8 +1,8 @@
 # Feature Ready — `bisalta-db` v0.1.0 · consulta de solo lectura sin credencial en contexto
 
-**Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v18** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
-**Agentes**: `AGENT_r1` (infra, reabierto para v17) · `AGENT_r2` (third-party-integration, reabierto para v16) · todo lo posterior al último `APPROVED` pasó **tres rondas de review** y lo ratificó el planner en v18 (ver "Estado honesto")
-**Gates**: suite 17/17 · secret-scan exit 0 · shellcheck exit 0 · linter de closure exit 0
+**Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v20** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
+**Quién hizo qué**: `AGENT_r1` (infra) y `AGENT_r2` (third-party-integration) hasta v19 · **v20 lo escribió Patrick Ocampo** (casos y función de normalización) y lo integró el planner, porque ningún agente pudo tocar esa parte (ver "Dónde está el riesgo") · v19 y v20 **todavía sin review**
+**Gates**: suite 17/17 · secret-scan exit 0 · shellcheck exit 0 · linter de closure exit 0 · 42 de 42 casos adversariales de Patrick
 
 ---
 
@@ -13,12 +13,12 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 ## Decisiones que tomé por vos
 
 1. **Cero dependencias npm.** JSON-RPC 2.0 escrito a mano; `psql`, `sqlcmd` y `aws` por CLI. Es tu propio argumento contra `npx -y` aplicado hasta el final, y el repo ya tenía precedente (`usage-monitor` es Node plano probado desde bash).
-2. **La lista blanca se portó literal** de `Bisalta/Proveedores-Back`, con sus doce casos — incluido el que la mató (`DELETE … WHERE id IN (SELECT …)`). **Y resultó insuficiente**: con ella se portó su punto ciego (ver "Dónde está el riesgo"). v16 le agrega el rechazo de escrituras embebidas.
+2. **La lista blanca se portó literal** de `Bisalta/Proveedores-Back`, con sus doce casos. **Resultó insuficiente**, y con ella se portó un defecto de normalización (ver "Dónde está el riesgo"). v16, v19 y v20 la corrigieron.
 3. **`AC38(a)` pasa a `N/A`**: te pedí agregar los scripts del plugin al glob de shellcheck y el plugin no trae ningún `.sh` — agregarlo pone el gate en rojo permanente. Medido.
 4. **`AC41` es freno, no clasificador.** La guarda por nombre detiene; no decide si un cluster tiene producción.
 5. **`portalrh_dev` y `portalrh_qa` fuera del alcance**, porque no sabías si algo se conecta con otro rol y quitar la dependencia es mejor que responder por inferencia.
 
-Y dos que decidiste vos el 23-sep: la réplica **se comprueba en cada consulta** (`AC46`) en vez de declararse, y las escrituras embebidas **se rechazan en la lista blanca** (`AC47`) en vez de aceptarse como riesgo.
+**Lo que decidiste vos** (23-sep): la réplica se **comprueba en cada consulta** (`AC46`) y las escrituras embebidas se **rechazan** (`AC47`). **Lo que decidió Patrick** (23-sep): el límite de tiempo vive **en el rol** con 60 s y el plugin deja de mandarlo (`AC28`), y la lista blanca se describe como **la capa que da un error temprano, no la que impide el daño** (`D62`).
 
 ## Dónde está el riesgo
 
@@ -26,52 +26,50 @@ Y dos que decidiste vos el 23-sep: la réplica **se comprueba en cada consulta**
 
 🔴 **La aprobación de Esteban Fait o Sebastián sigue pendiente.** Patrick aprobó el login de Dev SQL sabiendo que son copias de producción; la política de uso de IA exige además la suya. **Es precondición de habilitar el plugin al equipo, no de mergearlo.**
 
-🟡 **La lista blanca dejaba pasar escrituras, y nada del ciclo lo vio hasta el 23-sep** (`RT50`). Aceptaba `WITH x AS (DELETE …) SELECT …` en los dos dialectos, `SELECT … INTO` —que crea una tabla— y `set_config` para apagar la sesión de solo lectura. Sobrevivió a 17 triples de mutación y a tres reviews: los tests verificaban bien lo que enumeraban, y nadie enumeró esto. **No hubo exposición**: en Postgres lo frenaban tres barreras detrás, medidas con cinco sondas sin efecto posible; en SQL Server se encontró **antes** de que existiera el login. Cerrado en v16 (`AC47`) y verificado contra los casos enumerados. **La revisión adversarial —intentar romperla con formas que nadie enumeró— no se hizo** (`D62`, MAJOR): se le pide a Patrick. Tu copia instalada lo tiene desde la reinstalación del 23-sep a las 14:29.
+🟡 **La lista blanca es la capa que da un error temprano, no la barrera.** Patrick intentó romperla el 23-sep y encontró **doce formas de pasarla, ninguna brecha**: todas chocan después con el privilegio, que midió firme en los dos motores, o con la réplica. Se arreglaron las que eran baratas —un defecto de normalización que venía del código original de R2, y sentencias de SQL Server sin separador— y una regresión que introdujo el primer arreglo. Dos clases quedan como **límite conocido**, escritas en el contract: el SQL que viaja como texto a una función, y las funciones que escriben sin nombrar una escritura.
 
-🟡 **El endpoint de réplica depende de que el cluster tenga réplicas, y tiene una sola** — con los nombres de instancia cruzados, huella de un failover anterior. Aurora apunta `cluster-ro-` al writer si se queda sin réplicas. Desde v16 **el plugin lo comprueba en cada consulta y se niega** (`no_es_replica`, código 9): si el cluster pierde su réplica, el plugin deja de responder en Postgres en vez de quedar en condiciones de escribir. Es una falla cerrada, y un riesgo de disponibilidad, ya no de seguridad.
+🟡 **Una mutación de v20 no cae.** Apagando la regla de los literales `E'…'` de Postgres, la suite sigue verde: la regla está implementada y los 42 casos coinciden, pero **hoy ningún caso la mata**. Se le pidió a Patrick el caso que falta. Es un hueco de prueba, no de la barrera; está declarado en el contract (`AC51`, mutación (b)).
 
-🟡 **En SQL Server el rol es la única barrera detrás de la lista blanca** — y Patrick midió que es **firme**: el rechazo es por privilegio (`Msg 262`), que el consumidor no puede apagar, a diferencia del parámetro de sesión de Postgres. Sigue siendo `condicional` porque el plugin no lo comprueba en cada consulta, y porque sin `db_denydatawriter` no hay `DENY` que anule un `GRANT` de escritura concedido por error (`D48`, aceptado por Patrick).
+🟡 **Esta parte de la lista blanca no la puede tocar un agente.** El filtro de seguridad cortó tres veces el trabajo de ajustarla contra formas de pasarla, aunque los casos fueran de Patrick. Por eso v20 lo escribió él. Cualquier cambio futuro a la lista blanca va a necesitar a una persona para esa parte (`RT54`).
 
-🟡 **En Postgres, `claude_lectura` ve los nombres de las 29 bases del cluster** (v17). En SQL Server el equivalente —el login listaba 36 nombres entrando por `guest` en `master`— lo encontró y cerró Patrick con `DENY VIEW ANY DATABASE` (`AC48`): medido desde el plugin, cada conexión ve sólo su propia base, `master` y `tempdb`. En Postgres `pg_database` es legible por todo rol y ocultarla rompe clientes: riesgo aceptado, tu dueño, informado a Patrick.
+🟡 **El endpoint de réplica depende de que el cluster tenga réplicas, y tiene una sola** — con los nombres de instancia cruzados, huella de un failover anterior. Desde v16 el plugin lo comprueba en cada consulta y **se niega** (`no_es_replica`, código 9) si llegó al writer: una falla cerrada, y un riesgo de disponibilidad, no de seguridad.
 
-🟡 **Lo que Patrick configuró en el rol de Postgres no está en el repo** (`D59`): un `ALTER ROLE` con `default_transaction_read_only`, `statement_timeout`, `idle_in_transaction_session_timeout` y `lock_timeout`, que fue una de las barreras que frenó las sondas. Recrear el rol lo pierde. Y el `statement_timeout` de 60 s que puso él **no rige**: los 120 s del plugin le ganan (`D58`, decisión suya).
+🟡 **Los scripts de aprovisionamiento nuevos no los corrió nadie.** v19 metió en los scripts el `ALTER ROLE` y el `REVOKE CREATE ON SCHEMA public` que Patrick aplicó a mano. Lo que está en el motor coincide con lo que los scripts mandan —verificado en seis de seis bases—, pero la primera corrida real de los scripts va a ser la prueba de que reproducen el estado.
+
+🟡 **En Postgres, `claude_lectura` ve los nombres de las bases del cluster**: `pg_database` es legible por todo rol, y ocultarla rompe clientes. Riesgo aceptado, confirmado por Patrick. En SQL Server el equivalente lo cerró él (`AC48`).
 
 🟡 **La cuenta de producción no está enumerada** (`D43`). Ninguna entrada del catálogo apunta ahí, pero "producción es irrepresentable" descansa en eso, no en un inventario.
 
-✅ **Postgres probado de punta a punta contra la base real (23-sep-2026).** Las seis conexiones de Postgres responden a través del plugin instalado, las seis con `application_name = claude_lectura` — **la copia instalada tenía el código de v15**, sin la guarda de `AC46`; lo que `AC29` afirma no cambió entre v15 y v16. La sesión en solo lectura y la conexión contra la réplica se verificaron en `proveedores-dev`. La guarda de `AC46` se verificó con el servidor del repo: contra el endpoint de escritura se niega con código 9, y contra la réplica devuelve filas.
+✅ **Postgres y SQL Server probados contra las bases reales.** Las seis conexiones de Postgres responden a través del plugin, con `application_name = claude_lectura`; desde v19, con el límite de tiempo del rol (medido con el servidor del repo: `1min`). SQL Server responde desde el plugin, en la instancia correcta, y el login ve sólo su propia base, `master` y `tempdb`.
 
-✅ **La prueba en vivo encontró un defecto que la suite no veía.** `AC29` estaba verde en los tests y la sesión real se llamaba `psql`: el test miraba cómo se armaba el comando, no qué efecto tenía (`RT48`). Corregido en v15.
-
-✅ **`AC34` probado contra una sesión real de Claude Code (22-sep-2026).** Claude Code negoció `2024-11-05`, descubrió las dos herramientas y las invocó sin ajustes.
+✅ **`AC34` probado contra una sesión real de Claude Code (22-sep-2026).**
 
 ## Qué mirar en 5 minutos
 
-1. **`plugins/bisalta-db/scripts/lista-blanca.js`** — la guarda que decide qué SQL corre. Es la que tenía el hueco; mirá los dos chequeos nuevos al final del recorrido por sentencia.
-2. **`plugins/bisalta-db/catalogo.json`** — doce entradas (seis de Postgres, seis de SQL Server), ninguna con usuario ni contraseña, sólo `secret_id`. Cada garantía declara su nivel y la condición de la que depende.
-3. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-v16.md`** — la escalera sellada por el runner, los trece triples de v16 con el exit code de cada corrida, el binding AC ↔ test, y la verificación contra el motor.
-4. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-R2.md` §2** — los diecisiete triples originales de R2, más un decimoctavo de la ronda 2.
+1. **`plugins/bisalta-db/scripts/lista-blanca.js`** — la normalización de v20 es la de Patrick, con sus límites escritos en el comentario de la función.
+2. **`SDD/tests/fixtures/`** — los dos archivos de casos de Patrick, que el test recorre sin copiar sus consultas.
+3. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-v20.md`** — la escalera sellada, los 42 casos y las tres mutaciones, con la abierta declarada.
+4. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-v19-parte-1.md`** — el timeout, el `ALTER ROLE` y el esquema `public`, verificados contra el motor.
 5. **`plugins/bisalta-db/aprovisionamiento/APROBACIONES.md`** — quién autorizó qué, y la diferencia entre lo que la aprobación enumera y lo que el acceso alcanza.
 
 ## Estado honesto
 
 | | |
 |---|---|
-| **R2 — el plugin** | `APPROVED` por el reviewer sobre su alcance original: 30 ACs, 17 triples re-corridos por él. **Reabierto para v16** (`AC45a`–`AC47`), implementado por `AGENT_r2`: trece triples, en review |
-| **R1 — el aprovisionamiento** | `APPROVED` por el reviewer por última vez sobre el contract **v14** (`2529071`, 22-sep). **Reabierto para v17** (`AC44` medido, `AC48`), implementado por `AGENT_r1`, en review. Antes hubo dos `ESCALATE`, los dos por el cap de tres rondas. `E9` era un defecto del contract: un cambio de diseño que no reconcilió los ACs que lo verifican. `E10` era de medición: el barrido de clase buscó con los patrones de las citas ya corregidas y no por el concepto, y se le escapó un `PRINT` que habría revocado bases recién concedidas. El planner resolvió los dos, y la review sobre v14 los cubrió después |
-| **Todo lo posterior a `2529071`** | **Tres rondas de review** (`quality-gates.md` §7.5: una corrección de algo ya aprobado vuelve al loop), las tres `ESCALATE`, y **ratificado por el planner en v18 sin una cuarta ronda** — con el aval escrito del reviewer de que el ciclo quedaba en condiciones de ratificarse. La ratificación misma no la revisó nadie (`E16`). Se escribe como rango y no como lista porque una lista de commits dentro de un documento que se commitea después queda vieja en el mismo acto. La ronda 1 devolvió `ESCALATE` (`E12`): tres decisiones que el contract no tenía, cerradas en v16. La ronda 2 no encontró BLOCKER ni MAJOR y cerró los once de la ronda 1, pero devolvió `ESCALATE` porque no hizo la revisión adversarial de `AC47`, que quedó como deuda (`D62`). La ronda 3 dejó un MAJOR —`AC48` afirmaba una lectura que nadie había corrido— y cuatro MINOR; todo cerrado en v18 |
-| **Aprovisionamiento de Postgres** | **Ejecutado por Patrick el 22-sep.** Su verificación —431 objetos legibles, cero escribibles, `CREATE TABLE` rechazado— está en Slack, **no en un artefacto del repo** (`D61`) |
-| **Aprovisionamiento de SQL Server** | **Ejecutado por Patrick el 23-sep.** Login `bisalta_lectura` con `db_datareader` en las seis; verificado como el login: lee, `CREATE TABLE` denegado por privilegio, sin acceso a `SSISDB` ni `CONSTRUPLAZA_EFLOW`. `MachineName` medido (`AC44` cerrado). El `DENY VIEW ANY DATABASE` que aplicó a mano quedó en el script en v17 (`AC48`). Su evidencia vive en Slack (`D61`). **Consultado desde el plugin el 23-sep**: `AC44` y `AC48` verificados desde el consumidor (report `R1-v17`) |
-| **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep (`COMPRAS`, `COMPRAS_STG`, `Ecommerce`, `Ecommerce_qa`, `EXACTUS`, `BI`), **iniciales para probar la herramienta**, no definitivas |
-| **Deuda, retro y escalaciones del ciclo** | 31 ítems de deuda (`D32`–`D62`), 30 entradas de retro (`RT23`–`RT52`) y 8 escalaciones (`E9`–`E16`). Dos ítems de deuda son del propio `sdd-flow` (`D34`/`D35`: el verification report queda fuera del gate que valida el árbol) |
+| **Hasta v18** | Tres rondas de review sobre todo lo posterior al último `APPROVED`, ratificadas por el planner en v18 |
+| **v19** | Parte 1 (timeout, `ALTER ROLE`, esquema `public`) implementada por `AGENT_r1` y verificada contra el motor. Parte 2 (normalización, T-SQL sin separador) implementada por `AGENT_r2`. **Sin review** |
+| **v20** | Casos y función de Patrick, integración del planner. 42 de 42 casos. Mutaciones (c) y (d) caen; **(b) abierta**. **Sin review** |
+| **Aprovisionamiento** | Postgres ejecutado por Patrick el 22-sep y SQL Server el 23-sep, verificados desde el plugin. Parte de su evidencia vive en Slack (`D61`) |
+| **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep, **iniciales para probar la herramienta**, no definitivas |
+| **Deuda, retro y escalaciones del ciclo** | 31 ítems de deuda (22 abiertos), 32 entradas de retro hasta `RT54` y 10 escalaciones hasta `E18` |
 
-**Lo que este PR NO hace**: no crea ningún rol, no toca ninguna base, no carga ningún secreto. Es código y procedimientos. Lo que ya existe en AWS y en las bases lo hizo Patrick a mano, siguiendo el runbook.
+**Lo que este PR NO hace**: no crea ningún rol, no toca ninguna base, no carga ningún secreto. Es código y procedimientos. Lo que ya existe en AWS y en las bases lo hizo Patrick a mano.
 
 ## Siguiente paso
 
-1. ~~Reinstalar el plugin y la primera consulta a SQL Server~~ — hecho el 23-sep.
-2. ~~Review de todo lo posterior a `2529071`~~ — tres rondas, ratificado en v18. La revisión adversarial de `AC47` va por separado (`D62`).
-
-3. **Tu gate de Feature Ready**, sobre este brief.
+1. **Review de v19 y v20**, acotada: casos, mutaciones, consistencia entre evidencia, contract y docs. El análisis adversarial de la lista blanca no le toca: lo hizo Patrick.
+2. **Reinstalar** el plugin y verificar en vivo.
+3. **Tu gate de Feature Ready.** Se puede decidir con la mutación (b) abierta y declarada, o esperar el caso de Patrick.
 4. **Merge.** No habilita nada al equipo por sí solo.
 
-Para **habilitarlo al equipo** hace falta además SQL Server completo (Patrick) y la aprobación de Esteban o Sebastián.
+Para **habilitarlo al equipo** hace falta además la aprobación de Esteban o Sebastián.
