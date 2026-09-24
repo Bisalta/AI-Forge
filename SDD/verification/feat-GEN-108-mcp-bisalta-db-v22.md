@@ -82,7 +82,9 @@ PASS  test_usage_summary.sh
 Se agrupa por prefijo porque el nombre de cada assert incluye la descripción que Patrick le puso al caso.
 
 ```
-$ bash SDD/tests/test_lista_blanca.sh   # agrupado por prefijo de assert
+$ out="$(bash SDD/tests/test_lista_blanca.sh 2>&1)"; ec=$?
+$ for p in <cada prefijo de abajo>; do grep -cE "^  ok +$p" <<<"$out"; grep -cE "^  FAIL +$p" <<<"$out"; done
+$ grep -c '^  ok' <<<"$out"; grep -c '^  FAIL' <<<"$out"; echo "$ec"
 AC51/AC52 caso [0-9]+ \(                           ok=21 FAIL=0
 AC51 v20 caso [0-9]+ \(                            ok=21 FAIL=0
 AC51 v20 caso [0-9]+: el motivo lleva el tipo      ok=5 FAIL=0
@@ -98,9 +100,18 @@ total del archivo: ok=128 FAIL=0 · exit=0
 |---|---|
 | `AC51` / `AC52`, primera tanda | `AC51/AC52 caso <índice> (<dialecto>): <motivo>` — 21, uno por caso de `casos-adversariales-lista-blanca.js` |
 | `AC51` v20, segunda tanda | `AC51 v20 caso <índice> (<dialecto>): <motivo>` — 21, uno por caso de `casos-adversariales-v20.js` |
-| `AC51` v20, tipo en el motivo | `AC51 v20 caso <índice>: el motivo lleva el tipo (<tipo>)` — 5, uno por caso de construcción sin cerrar |
+| `AC51` v20, tipo en el motivo | `AC51 v20 caso <índice>: el motivo lleva el tipo (<tipo>)` — 5, uno por caso de construcción sin cerrar. **Excepción**: en uno de los cinco la descripción del caso no nombra el tipo, y ahí el assert verifica sólo el prefijo `construccion_sin_cerrar_`; en los otros cuatro, el tipo exacto |
 | Controles del recorrido | `… el archivo de casos adversariales carga` y `… trae casos`, por archivo; `AC51 v20 hay casos de construcción sin cerrar …` |
 
 ## 3. Mutaciones — pendiente, a cargo de una persona
 
-La evidencia de las mutaciones de `AC51` sobre este árbol queda **pendiente**. Rehacerlas es trabajo sobre la lista blanca que el filtro de seguridad corta cuando lo hace un agente (`RT54`), y se cortó también esta vez. Lo que hay mientras tanto: el report de v20 (`6b848f9`), y el triple del test nuevo del tipo en el motivo, que dio 0 → 1 → 0 con cinco asserts rojos (`9948aff`, en su mensaje de commit). La mutación (b) sigue abierta, a la espera del caso de Patrick.
+La evidencia de las mutaciones de `AC51` sobre este árbol queda **pendiente**. Rehacerlas es trabajo sobre la lista blanca que el filtro de seguridad corta cuando lo hace un agente (`RT54`), y se cortó también esta vez. Lo que hay mientras tanto: el report de v20 (`6b848f9`), corrido sobre aquel árbol, y el triple del test nuevo del tipo en el motivo (abajo). Estado declarado en el contract v22: **(b) abierta**, a la espera del caso de Patrick; **(c) abierta en parte**; (a) declarada con adaptador; (d) cae.
+
+**Triple del test del tipo en el motivo** (24-sep, sobre `9948aff`). La mutación saca el sufijo con el tipo del motivo en `validarSql()` —plomería, no la normalización—; verifica que se aplicó y que se restauró:
+
+```
+$ bash SDD/tests/test_lista_blanca.sh   # contando '^  FAIL'
+verde:      exit=0 asserts_que_caen=0
+mutado:     exit=1 asserts_que_caen=5
+restaurado: exit=0 asserts_que_caen=0
+```

@@ -1,7 +1,7 @@
 # Feature Ready — `bisalta-db` v0.1.0 · consulta de solo lectura sin credencial en contexto
 
 **Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v22** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
-**Quién hizo qué**: `AGENT_r1` (infra) y `AGENT_r2` (third-party-integration) hasta v19 · **v20 lo escribió Patrick Ocampo** (casos y función de normalización), Ian los pegó y lo integró el planner, porque ningún agente pudo tocar esa parte (ver "Dónde está el riesgo") · v19 y v20 **todavía sin review**
+**Quién hizo qué**: `AGENT_r1` (infra) y `AGENT_r2` (third-party-integration) hasta v19 · **v20 lo escribió Patrick Ocampo** (casos y función de normalización), Ian los pegó y lo integró el planner, porque ningún agente pudo tocar esa parte (ver "Dónde está el riesgo") · v19 a v22 **en review**: ronda 1 `REJECTED` (`E19`), ronda 2 `REJECTED` sólo por documentos, ronda 3 pendiente
 **Gates**: suite 17/17 · secret-scan exit 0 · shellcheck exit 0 · linter de closure exit 0 · 42 de 42 casos adversariales de Patrick
 
 ---
@@ -28,7 +28,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 
 🟡 **La lista blanca es la capa que da un error temprano, no la barrera.** Patrick intentó romperla el 23-sep y encontró **doce formas de pasarla, ninguna brecha**: todas chocan después con el privilegio, que midió firme en los dos motores, o con la réplica. Se arreglaron las que eran baratas —un defecto de normalización que venía del código original de R2, y sentencias de SQL Server sin separador— y dos regresiones que introdujo el primer arreglo. Dos clases quedan como **límite conocido**, escritas en el contract: el SQL que viaja como texto a una función, y las funciones que escriben sin nombrar una escritura.
 
-🟡 **Una mutación de v20 no cae.** Apagando la regla de los literales `E'…'` de Postgres, la suite sigue verde: la regla está implementada y los 42 casos coinciden, pero **hoy ningún caso la mata**. Se le pidió a Patrick el caso que falta. Es un hueco de prueba, no de la barrera; está declarado en el contract (`AC51`, mutación (b)).
+🟡 **Dos mutaciones de la lista blanca quedan abiertas, y su evidencia sobre el árbol actual está pendiente.** La (b) —la regla de los literales `E'…'` de Postgres— no cae: apagada, la suite sigue verde; hoy ningún caso la mata, y se le pidió a Patrick el caso que falta. La (c) —la de los corchetes— cae **en parte**: con la regla apagada cae un solo caso, que también cae con otra mutación. La (a) está declarada con adaptador. La evidencia de las mutaciones sobre el árbol de v22 la tiene que rehacer una persona (report de v22, §3; `RT54`). Son huecos de prueba, no de la barrera: las reglas están implementadas y los 42 casos coinciden.
 
 🟡 **Esta parte de la lista blanca no la puede tocar un agente.** El filtro de seguridad cortó tres veces el trabajo de ajustarla contra formas de pasarla, aunque los casos fueran de Patrick. Por eso v20 lo escribió él. Cualquier cambio futuro a la lista blanca va a necesitar a una persona para esa parte (`RT54`).
 
@@ -48,7 +48,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 
 1. **`plugins/bisalta-db/scripts/lista-blanca.js`** — la normalización de v20 es la de Patrick, con sus límites escritos en el comentario de la función.
 2. **`SDD/tests/fixtures/`** — los dos archivos de casos de Patrick, que el test recorre sin copiar sus consultas.
-3. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-v20.md`** — la escalera sellada, los 42 casos y las tres mutaciones, con la abierta declarada.
+3. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-v22.md`** — la escalera sellada sobre el árbol actual, los 42 casos agrupados, el binding y el estado de las mutaciones. El de v20 conserva las tres mutaciones corridas sobre aquel árbol.
 4. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-v19-parte-1.md`** — el timeout, el `ALTER ROLE` y el esquema `public`, verificados contra el motor.
 5. **`plugins/bisalta-db/aprovisionamiento/APROBACIONES.md`** — quién autorizó qué, y la diferencia entre lo que la aprobación enumera y lo que el acceso alcanza.
 
@@ -57,19 +57,19 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 | | |
 |---|---|
 | **Hasta v18** | Tres rondas de review sobre todo lo posterior al último `APPROVED`, ratificadas por el planner en v18 |
-| **v19** | Parte 1 (timeout, `ALTER ROLE`, esquema `public`) implementada por `AGENT_r1` y verificada contra el motor. Parte 2 (normalización, T-SQL sin separador) implementada por `AGENT_r2`. **Sin review** |
-| **v20** | Casos y función de Patrick, integración del planner. 42 de 42 casos. Mutaciones (c) y (d) caen; **(b) abierta**. **Sin review** |
+| **v19** | Parte 1 (timeout, `ALTER ROLE`, esquema `public`) implementada por `AGENT_r1` y verificada contra el motor. Parte 2 (normalización, T-SQL sin separador) implementada por `AGENT_r2`. En review |
+| **v20 a v22** | Casos y función de Patrick, integración del planner; v21 y v22 cierran la ronda 1 de review. 42 de 42 casos. Mutaciones: (d) cae; **(b) abierta**; **(c) abierta en parte**; (a) declarada con adaptador. La evidencia de mutaciones sobre el árbol de v22, **pendiente** a cargo de una persona. En review |
 | **Aprovisionamiento** | Postgres ejecutado por Patrick el 22-sep y SQL Server el 23-sep, verificados desde el plugin. Parte de su evidencia vive en Slack (`D61`) |
 | **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep, **iniciales para probar la herramienta**, no definitivas |
-| **Deuda, retro y escalaciones del ciclo** | 31 ítems de deuda (22 abiertos), 32 entradas de retro hasta `RT54` y 10 escalaciones hasta `E18` |
+| **Deuda, retro y escalaciones del ciclo** | 31 ítems de deuda (22 abiertos), 32 entradas de retro hasta `RT54` y 11 escalaciones hasta `E19` |
 
 **Lo que este PR NO hace**: no crea ningún rol, no toca ninguna base, no carga ningún secreto. Es código y procedimientos. Lo que ya existe en AWS y en las bases lo hizo Patrick a mano.
 
 ## Siguiente paso
 
-1. **Review de v19 y v20**, acotada: casos, mutaciones, consistencia entre evidencia, contract y docs. El análisis adversarial de la lista blanca no le toca: lo hizo Patrick.
+1. **Ronda 3 de la review**, la última antes del cap, sobre los documentos que la ronda 2 marcó. El análisis adversarial y las mutaciones de la lista blanca no le tocan.
 2. **Reinstalar** el plugin y verificar en vivo.
-3. **Tu gate de Feature Ready.** Se puede decidir con la mutación (b) abierta y declarada, o esperar el caso de Patrick.
+3. **Tu gate de Feature Ready.** Se puede decidir con las mutaciones (b) y (c) abiertas y su evidencia pendiente, todo declarado, o esperar a Patrick.
 4. **Merge.** No habilita nada al equipo por sí solo.
 
 Para **habilitarlo al equipo** hace falta además la aprobación de Esteban o Sebastián.

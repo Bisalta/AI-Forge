@@ -270,7 +270,17 @@ SELECT r.rolname AS rol, s.setconfig FROM pg_db_role_setting s JOIN pg_roles r O
 
 Los cuatro valores, configurados en el rol y no en la sesión.
 
-**`AC50` — la enumeración de dueños de la Parte B, corrida en lectura** contra `proveedores_dev`, 24-sep. Por dueño, antes del cambio de v21:
+**`AC50` — la enumeración de dueños de la Parte B, corrida en lectura** contra `proveedores_dev`, 24-sep. Por dueño, antes del cambio de v21, con esta consulta:
+
+```
+SELECT r.rolname AS dueno, r.rolsuper AS superusuario,
+  (SELECT count(*) FROM pg_catalog.pg_class c WHERE c.relnamespace = 'public'::regnamespace AND c.relowner = r.oid) AS relaciones,
+  (SELECT count(*) FROM pg_catalog.pg_proc f WHERE f.pronamespace = 'public'::regnamespace AND f.proowner = r.oid) AS funciones,
+  (SELECT count(*) FROM pg_catalog.pg_type t WHERE t.typnamespace = 'public'::regnamespace AND t.typowner = r.oid) AS tipos
+FROM pg_catalog.pg_roles r WHERE r.rolname IN ('AurAwsDbMaster','proveedores','rdsadmin') ORDER BY 1
+```
+
+Resultado:
 
 ```
 AurAwsDbMaster  superusuario=f  relaciones=0  funciones=1   tipos=2

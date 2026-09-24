@@ -110,7 +110,9 @@ Las herramientas quedan disponibles como
 3. **La lista blanca** exige que *cada* sentencia empiece con `SELECT` o
    `WITH` **y** que no contenga una escritura embebida (`INSERT`, `UPDATE`,
    `DELETE`, `MERGE` o `INTO` como palabra; en `postgres`, además,
-   `set_config`), después de quitar comentarios y literales. **No es la
+   `set_config`; en `sqlserver`, además, `TRUNCATE`, `DROP`, `CREATE` y
+   `ALTER` — ver la tabla por dialecto), después de quitar comentarios y
+   literales. **No es la
    barrera que impide una escritura** (v19): es la primera capa, la que
    rechaza temprano y con un mensaje claro; lo que impide el daño son las
    capas de atrás — la réplica, la sesión y el rol. Patrick Ocampo revisó el

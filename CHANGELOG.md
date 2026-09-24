@@ -108,7 +108,7 @@ original, las sentencias de SQL Server sin separador y dos regresiones que intro
 dos clases quedan como límite conocido. v20 —la normalización que conoce el comillado de cada
 dialecto— la escribió Patrick, casos y función: ningún agente pudo hacer ese trabajo (`RT54`). También
 en v19: el límite de tiempo pasa al rol, y el `ALTER ROLE` y el esquema `public` que Patrick había
-configurado a mano entran a los scripts. Una de las mutaciones declaradas de v20 queda abierta, declarada en el contract.
+configurado a mano entran a los scripts. Dos mutaciones de la lista blanca quedan abiertas —la de los literales `E'…'`, y en parte la de los corchetes—, declaradas en el contract.
 
 **Lo que dejó el kilometraje**: dos defectos que la suite encontró y que valen por separado. (1) El
 tope de bytes salía vacío porque `process.exit()` **corta lo que `process.stdout` todavía tiene en

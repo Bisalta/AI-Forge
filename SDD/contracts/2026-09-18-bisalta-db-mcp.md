@@ -4,7 +4,7 @@
 
 ### Cambios v21 → v22 (el resto de la review de v19 y v20, 24-sep-2026)
 
-Se cierran los hallazgos de esa review que v21 dejó para una persona (`SDD/briefs/pendiente-humano-AC51.md`): en `AC51`, la autoría de los casos de v20, la mutación (a) declarada con adaptador, la (c) abierta en parte y la corrección del fixture declarada; un test nuevo verifica el tipo en el motivo de una construcción sin cerrar; y el README deja de presentar la lista blanca como barrera. La evidencia está en `SDD/verification/feat-GEN-108-mcp-bisalta-db-v22.md`.
+Se cierran los hallazgos de esa review que v21 dejó para una persona (`SDD/briefs/pendiente-humano-AC51.md`): en `AC51`, la autoría de los casos de v20, la mutación (a) declarada con adaptador, la (c) abierta en parte y la corrección del fixture declarada; un test nuevo verifica el tipo en el motivo de una construcción sin cerrar; y el README deja de presentar la lista blanca como barrera. La evidencia está en `SDD/verification/feat-GEN-108-mcp-bisalta-db-v22.md`. **Autoría**: v21 había reservado estos cambios para una persona; los hizo el planner, a pedido de Ian Vargas, y el filtro no los cortó. Lo que sí quedó para una persona es la evidencia de las mutaciones sobre el árbol de v22 (§3 de ese report).
 
 ### Cambios v20 → v21 (review §7.5 de v19 y v20, ronda 1 `REJECTED`, 24-sep-2026)
 
@@ -671,7 +671,7 @@ Casos del test — rechazados: en `postgres`, `WITH x AS (INSERT INTO t VALUES (
 `manual-only: requiere el cluster; misma razón que AC1.` **Evidencia**: la lectura del 24-sep, pegada en el report de v19 parte 1.
 
 **AC50** (detección, `manual-only`) — `postgres-parte-b.sql`, en cada base que recorre: primero concede `CREATE ON SCHEMA public` al dueño de la base **y** a todo rol no superusuario que sea dueño de una relación, una función o un tipo en `public`, y **después** revoca `CREATE ON SCHEMA public FROM PUBLIC`. El orden es la condición: revocar primero rompe las migraciones de quien ya crea ahí. Verificado como `claude_lectura` con `has_schema_privilege('public','CREATE')` = `f`, sin intentar una escritura.
-`manual-only: requiere el cluster.` **Evidencia mínima aceptada** (v21): el par antes/después de Patrick (22-sep) y la medición de seis de seis bases en `f` (23-sep). El `REVOKE CONNECT` sobre la base `postgres` va al runbook como paso explícito, con su verificación.
+`manual-only: requiere el cluster.` **Evidencia mínima aceptada** (v21): el par antes/después de Patrick (22-sep) —que vive en Slack, `D61`— y la medición de seis de seis bases en `f` (23-sep), pegada en el report de v19 parte 1. El `REVOKE CONNECT` sobre la base `postgres` va al runbook como paso explícito, con su verificación.
 
 **AC51** (detección) — La normalización de la lista blanca es **un solo recorrido de izquierda a derecha** que conoce las reglas de comillado de cada dialecto, de modo que **el validador ve las mismas sentencias que ejecuta el motor**:
 - **en los dos dialectos**: literales entre comillas simples con `''` como escape; identificadores entre comillas dobles con `""` como escape (se copian tal cual); comentarios de línea (`--` hasta el fin de línea); comentarios de bloque **anidados**;
