@@ -285,7 +285,9 @@ Dos precisiones sobre estos valores:
   y se comporta como `verify-ca`; un `root.crt` de otra cosa impide conectar.
 - **SQL Server**: `-N true -C`. Exige el cifrado, pero confía en el
   certificado sin validarlo: medido el 25-sep, sin `-C` la conexión falla
-  porque el certificado de la instancia no es de una autoridad conocida.
+  porque el certificado de la instancia no es de una autoridad conocida: es
+  `SSL_Self_Signed_Fallback`, el que SQL Server genera solo cuando no tiene uno
+  configurado.
   **Cifra, pero no autentica al servidor** (`D71`).
 
 ## Respuesta y topes
