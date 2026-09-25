@@ -43,6 +43,10 @@ const PREFIJO_TEMP = 'bisalta-db-';
 // encima del corte de proceso (TIMEOUT_PROCESO_MS), así que no se borra el de
 // una consulta que otra sesión todavía está corriendo.
 const EDAD_HUERFANO_MS = 10 * 60 * 1000;
+// AC58 (v26): las autoridades de certificación de Amazon RDS, del sitio
+// oficial de AWS (truststore.pki.rds.amazonaws.com/global/global-bundle.pem,
+// descargado el 25-sep-2026). Viaja con el plugin: libpq no lo trae.
+const BUNDLE_RDS = path.join(__dirname, '..', 'certificados', 'rds-global-bundle.pem');
 const NOMBRE_TEMP = new RegExp('^' + PREFIJO_TEMP + '[A-Za-z0-9]{6}$');
 // AC54 (v25): límite de consulta de SQL Server, del lado del cliente con `-t`.
 // Es el mismo valor que el `statement_timeout` del rol de Postgres (AC49):
@@ -187,11 +191,15 @@ function construirComandoPostgres(entrada, usuario, rutaPassfile, sql) {
       // parámetro del conninfo sobreviven. No mover esto de vuelta a
       // PGOPTIONS: el comando se ve correcto y el efecto no lo es.
       PGAPPNAME: usuario,
-      // AC55 (v25): TLS obligatorio. Con el `prefer` por omisión, libpq cifra
-      // si el servidor lo ofrece, pero cae a texto plano si no. `require`
-      // cifra o no conecta; todavía no verifica el certificado: eso es
-      // `verify-full` con el bundle de RDS (D70).
-      PGSSLMODE: 'require',
+      // AC55 (v25) y AC58 (v26): TLS obligatorio y con el servidor
+      // autenticado. `verify-full` exige que el certificado lo firme una de
+      // las autoridades del bundle de RDS que viaja con el plugin, y que el
+      // nombre del host coincida. Con el `prefer` por omisión, libpq caía a
+      // texto plano si el servidor no ofrecía TLS; con `require`, cifraba sin
+      // saber con quién. PGSSLROOTCERT explícito, además, hace que un
+      // `~/.postgresql/root.crt` de otra cosa no cambie el comportamiento.
+      PGSSLMODE: 'verify-full',
+      PGSSLROOTCERT: BUNDLE_RDS,
       PGCONNECT_TIMEOUT: '15'
     }
   };
@@ -417,6 +425,7 @@ module.exports = {
   limpiarTemporalesHuerfanos: limpiarTemporalesHuerfanos,
   EDAD_HUERFANO_MS: EDAD_HUERFANO_MS,
   TIMEOUT_CONSULTA_SQLSERVER_S: TIMEOUT_CONSULTA_SQLSERVER_S,
+  BUNDLE_RDS: BUNDLE_RDS,
   resolverCredencial: resolverCredencial,
   ejecutarConsulta: ejecutarConsulta,
   construirComandoPostgres: construirComandoPostgres,

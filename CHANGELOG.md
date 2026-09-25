@@ -6,7 +6,7 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ### 0.1.0 — 2026-09-18
 
-Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v25).
+Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v26).
 Consulta de solo lectura a las bases de dev/qa de Bisalta desde Claude Code, **sin que
 ninguna credencial entre en el contexto de la sesión**. La credencial no desaparece: pasa de un
 archivo que hoy hay que leerle al modelo —y que queda archivado en el transcript— a un secreto de
@@ -112,7 +112,8 @@ configurado a mano entran a los scripts. Las cuatro mutaciones declaradas de `AC
 
 **Review de seguridad de gradiel12 (v25)**: TLS obligatorio en los dos motores, todavía sin verificar
 el certificado del servidor; `sqlcmd -t 60`; diecisiete sentencias de SQL Server que no son lectura,
-rechazadas por nombre; y los temporales huérfanos, borrados al arrancar. Al medir apareció un defecto
+rechazadas por nombre; y los temporales huérfanos, borrados al arrancar. En v26, Postgres pasa a
+`verify-full` con el bundle de certificados de RDS, que viaja con el plugin: autentica al servidor. Al medir apareció un defecto
 que ninguna review había visto: `sqlcmd` escribe sus errores en stdout, el plugin sólo leía stderr, y
 todo error de SQL Server llegaba sin mensaje. El stub del test era una copia del de `psql` (`RT55`).
 

@@ -96,6 +96,12 @@ cat > "$BIN_DIR/psql" <<'STUB'
   printf 'PGOPTIONS %s\n' "${PGOPTIONS:-(vacio)}"
   printf 'PGAPPNAME %s\n' "${PGAPPNAME:-(vacio)}"
   printf 'PGSSLMODE %s\n' "${PGSSLMODE:-(vacio)}"
+  printf 'PGSSLROOTCERT %s\n' "${PGSSLROOTCERT:-(vacio)}"
+  if [ -n "${PGSSLROOTCERT:-}" ] && [ -f "$PGSSLROOTCERT" ]; then
+    printf 'PGSSLROOTCERT_EXISTE si\n'
+  else
+    printf 'PGSSLROOTCERT_EXISTE no\n'
+  fi
   if [ -n "${PGPASSFILE:-}" ] && [ -f "$PGPASSFILE" ]; then
     printf 'PASSFILE_EXISTE si\n'
     printf 'PASSFILE_MODO %s\n' "$(ls -l "$PGPASSFILE" | cut -c1-10)"
@@ -719,8 +725,17 @@ export BISALTA_STUB_PSQL_MODO
 # ---------------------------------------------------------------------------
 reiniciar_registros
 servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
-assert_contains "$(grep '^PGSSLMODE ' "$TMP_DIR/psql-invocado.log")" "PGSSLMODE require" \
-  "AC55 psql exige TLS (PGSSLMODE=require: cifra o no conecta)"
+assert_contains "$(grep '^PGSSLMODE ' "$TMP_DIR/psql-invocado.log")" "PGSSLMODE verify-full" \
+  "AC55/AC58 psql exige TLS y autentica al servidor (PGSSLMODE=verify-full)"
+# AC58 (v26): el bundle de RDS viaja con el plugin y el comando lo nombra.
+assert_contains "$(grep '^PGSSLROOTCERT ' "$TMP_DIR/psql-invocado.log")" "certificados/rds-global-bundle.pem" \
+  "AC58 psql apunta PGSSLROOTCERT al bundle de RDS del plugin"
+assert_contains "$(cat "$TMP_DIR/psql-invocado.log")" "PGSSLROOTCERT_EXISTE si" \
+  "AC58 el archivo al que apunta PGSSLROOTCERT existe"
+BUNDLE="$PLUGIN_DIR/certificados/rds-global-bundle.pem"
+assert_eq "$([ "$(grep -c 'BEGIN CERTIFICATE' "$BUNDLE" 2>/dev/null)" -gt 0 ] && echo si || echo no)" "si" \
+  "AC58 el bundle trae certificados"
+assert_eq "$(grep -c 'PRIVATE KEY' "$BUNDLE" 2>/dev/null)" "0" "AC58 el bundle no trae ninguna clave privada"
 
 # ---------------------------------------------------------------------------
 # AC56 (v25) — los temporales huérfanos se borran al arrancar

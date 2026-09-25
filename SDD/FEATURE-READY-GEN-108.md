@@ -1,8 +1,8 @@
 # Feature Ready — `bisalta-db` v0.1.0 · consulta de solo lectura sin credencial en contexto
 
-**Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v25** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
+**Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v26** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
 **Quién hizo qué**: `AGENT_r1` (infra) y `AGENT_r2` (third-party-integration) hasta v19 · **v20 lo escribió Patrick Ocampo** (casos y función de normalización), Ian los pegó y lo integró el planner · v21 y v22 los hizo el planner a pedido de Ian, porque ningún agente pudo tocar esa parte (ver "Dónde está el riesgo") · v19 a v22 **en review**: ronda 1 `REJECTED` (`E19`), ronda 2 `REJECTED` sólo por documentos, **ronda 3 `APPROVED`**
-**Feature Ready: APROBADO por Ian Vargas, 24-sep-2026** sobre v22, con las mutaciones (b) y (c) abiertas y su evidencia pendiente (`D63`–`D65`). **Después de aprobar**: v23 cerró la (b) con seis casos de Patrick y corrió (b), (c) y (d) sobre su árbol (`76f258e`); por ser una corrección posterior a `APPROVED`, v23 volvió a review (§7.5) y quedó `APPROVED` en la ronda 2. Después, el caso 13 pasó a nombrar su tipo (`D67`, `e0a70bb`); su review escaló en la ronda 3 por falta de la escalera sellada sobre ese árbol, y el planner la ratificó corriendo el runner (`E20`). Después se corrió la (a), con adaptador, sobre el árbol de entonces (`D65`). Después, v24 cerró la (c) con cinco casos del planner (`D64`). **Por último, v25 cambia código** a partir de la review de seguridad de gradiel12 en el PR: TLS obligatorio, límite de consulta en SQL Server y más sentencias rechazadas. **Feature Ready: APROBADO de nuevo por Ian Vargas sobre v25, el 25-sep-2026**, después de probarlo a través del plugin instalado. En la misma aprobación pidió sumar ya el bundle de RDS (`D70`).
+**Feature Ready: APROBADO por Ian Vargas, 24-sep-2026** sobre v22, con las mutaciones (b) y (c) abiertas y su evidencia pendiente (`D63`–`D65`). **Después de aprobar**: v23 cerró la (b) con seis casos de Patrick y corrió (b), (c) y (d) sobre su árbol (`76f258e`); por ser una corrección posterior a `APPROVED`, v23 volvió a review (§7.5) y quedó `APPROVED` en la ronda 2. Después, el caso 13 pasó a nombrar su tipo (`D67`, `e0a70bb`); su review escaló en la ronda 3 por falta de la escalera sellada sobre ese árbol, y el planner la ratificó corriendo el runner (`E20`). Después se corrió la (a), con adaptador, sobre el árbol de entonces (`D65`). Después, v24 cerró la (c) con cinco casos del planner (`D64`). **Por último, v25 cambia código** a partir de la review de seguridad de gradiel12 en el PR: TLS obligatorio, límite de consulta en SQL Server y más sentencias rechazadas. **Feature Ready: APROBADO de nuevo por Ian Vargas sobre v25, el 25-sep-2026**, después de probarlo a través del plugin instalado. En la misma aprobación pidió sumar ya el bundle de RDS (`D70`): eso es **v26**, donde Postgres pasa a autenticar al servidor.
 **Gates**: suite 17/17 · secret-scan exit 0 · shellcheck exit 0 · linter de closure exit 0 · 48 de 48 casos adversariales de Patrick (en v25, el caso 8 pasa de aceptar a rechazar) y los del planner · escalera del árbol actual sellada por el runner en `SDD/verification/feat-GEN-108-mcp-bisalta-db-v25.md`
 
 ---
@@ -34,7 +34,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 🟡 **Una parte de la lista blanca no la puede tocar un agente.** El filtro de seguridad cortó tres veces el trabajo de ajustarla contra formas de pasarla, aunque los casos fueran de Patrick. Por eso v20 lo escribió él (`RT54`). Lo que no cortó, de v23 a v25, fueron los casos de consultas legítimas y las reglas de rechazo explícitas por nombre (`RT55`).
 
 🟠 **Review de seguridad de gradiel12 (PR #14, 24-sep).** No bloquea el merge; pide sus puntos 1 y 2 antes de habilitar al equipo. v25 aplica lo que no dependía de nadie más, y todo tiene su mutación verificada:
-- **TLS obligatorio** en los dos motores (`AC55`). **Todavía no se verifica el certificado del servidor**: en Postgres falta el bundle de RDS, que hay que descargar con tu OK (`D70`). En SQL Server, Patrick tiene que poner un certificado verificable (`D71`).
+- **TLS obligatorio** en los dos motores (`AC55`). **Desde v26, Postgres autentica al servidor** con el bundle de RDS (`AC58`, `D70` pagada). **SQL Server todavía no**: Patrick tiene que poner un certificado verificable (`D71`).
 - **`sqlcmd -t 60`** (`AC54`): SQL Server no tenía límite de consulta.
 - **Diecisiete sentencias de SQL Server que no son lectura, rechazadas** (`AC53`). El caso 8 de Patrick usaba `OPENQUERY` y deja de ser límite conocido: se cambió sólo su veredicto esperado.
 - **Temporales huérfanos** borrados al arrancar (`AC56`).
@@ -71,9 +71,10 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 | **v23** | Seis casos más de Patrick para la mutación (b), que ahora cae. 48 de 48 casos. Review §7.5: `APPROVED` en la ronda 2. El caso 13 nombra su tipo (`D67`): `ESCALATE` en la ronda 3 por evidencia faltante, ratificado por el planner con la escalera sellada (`E20`). Después, la (a) sobre el árbol actual (`D65`), con review `APPROVED` en la ronda 3 |
 | **v24** | Cinco casos del planner para la mutación (c), que ahora cae (`D64`). Las cuatro mutaciones de `AC51` caen sobre el árbol actual. Review §7.5: `APPROVED` en la ronda 3 |
 | **v25** | Review de seguridad de gradiel12: `AC53` a `AC57`, 34 mutaciones que caen, cifrado verificado en vivo. Review §7.5: `APPROVED` en la ronda 3. **Probado a través del plugin instalado** el 25-sep (report de v25, §5) |
+| **v26** | Postgres autentica al servidor con el bundle de RDS (`AC58`). Las seis conexiones conectan con `verify-full`, y con una autoridad ajena falla. **En review** (§7.5) |
 | **Aprovisionamiento** | Postgres ejecutado por Patrick el 22-sep y SQL Server el 23-sep, verificados desde el plugin. Parte de su evidencia vive en Slack (`D61`) |
 | **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep, **iniciales para probar la herramienta**, no definitivas |
-| **Deuda, retro y escalaciones del ciclo** | 47 ítems de deuda (33 abiertos), 33 entradas de retro hasta `RT55` y 12 escalaciones hasta `E20` |
+| **Deuda, retro y escalaciones del ciclo** | 47 ítems de deuda (32 abiertos), 33 entradas de retro hasta `RT55` y 12 escalaciones hasta `E20` |
 
 **Lo que este PR NO hace**: no crea ningún rol, no toca ninguna base, no carga ningún secreto. Es código y procedimientos. Lo que ya existe en AWS y en las bases lo hizo Patrick a mano.
 
@@ -86,6 +87,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 5. ~~Review §7.5 de v24~~ — ronda 1 `REJECTED`, sólo por documentos; ronda 2 `APPROVED` con un MINOR, corregido; **ronda 3 `APPROVED`**, sin hallazgos.
 6. ~~Review §7.5 de v25~~ — ronda 1 `REJECTED` (dos MAJOR de documentación); ronda 2 `APPROVED` con cuatro MINOR, corregidos; **ronda 3 `APPROVED`**, sin hallazgos.
 7. ~~Tu gate de Feature Ready, otra vez, sobre v25~~ — **aprobado el 25-sep**, después de la prueba a través del plugin instalado.
+7b. **v26, el bundle de RDS** (pedido en la misma aprobación): review §7.5 pendiente.
 8. **Merge.** Requiere la review de un code owner (`@Bisalta/construplaza-admin`). No habilita nada al equipo por sí solo.
 
 Para **habilitarlo al equipo** hace falta además la aprobación de Esteban o Sebastián.

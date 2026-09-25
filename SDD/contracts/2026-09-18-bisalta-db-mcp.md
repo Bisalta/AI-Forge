@@ -1,6 +1,16 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v25
+- **Versión**: v26
+
+### Cambios v25 → v26 (Postgres autentica al servidor, 25-sep-2026)
+
+Ian Vargas aprobó Feature Ready sobre v25 el 25-sep y, en la misma aprobación, pidió sumar ya el bundle de certificados de RDS (`D70`). Entra **`AC58`**, y cambia la condición de aprobación de `AC55` para Postgres, de `require` a `verify-full`; por eso el bump.
+
+- El bundle se descargó el 25-sep del sitio oficial de AWS (`https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem`). Pesa 165 408 bytes, y su sha256 es `e5bb2084ccf45087bda1c9bffdea0eb15ee67f0b91646106e466714f9de3c7e3`. Trae 108 certificados, todos autoridades de Amazon RDS, y ninguna clave privada. Viaja con el plugin en `plugins/bisalta-db/certificados/rds-global-bundle.pem`.
+- Medido el 25-sep con el servidor del repo: las seis conexiones de Postgres conectan con `verify-full`. **Control negativo**: con el bundle reemplazado por una autoridad ajena, la conexión falla con `certificate verify failed`, así que la verificación funciona de verdad.
+- SQL Server sigue igual: cifra sin autenticar al servidor (`D71`, Patrick).
+
+Evidencia en `SDD/verification/feat-GEN-108-mcp-bisalta-db-v26.md`.
 
 ### Cambios v24 → v25 (review de seguridad de gradiel12 en el PR #14, 25-sep-2026)
 
@@ -711,7 +721,9 @@ Casos de prueba: los 21 de la revisión de Patrick Ocampo (`SDD/tests/fixtures/c
 
 **AC54** (detección, v25) — El comando de `sqlcmd` lleva `-t 60`: el límite de consulta de SQL Server, igual al `statement_timeout` del rol de Postgres. **Mutación declarada**: quitar `-t` pone rojo su assert. **Parte `manual-only`**: que el corte del motor se produzca a los 60 s contra la instancia real no se mide en este alcance, para no cargar una copia de producción con una consulta de un minuto.
 
-**AC55** (detección, v25) — El comando de `psql` lleva `PGSSLMODE=require` en su entorno, y el de `sqlcmd`, `-N true` y `-C`. **Mutaciones declaradas**: quitar cualquiera de los tres pone rojo su assert. **Parte `manual-only`**, contra las bases reales, desde el servidor del repo: en Postgres, `pg_stat_ssl` de la propia sesión devuelve `ssl = t`; en SQL Server, la conexión con las banderas nuevas responde. **No verifica el certificado del servidor en ningún motor** (`D70`, `D71`).
+**AC55** (detección, v25; Postgres cambia en v26) — El comando de `psql` lleva `PGSSLMODE=verify-full` en su entorno (hasta v25, `require`), y el de `sqlcmd`, `-N true` y `-C`. **Mutaciones declaradas**: quitar cualquiera de los tres pone rojo su assert. **Parte `manual-only`**, contra las bases reales, desde el servidor del repo: en Postgres, `pg_stat_ssl` de la propia sesión devuelve `ssl = t`; en SQL Server, la conexión con las banderas nuevas responde. **Desde v26, Postgres verifica el certificado del servidor (`AC58`); SQL Server todavía no** (`D71`).
+
+**AC58** (detección, v26) — El comando de `psql` lleva `PGSSLROOTCERT` apuntando a `certificados/rds-global-bundle.pem` del propio plugin, y ese archivo existe, trae certificados y no trae ninguna clave privada. **Mutaciones declaradas**: (a) volver a `require` pone rojo el assert del modo; (b) quitar `PGSSLROOTCERT` pone rojo el assert de la ruta; (c) apuntarla a un archivo que no existe pone rojo el assert de existencia. **Parte `manual-only`**, contra las bases reales, desde el servidor del repo: las seis conexiones de Postgres conectan con `verify-full`; y con el bundle reemplazado por una autoridad ajena, la conexión falla con `certificate verify failed`.
 
 **AC56** (detección, v25) — Al arrancar, el servidor borra de su tmpdir los directorios con el nombre que da `mkdtemp` al plugin —el prefijo y seis caracteres— y más de 10 minutos de antigüedad. No toca los recientes, ni los que no son del plugin, ni uno viejo que tenga el prefijo pero no ese nombre, y no sigue symlinks (`lstat`). **Mutaciones declaradas**: (a) quitar la llamada al arrancar; (b) borrar sin mirar la edad; (c) borrar sin mirar el nombre; (d) aceptar cualquier nombre con el prefijo; (e) `stat` en lugar de `lstat`. Cada una pone rojo su assert.
 
@@ -750,5 +762,6 @@ Casos de prueba: los 21 de la revisión de Patrick Ocampo (`SDD/tests/fixtures/c
 | ~~El cluster de dev/qa podría no tener réplica de lectura…~~ | ✅ **CERRADO el 22-sep-2026**: `describe-db-clusters` sobre `sistemas-costruplaza-db` devuelve `ReaderEndpoint = sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com`, idéntico al host que declaran las seis entradas de Postgres del catálogo. La garantía `endpoint-replica-lectura` se sostiene. (`IAMDatabaseAuthenticationEnabled` sigue en `false`, consistente con la decisión de v4.) |
 | ~~**El `secret_id` de las 12 entradas del catálogo no lo acordó nadie.**~~ | ✅ **CERRADO.** (a) y (b) en v12: Patrick eligió `dev/bd/claude-lectura-postgres` y `dev/bd/claude-lectura-sqlserver`, y reformuló su propia regla a *"un secreto por credencial, aislamiento por política IAM por consumidor"*, bajo la cual el esquema de 12 conexiones sobre 2 secretos es correcto. (c) en v13: `neo_lectura` salió del diseño, así que **ningún artefacto manda crearlo**. `D51` figura cerrada en el ledger. |
 | Un solo secreto por motor cubre `dev` y `qa` a la vez: si se filtra el de Postgres, abre las seis bases de Postgres; si se filtra el de SQL Server, las seis de SQL Server (v25, review de gradiel12). | Riesgo aceptado: es la regla de Patrick Ocampo de v12, *un secreto por credencial, aislamiento por política IAM por consumidor*. Separar `dev` de `qa` exigiría dos logins y dos roles por motor. |
-| El cifrado en tránsito no autentica al servidor en ningún motor (v25). | `AC55` impide el texto plano. La verificación del certificado queda como deuda con dueño: `D70` (Postgres, el bundle de RDS) y `D71` (SQL Server, el certificado de la instancia). |
+| ~~El cifrado en tránsito no autentica al servidor en ningún motor (v25).~~ En SQL Server el cifrado todavía no autentica al servidor (v26). | Postgres autentica al servidor desde v26 (`AC58`, `D70` pagada). En SQL Server, `AC55` impide el texto plano, y la verificación queda como deuda de Patrick (`D71`): la instancia presenta `SSL_Self_Signed_Fallback`. |
+| El bundle de RDS envejece: AWS rota sus autoridades y agrega regiones (v26). | Medido el 25-sep: ninguna de las 108 autoridades del bundle está vencida, y vencen entre mayo de 2061 y mayo de 2125. El riesgo no es el vencimiento, sino la rotación. Si AWS rota la que firma el cluster, `verify-full` deja de conectar y falla cerrado, con `certificate verify failed`. Se renueva descargando el mismo archivo del mismo sitio; el README dice cómo. |
 | Una cifra citada en prosa drifta respecto del árbol que describe — ya pasó en este mismo contract entre v1 y v2. | `AC38` y `AC40` se verifican por derivación del árbol, no contra un número escrito. Registrado en `SDD/retro.md`. |

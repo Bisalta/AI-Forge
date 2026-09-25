@@ -278,11 +278,16 @@ Dos precisiones sobre estos valores:
 
 ## Cifrado en tránsito (v25, `AC55`)
 
-- **Postgres**: `PGSSLMODE=require`. Cifra o no conecta; con el `prefer` por
-  omisión, caía a texto plano si el servidor no ofrecía TLS. **Todavía no
-  verifica el certificado** (`verify-full` con el bundle de RDS, `D70`). Ojo:
-  si existe `~/.postgresql/root.crt`, libpq lo usa aunque el modo sea `require`
-  y se comporta como `verify-ca`; un `root.crt` de otra cosa impide conectar.
+- **Postgres** (v26, `AC58`): `PGSSLMODE=verify-full` y `PGSSLROOTCERT` apuntando a
+  `certificados/rds-global-bundle.pem`, que viaja con el plugin. Cifra, y además
+  **autentica al servidor**: el certificado lo tiene que firmar una autoridad de
+  Amazon RDS, y el nombre tiene que coincidir con el host. Como la ruta es
+  explícita, un `~/.postgresql/root.crt` de otra cosa ya no cambia nada.
+  - **Si deja de conectar con `certificate verify failed`**, lo más probable es
+    que AWS haya rotado la autoridad del cluster. Se renueva bajando el mismo
+    archivo, `https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem`,
+    a `certificados/rds-global-bundle.pem`. El del 25-sep-2026 tiene sha256
+    `e5bb2084ccf45087…`. Falla cerrado: no conecta sin verificar.
 - **SQL Server**: `-N true -C`. Exige el cifrado, pero confía en el
   certificado sin validarlo: medido el 25-sep, sin `-C` la conexión falla
   porque el certificado de la instancia no es de una autoridad conocida: es
