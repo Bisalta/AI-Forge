@@ -9,7 +9,7 @@ Ian Vargas aprobó Feature Ready sobre v25 el 25-sep y, en la misma aprobación,
 - El bundle se descargó el 25-sep del sitio oficial de AWS (`https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem`). Pesa 165 408 bytes, y su sha256 es `e5bb2084ccf45087bda1c9bffdea0eb15ee67f0b91646106e466714f9de3c7e3`. Trae 108 certificados, todos autoridades de Amazon RDS, y ninguna clave privada. Viaja con el plugin en `plugins/bisalta-db/certificados/rds-global-bundle.pem`.
 - Medido el 25-sep con el servidor del repo: las seis conexiones de Postgres conectan con `verify-full`. **Control negativo**: con el bundle reemplazado por una autoridad ajena, la conexión falla con `certificate verify failed`, así que la verificación funciona de verdad.
 - SQL Server sigue igual: cifra sin autenticar al servidor (`D71`, Patrick).
-- **`AC59`, el secret-scan y los certificados públicos.** Con el bundle commiteado, el gate 9 dio rojo: en una línea de uno de los certificados, el base64 forma al azar `AKIA` seguido de 16 caracteres, que es el patrón de una clave de acceso de AWS. Es un falso positivo, porque son datos de un certificado público. **No se resolvió excluyendo el archivo**, que es lo que `SDD/tests/secret-scan.sh` prohíbe desde el contract v3 de ese script. Se resolvió por contenido: dentro de un bloque de certificado, las líneas que son base64 puro no se escanean. Cualquier otra línea adentro del bloque, y todo lo que esté afuera, se sigue escaneando igual.
+- **`AC59`, el secret-scan y los certificados públicos.** (La primera versión de la regla tenía dos huecos, que encontró la review de v26 en la ronda 1: un `BEGIN` sin `END` apagaba el scan del resto del archivo, y `clave=valor` pasaba por base64. Están corregidos; el texto de `AC59` es el vigente.) Con el bundle commiteado, el gate 9 dio rojo: en una línea de uno de los certificados, el base64 forma al azar `AKIA` seguido de 16 caracteres, que es el patrón de una clave de acceso de AWS. Es un falso positivo, porque son datos de un certificado público. **No se resolvió excluyendo el archivo**, que es lo que `SDD/tests/secret-scan.sh` prohíbe desde el contract v3 de ese script. Se resolvió por contenido: dentro de un bloque de certificado, las líneas que son base64 puro no se escanean. Cualquier otra línea adentro del bloque, y todo lo que esté afuera, se sigue escaneando igual.
 
 Evidencia en `SDD/verification/feat-GEN-108-mcp-bisalta-db-v26.md`.
 
@@ -724,9 +724,30 @@ Casos de prueba: los 21 de la revisión de Patrick Ocampo (`SDD/tests/fixtures/c
 
 **AC55** (detección, v25; Postgres cambia en v26) — El comando de `psql` lleva `PGSSLMODE=verify-full` en su entorno (hasta v25, `require`), y el de `sqlcmd`, `-N true` y `-C`. **Mutaciones declaradas**: quitar cualquiera de los tres pone rojo su assert. **Parte `manual-only`**, contra las bases reales, desde el servidor del repo: en Postgres, `pg_stat_ssl` de la propia sesión devuelve `ssl = t`; en SQL Server, la conexión con las banderas nuevas responde. **Desde v26, Postgres verifica el certificado del servidor (`AC58`); SQL Server todavía no** (`D71`).
 
-**AC58** (detección, v26) — El comando de `psql` lleva `PGSSLROOTCERT` apuntando a `certificados/rds-global-bundle.pem` del propio plugin, y ese archivo existe, trae certificados y no trae ninguna clave privada. **Mutaciones declaradas**: (a) volver a `require` pone rojo el assert del modo; (b) quitar `PGSSLROOTCERT` pone rojo el assert de la ruta; (c) apuntarla a un archivo que no existe pone rojo el assert de existencia. **Parte `manual-only`**, contra las bases reales, desde el servidor del repo: las seis conexiones de Postgres conectan con `verify-full`; y con el bundle reemplazado por una autoridad ajena, la conexión falla con `certificate verify failed`.
+**AC58** (detección, v26) — El comando de `psql` lleva `PGSSLROOTCERT` apuntando a `plugins/bisalta-db/certificados/rds-global-bundle.pem`, dentro del propio plugin, y ese archivo existe, trae certificados y no trae ninguna clave privada. **Mutaciones declaradas**: (a) volver a `require` pone rojo el assert del modo; (b) quitar `PGSSLROOTCERT` pone rojo el assert de la ruta; (c) apuntarla a un archivo que no existe pone rojo el assert de existencia. **Parte `manual-only`**, contra las bases reales, desde el servidor del repo: las seis conexiones de Postgres conectan con `verify-full`; y con el bundle reemplazado por una autoridad ajena, la conexión falla con `certificate verify failed`.
 
-**AC59** (detección, v26) — `SDD/tests/secret-scan.sh` no escanea las líneas de base64 puro que están dentro de un bloque `-----BEGIN CERTIFICATE-----` … `-----END CERTIFICATE-----`. Escanea todo lo demás: una línea que no sea base64 dentro del bloque, y cualquier línea fuera de él. Los números de línea informados siguen siendo los del archivo. Ninguna exclusión por path. Casos en `SDD/tests/test_secret_scan.sh`, formas 7 a 9: el patrón dentro del base64 de un certificado da verde; la misma línea fuera de un certificado da rojo; y una línea que no es base64 dentro del bloque da rojo, con su número de línea. **Mutaciones declaradas**: (a) quitar la regla pone rojo la forma 7; (b) vaciar toda línea dentro del bloque pone rojo la forma 9; (c) vaciar las líneas base64 aunque estén fuera de un certificado pone rojo la forma 8.
+**AC59** (detección, v26) — `SDD/tests/secret-scan.sh` no escanea las líneas de **base64 puro** que están dentro de un bloque **cerrado** `-----BEGIN CERTIFICATE-----` … `-----END CERTIFICATE-----`. Escanea todo lo demás, y los números de línea informados siguen siendo los del archivo. No hay ninguna exclusión por path. Las condiciones son cuatro:
+(1) **Bloque cerrado**: las líneas del bloque se vacían recién cuando llega el `END`; si el archivo termina sin `END`, todas se escanean tal cual.
+(2) **Base64 puro**: la línea, sin CR ni espacios finales, tiene entre 1 y 76 caracteres de `A–Z`, `a–z`, `0–9`, `+` y `/`, con a lo sumo dos `=` y sólo al final. `clave=valor` no lo es.
+(3) **CR y espacios al final** se toleran al reconocer las líneas `BEGIN`/`END` y al decidir si una línea es base64.
+(4) **Los binarios** se saltean antes, como antes de `AC59`.
+Casos en `SDD/tests/test_secret_scan.sh`, formas 7 a 13:
+- la forma 7: el patrón dentro del base64 de un certificado da verde;
+- la forma 8: la misma línea fuera de un certificado da rojo;
+- la forma 9: una línea que no es base64 dentro del bloque da rojo, con su línea;
+- la forma 10: un `BEGIN` sin `END` seguido de un `clave=valor` y de una clave de AWS da rojo, con las dos líneas;
+- la forma 11: un `clave=valor` alfanumérico dentro de un bloque cerrado da rojo;
+- la forma 12: un binario no se escanea;
+- la forma 13: un certificado con CRLF se reconoce.
+**Mutaciones declaradas**, cada una pone rojo la forma indicada:
+- (a) quitar la regla: la 7;
+- (b) vaciar toda línea del bloque: la 9 y la 11;
+- (c) vaciar las líneas base64 aunque estén fuera de un bloque: la 8;
+- (d) tratar el fin de archivo como `END`: la 10;
+- (e) una clase de base64 que acepte `=` en cualquier lugar: la 11;
+- (f) no saltear los binarios: la 12;
+- (g) no tolerar CR: la 13.
+**Límite conocido**: un identificador de clave de AWS escrito solo en su línea, dentro de un bloque de certificado bien formado y cerrado, no se detecta. Esconderlo así exige armar a propósito un certificado falso, y el patrón de identificador de clave nunca detectó por sí solo la clave secreta.
 
 **AC56** (detección, v25) — Al arrancar, el servidor borra de su tmpdir los directorios con el nombre que da `mkdtemp` al plugin —el prefijo y seis caracteres— y más de 10 minutos de antigüedad. No toca los recientes, ni los que no son del plugin, ni uno viejo que tenga el prefijo pero no ese nombre, y no sigue symlinks (`lstat`). **Mutaciones declaradas**: (a) quitar la llamada al arrancar; (b) borrar sin mirar la edad; (c) borrar sin mirar el nombre; (d) aceptar cualquier nombre con el prefijo; (e) `stat` en lugar de `lstat`. Cada una pone rojo su assert.
 
