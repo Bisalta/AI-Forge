@@ -34,7 +34,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 🟡 **Una parte de la lista blanca no la puede tocar un agente.** El filtro de seguridad cortó tres veces el trabajo de ajustarla contra formas de pasarla, aunque los casos fueran de Patrick. Por eso v20 lo escribió él (`RT54`). Lo que no cortó, de v23 a v25, fueron los casos de consultas legítimas y las reglas de rechazo explícitas por nombre (`RT55`).
 
 🟠 **Review de seguridad de gradiel12 (PR #14, 24-sep).** No bloquea el merge; pide sus puntos 1 y 2 antes de habilitar al equipo. v25 aplica lo que no dependía de nadie más, y todo tiene su mutación verificada:
-- **TLS obligatorio** en los dos motores (`AC55`). **Desde v26, Postgres autentica al servidor** con el bundle de RDS (`AC58`, `D70` pagada). **SQL Server todavía no**: Patrick tiene que poner un certificado verificable (`D71`).
+- **TLS obligatorio** en los dos motores (`AC55`). **Desde v26, Postgres autentica al servidor** con el bundle de RDS (`AC58`, `D70` pagada). **SQL Server cifra pero no autentica al servidor**, y eso queda como **riesgo aceptado** (`D71`, 25-sep): a Dev SQL sólo se llega por la VPN, según confirmaste vos, y Patrick lo aceptó.
 - **`sqlcmd -t 60`** (`AC54`): SQL Server no tenía límite de consulta.
 - **Diecisiete sentencias de SQL Server que no son lectura, rechazadas** (`AC53`). El caso 8 de Patrick usaba `OPENQUERY` y deja de ser límite conocido: se cambió sólo su veredicto esperado.
 - **Temporales huérfanos** borrados al arrancar (`AC56`).
@@ -74,7 +74,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 | **v26** | Postgres autentica al servidor con el bundle de RDS (`AC58`). Las seis conexiones conectan con `verify-full`, y con una autoridad ajena falla. **Un gate de seguridad cambió qué mira** (`AC59`): el secret-scan ya no escanea el base64 de un certificado público dentro de un bloque cerrado. La primera versión de la regla tenía tres huecos que la review encontró y que ya están cerrados. Review §7.5: `APPROVED` en la ronda 3 |
 | **Aprovisionamiento** | Postgres ejecutado por Patrick el 22-sep y SQL Server el 23-sep, verificados desde el plugin. Parte de su evidencia vive en Slack (`D61`) |
 | **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep, **iniciales para probar la herramienta**, no definitivas |
-| **Deuda, retro y escalaciones del ciclo** | 49 ítems de deuda (34 abiertos), 34 entradas de retro hasta `RT56` y 12 escalaciones hasta `E20` |
+| **Deuda, retro y escalaciones del ciclo** | 49 ítems de deuda (33 abiertos), 34 entradas de retro hasta `RT56` y 12 escalaciones hasta `E20` |
 
 **Lo que este PR NO hace**: no crea ningún rol, no toca ninguna base, no carga ningún secreto. Es código y procedimientos. Lo que ya existe en AWS y en las bases lo hizo Patrick a mano.
 

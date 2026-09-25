@@ -293,7 +293,9 @@ Dos precisiones sobre estos valores:
   porque el certificado de la instancia no es de una autoridad conocida: es
   `SSL_Self_Signed_Fallback`, el que SQL Server genera solo cuando no tiene uno
   configurado.
-  **Cifra, pero no autentica al servidor** (`D71`).
+  **Cifra, pero no autentica al servidor.** Riesgo aceptado (`D71`): a Dev SQL sólo se
+  llega por la VPN, así que lo que falta sólo protege de alguien que ya esté dentro de
+  la red. Si aparece otro camino a la instancia, se reabre.
 
 ## Respuesta y topes
 
