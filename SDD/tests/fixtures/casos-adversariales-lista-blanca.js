@@ -19,8 +19,8 @@ const CASOS = [
   ['sqlserver', "SELECT 1 ALTER TABLE dbo.t ADD z int",               false, 'ALTER'],
 
   // --- limite conocido, NO pendiente: escritura dentro de un literal ---
-  ['sqlserver', "SELECT * FROM OPENQUERY(srv, 'DELETE FROM t')",      true,
-   'el literal se borra al normalizar; el motor si lo ejecuta'],
+  ['sqlserver', "SELECT * FROM OPENQUERY(srv, 'DELETE FROM t')",      false,
+   'el literal se borra al normalizar; el motor si lo ejecuta (v25: ya no es limite conocido, se rechaza por OPENQUERY, AC53)'],
   ['postgres',  "SELECT dblink_exec('dbname=x', 'DELETE FROM t')",    true, 'idem via dblink'],
 
   // --- limite conocido: funciones que escriben sin nombrar la escritura ---

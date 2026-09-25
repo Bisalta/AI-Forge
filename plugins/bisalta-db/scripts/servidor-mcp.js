@@ -346,6 +346,9 @@ module.exports = {
 };
 
 if (require.main === module) {
+  // AC56 (v25): antes de atender nada, los archivos de contraseña que dejó un
+  // proceso muerto sin pasar por su `finally`.
+  conexion.limpiarTemporalesHuerfanos();
   const argv = process.argv.slice(2);
   if (argv.indexOf('--consultar') !== -1 || argv.indexOf('--listar-conexiones') !== -1) {
     correrUnaVez(argv);

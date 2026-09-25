@@ -61,6 +61,18 @@ const FUNCION_PROHIBIDA_POSTGRES = /(^|[^A-Za-z0-9_])set_config([^A-Za-z0-9_]|$)
 // ALTER; si una palabra se suma a ESCRITURA_EMBEBIDA, se suma también acá.
 const ESCRITURA_EMBEBIDA_SQLSERVER = /(^|[^A-Za-z0-9_])(INSERT|UPDATE|DELETE|MERGE|INTO|TRUNCATE|DROP|CREATE|ALTER)([^A-Za-z0-9_]|$)/i;
 
+// Sentencias de SQL Server que no son escrituras pero tampoco son lectura
+// (contract v25, AC53). Por la misma razón que AC52, pueden venir encadenadas
+// detrás de un SELECT sin `;`. Varias las frena el privilegio del login
+// (GRANT, DBCC, BACKUP, KILL, SHUTDOWN); otras no las frena nadie: WAITFOR y
+// WHILE retienen la sesión, USE y SET cambian el contexto de la sesión, y las
+// OPEN* abren una conexión a otro servidor desde el motor. Se rechazan todas
+// acá, que es la capa que da el error temprano. Como la palabra se busca en la
+// sentencia normalizada, una que vive dentro de un literal no cuenta, pero una
+// dentro de un nombre entre corchetes sí: `[set]` se rechaza de más, a
+// sabiendas.
+const SENTENCIA_NO_LECTURA_SQLSERVER = /(^|[^A-Za-z0-9_])(WAITFOR|WHILE|GRANT|REVOKE|DENY|USE|DBCC|SET|DECLARE|BEGIN|BACKUP|RESTORE|KILL|SHUTDOWN|OPENROWSET|OPENQUERY|OPENDATASOURCE)([^A-Za-z0-9_]|$)/i;
+
 /**
  * Quita comentarios de línea, comentarios de bloque y literales de texto, en
  * UN SOLO RECORRIDO de izquierda a derecha (contract v19, AC51).
@@ -259,6 +271,11 @@ function validarSql(sql, dialecto) {
     }
     if (dialecto === 'postgres' && FUNCION_PROHIBIDA_POSTGRES.test(sentencia)) {
       return rechazo('funcion_prohibida', sentencia);
+    }
+    // AC53 (v25): después de la escritura embebida, para que ningún rechazo
+    // que ya existía cambie de motivo.
+    if (dialecto === 'sqlserver' && SENTENCIA_NO_LECTURA_SQLSERVER.test(sentencia)) {
+      return rechazo('sentencia_no_permitida', sentencia);
     }
   }
 

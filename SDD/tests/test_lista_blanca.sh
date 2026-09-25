@@ -383,6 +383,49 @@ un nombre entre corchetes simple (control)|SELECT [a] FROM t
 CASOS
 
 # ---------------------------------------------------------------------------
+# AC53 (v25) — sentencias de SQL Server que no son lectura, encadenadas sin `;`
+# ---------------------------------------------------------------------------
+# Las propuso la review de gradiel12 en el PR #14 (24-sep). Una por palabra,
+# y el motivo exacto: si se comparara sólo el exit code, una palabra que se
+# cayera de la regla quedaría tapada por otra regla que también rechaza.
+while IFS='|' read -r palabra sql; do
+  [ -z "$palabra" ] && continue
+  assert_contains "$(veredicto sqlserver "$sql")" '"motivo":"sentencia_no_permitida"' \
+    "AC53 rechaza en sqlserver $palabra encadenado detrás de un SELECT"
+done <<'CASOS'
+WAITFOR|SELECT 1 WAITFOR DELAY '00:00:01'
+WHILE|SELECT 1 WHILE 1 = 1 SELECT 2
+GRANT|SELECT 1 GRANT SELECT ON t TO public
+REVOKE|SELECT 1 REVOKE SELECT ON t FROM public
+DENY|SELECT 1 DENY SELECT ON t TO public
+USE|SELECT 1 USE master
+DBCC|SELECT 1 DBCC CHECKDB
+SET|SELECT 1 SET NOCOUNT ON
+DECLARE|SELECT 1 DECLARE @x int
+BEGIN|SELECT 1 BEGIN SELECT 2 END
+BACKUP|SELECT 1 BACKUP DATABASE d TO DISK = 'x'
+RESTORE|SELECT 1 RESTORE DATABASE d FROM DISK = 'x'
+KILL|SELECT 1 KILL 55
+SHUTDOWN|SELECT 1 SHUTDOWN
+OPENROWSET|SELECT * FROM OPENROWSET('p', 'c', 'q')
+OPENQUERY|SELECT * FROM OPENQUERY(s, 'q')
+OPENDATASOURCE|SELECT * FROM OPENDATASOURCE('p', 'c').d.s.t
+CASOS
+
+# Lo que tiene que seguir pasando: la palabra como parte de un nombre (el
+# borde de palabra es la regla), y dentro de un literal (la regla mira el
+# texto normalizado). Y el mismo SQL en postgres, donde AC53 no aplica.
+while IFS='|' read -r dialecto etiqueta sql; do
+  [ -z "$dialecto" ] && continue
+  ec="$(validar "$dialecto" "$sql")"
+  assert_exit 0 "$ec" "AC53 acepta en $dialecto $etiqueta"
+done <<'CASOS'
+sqlserver|las palabras como parte de un nombre|SELECT begin_date, user_set, used, waitfor_x FROM t
+sqlserver|las palabras dentro de un literal|SELECT 'waitfor delay, use master, set x' AS texto
+postgres|un nombre de columna que es una de las palabras|SELECT 1 AS "use"
+CASOS
+
+# ---------------------------------------------------------------------------
 # Uso
 # ---------------------------------------------------------------------------
 printf '%s' 'SELECT 1' | node "$LISTA_BLANCA" >/dev/null 2>&1

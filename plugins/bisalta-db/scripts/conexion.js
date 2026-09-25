@@ -37,6 +37,17 @@ const TIMEOUT_PROCESO_MS = TIMEOUT_SENTENCIA_MS + 5000;
 const MAX_BUFFER = 64 * 1024 * 1024;
 
 const PREFIJO_TEMP = 'bisalta-db-';
+// AC56 (v25): un directorio temporal más viejo que esto es huérfano. El
+// `finally` de `ejecutarConsulta` no corre si el proceso muere con SIGKILL, y
+// el archivo de contraseña (0600) queda en el tmpdir. Diez minutos es muy por
+// encima del corte de proceso (TIMEOUT_PROCESO_MS), así que no se borra el de
+// una consulta que otra sesión todavía está corriendo.
+const EDAD_HUERFANO_MS = 10 * 60 * 1000;
+// AC54 (v25): límite de consulta de SQL Server, del lado del cliente con `-t`.
+// Es el mismo valor que el `statement_timeout` del rol de Postgres (AC49):
+// SQL Server no tiene un equivalente por login, y sin esto una sentencia
+// larga retiene la sesión hasta el corte de proceso.
+const TIMEOUT_CONSULTA_SQLSERVER_S = 60;
 // Separador de campos para SQL Server: un carácter de control que no aparece
 // en datos de texto normales (unit separator, 0x1F).
 const SEPARADOR_SQLSERVER = String.fromCharCode(31);
@@ -175,6 +186,11 @@ function construirComandoPostgres(entrada, usuario, rutaPassfile, sql) {
       // parámetro del conninfo sobreviven. No mover esto de vuelta a
       // PGOPTIONS: el comando se ve correcto y el efecto no lo es.
       PGAPPNAME: usuario,
+      // AC55 (v25): TLS obligatorio. Con el `prefer` por omisión, libpq cifra
+      // si el servidor lo ofrece, pero cae a texto plano si no. `require`
+      // cifra o no conecta; todavía no verifica el certificado: eso es
+      // `verify-full` con el bundle de RDS (D70).
+      PGSSLMODE: 'require',
       PGCONNECT_TIMEOUT: '15'
     }
   };
@@ -186,7 +202,13 @@ function construirComandoSqlserver(entrada, usuario, contrasena, sql) {
   env[VARIABLE_CREDENCIAL_SQLSERVER] = contrasena;
   return {
     comando: 'sqlcmd',
+    // AC55 (v25): `-N true` exige el cifrado en vez de dejarlo al default de
+    // cada versión de sqlcmd. `-C` confía en el certificado sin validarlo:
+    // medido el 25-sep, con `-N true` solo la conexión falla, porque el
+    // certificado de la instancia no es de una autoridad conocida. Cifra,
+    // pero no autentica al servidor (D71). AC54: `-t`, el límite de consulta.
     args: ['-S', entrada.host + ',' + entrada.puerto, '-d', entrada.base, '-U', usuario,
+      '-N', 'true', '-C', '-t', String(TIMEOUT_CONSULTA_SQLSERVER_S),
       '-b', '-s', SEPARADOR_SQLSERVER, '-W', '-Q', sql],
     env: env
   };
@@ -299,7 +321,14 @@ function ejecutarConsulta(entrada, sql) {
     if (r.error && r.error.code === 'ENOENT') {
       throw fallo(8, 'cliente_ausente', 'falta el binario `' + plan.comando + '` en el PATH');
     }
-    const salidaError = redactar(r.stderr, sensibles);
+    // AC57 (v25): sqlcmd escribe sus errores en stdout y deja stderr vacío
+    // (medido el 25-sep). Sin esto, todo error de SQL Server llegaba al
+    // consumidor sin mensaje, y un corte por `-t` no se reconocía como
+    // `tiempo_agotado`. Sólo cuando el proceso falló: en una corrida exitosa,
+    // stdout son datos.
+    const textoError = (entrada.dialecto === 'sqlserver' && r.status !== 0 && String(r.stderr || '').trim() === '')
+      ? r.stdout : r.stderr;
+    const salidaError = redactar(textoError, sensibles);
     // 🔴 LA GUARDA DE RÉPLICA SE CLASIFICA PRIMERO (AC46), antes del tiempo
     // agotado y del genérico `conexion_fallida`: si la sesión cayó en el
     // writer, lo que el consumidor tiene que saber es eso, y el SQL suyo no
@@ -335,7 +364,38 @@ function ejecutarConsulta(entrada, sql) {
   }
 }
 
+/**
+ * AC56 (v25): borra los directorios temporales del plugin que quedaron de un
+ * proceso muerto sin pasar por el `finally`. Se llama al arrancar el
+ * servidor. Sólo toca directorios con el prefijo del plugin y más viejos que
+ * `edadMinimaMs`; cualquier error se ignora, porque la limpieza no puede
+ * impedir que el servidor arranque.
+ * @returns {number} cuántos borró
+ */
+function limpiarTemporalesHuerfanos(directorio, edadMinimaMs, ahoraMs) {
+  const dir = directorio || os.tmpdir();
+  const edad = typeof edadMinimaMs === 'number' ? edadMinimaMs : EDAD_HUERFANO_MS;
+  const ahora = typeof ahoraMs === 'number' ? ahoraMs : Date.now();
+  let borrados = 0;
+  let nombres = [];
+  try { nombres = fs.readdirSync(dir); } catch (e) { return 0; }
+  for (let i = 0; i < nombres.length; i += 1) {
+    if (nombres[i].indexOf(PREFIJO_TEMP) !== 0) continue;
+    const ruta = path.join(dir, nombres[i]);
+    try {
+      const st = fs.statSync(ruta);
+      if (!st.isDirectory() || ahora - st.mtimeMs < edad) continue;
+      fs.rmSync(ruta, { recursive: true, force: true });
+      borrados += 1;
+    } catch (e) { /* nada que hacer */ }
+  }
+  return borrados;
+}
+
 module.exports = {
+  limpiarTemporalesHuerfanos: limpiarTemporalesHuerfanos,
+  EDAD_HUERFANO_MS: EDAD_HUERFANO_MS,
+  TIMEOUT_CONSULTA_SQLSERVER_S: TIMEOUT_CONSULTA_SQLSERVER_S,
   resolverCredencial: resolverCredencial,
   ejecutarConsulta: ejecutarConsulta,
   construirComandoPostgres: construirComandoPostgres,
