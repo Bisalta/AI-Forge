@@ -1,0 +1,440 @@
+#!/usr/bin/env bash
+# SDD/tests/test_lista_blanca.sh — plugins/bisalta-db/scripts/lista-blanca.js.
+# AC15-AC22 del contract SDD/contracts/2026-09-18-bisalta-db-mcp.md v3, y
+# AC47 (escrituras embebidas y set_config) de la v16.
+#
+# Port de tests/consultaLecturaWrapper.test.mjs de Bisalta/Proveedores-Back
+# (rama feat-PROV-131-api-comprassync): los doce casos, incluidos los cinco de
+# subconsulta, que allá encontró una mutación y no la lectura.
+#
+# 🔴 EL VALOR ENTERO DE ESTA CAPA ES LO QUE RECHAZA. Una lista blanca que deja
+# de rechazar en silencio es peor que no tenerla: da sensación de barrera que
+# ya no existe, y nadie se entera hasta que algo escribe.
+#
+# No hay base acá, y no hace falta: se afirma el código de salida de la
+# validación, que corre ANTES de conectar — una validación que corriera
+# después ya habría mandado la sentencia.
+#
+# 🔴 SOBRE LOS CASOS "DISCRIMINANTES" DE AC21. Un input como `EXEC algo` a
+# secas cae igual por el ancla común (no empieza con SELECT ni WITH), así que
+# afirmarlo NO distingue la regla del dialecto de la regla común: con las
+# reglas de sqlserver borradas seguiría dando 4, y la mutación declarada no
+# podría ponerlo rojo — una medición muerta. Por eso cada regla de sqlserver
+# se afirma DOS veces: con el input literal del AC, y con uno que las reglas
+# comunes aceptan (se verifica que postgres lo acepta) y que sólo el dialecto
+# rechaza.
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=SDD/tests/lib.sh
+. "$SCRIPT_DIR/lib.sh"
+
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+LISTA_BLANCA="$REPO_ROOT/plugins/bisalta-db/scripts/lista-blanca.js"
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "  FAIL  setup — node no está disponible (prerequisito de SDD/docs/doc_quality_gates.md)"
+  exit 1
+fi
+if [ ! -f "$LISTA_BLANCA" ]; then
+  echo "  FAIL  setup — no existe $LISTA_BLANCA"
+  exit 1
+fi
+
+# Corre la validación y devuelve SÓLO su código de salida. El SQL entra por
+# stdin: nunca por argv.
+validar() {
+  printf '%s' "$2" | node "$LISTA_BLANCA" "$1" >/dev/null 2>&1
+  echo $?
+}
+
+# Corre la validación y devuelve el veredicto JSON que imprime el CLI, para
+# afirmar el MOTIVO además del código de salida.
+veredicto() {
+  printf '%s' "$2" | node "$LISTA_BLANCA" "$1" 2>/dev/null
+}
+
+# ---------------------------------------------------------------------------
+# AC15 — las diez escrituras simples
+# ---------------------------------------------------------------------------
+# 🔴 ES LISTA BLANCA Y NO LISTA NEGRA, Y EL CASO QUE LO JUSTIFICA ES `DO`. Un
+# bloque `DO $$ ... $$` puede hacer cualquier cosa, y una lista negra de
+# INSERT/UPDATE/DELETE lo deja pasar entero.
+while IFS='|' read -r etiqueta sql; do
+  [ -z "$etiqueta" ] && continue
+  ec="$(validar postgres "$sql")"
+  assert_exit 4 "$ec" "AC15 rechaza $etiqueta"
+done <<'CASOS'
+un UPDATE|UPDATE proveedores.orden_compra SET moneda = 'X'
+un DELETE|DELETE FROM proveedores.usuario
+un INSERT|INSERT INTO proveedores.bitacora_proveedor (id) VALUES (1)
+un TRUNCATE|TRUNCATE proveedores.logs
+un DROP|DROP TABLE proveedores.orden_compra
+un ALTER|ALTER TABLE proveedores.usuario ADD COLUMN x int
+un GRANT|GRANT ALL ON proveedores.usuario TO alguien
+un bloque DO|DO $bloque$ BEGIN INSERT INTO t VALUES (1); END $bloque$
+un CALL|CALL algun_procedimiento()
+un COPY|COPY proveedores.usuario FROM '/tmp/x.csv'
+CASOS
+
+# ---------------------------------------------------------------------------
+# AC16 — las cinco escrituras que llevan una subconsulta adentro
+# ---------------------------------------------------------------------------
+# 🔴 EL CASO QUE SE LE HABÍA ESCAPADO AL ORIGINAL. Ninguna de las diez de
+# arriba nombra SELECT ni WITH, así que una comprobación que buscara esas
+# palabras en cualquier parte de la sentencia —en vez de exigirlas al
+# principio— pasaba los once tests igual. Estas cinco son las que matan esa
+# versión laxa.
+while IFS='|' read -r etiqueta sql; do
+  [ -z "$etiqueta" ] && continue
+  ec="$(validar postgres "$sql")"
+  assert_exit 4 "$ec" "AC16 rechaza $etiqueta"
+done <<'CASOS'
+DELETE ... WHERE id IN (SELECT|DELETE FROM proveedores.usuario WHERE id IN (SELECT id FROM proveedores.baja)
+INSERT ... SELECT|INSERT INTO proveedores.logs SELECT * FROM proveedores.origen
+UPDATE ... = (SELECT|UPDATE proveedores.orden_compra SET moneda = (SELECT 'X') WHERE id = 1
+CREATE TABLE ... AS SELECT|CREATE TABLE copia AS SELECT * FROM proveedores.usuario
+CREATE VIEW ... WITH (...) AS SELECT|CREATE VIEW v WITH (x) AS SELECT 1
+CASOS
+
+# ---------------------------------------------------------------------------
+# AC17 — una escritura detrás de una lectura
+# ---------------------------------------------------------------------------
+# El caso que una comprobación ingenua se pierde: la primera sentencia es
+# inocente.
+ec="$(validar postgres "SELECT 1; DELETE FROM proveedores.usuario")"
+assert_exit 4 "$ec" "AC17 rechaza una escritura escondida detrás de un SELECT"
+
+ec="$(validar postgres "$(printf 'SELECT 1\n  FROM proveedores.orden_compra\n LIMIT 1;\n\nDELETE FROM proveedores.usuario\n WHERE id = 1;')")"
+assert_exit 4 "$ec" "AC17 rechaza una escritura multilínea escondida detrás de una lectura multilínea"
+
+ec="$(validar postgres "DROP TABLE proveedores.usuario")"
+assert_exit 4 "$ec" "AC17 revisa la última sentencia aunque no termine en punto y coma"
+
+# ---------------------------------------------------------------------------
+# AC18 — los falsos rechazos, que también importan
+# ---------------------------------------------------------------------------
+# Una barrera que rechaza consultas legítimas se termina desactivando. Por eso
+# se quitan comentarios y literales antes de mirar.
+ec="$(validar postgres "$(printf -- '-- ojo: esto NO hace UPDATE de nada\n/* ni DELETE */\nSELECT 1')")"
+assert_exit 0 "$ec" "AC18 acepta un UPDATE que sólo aparece dentro de un comentario"
+
+ec="$(validar postgres "SELECT 'DELETE FROM x' AS texto, 'DROP TABLE y' AS otro")"
+assert_exit 0 "$ec" "AC18 acepta un DELETE que sólo aparece dentro de un literal de texto"
+
+# ---------------------------------------------------------------------------
+# AC19 — lo que sí tiene que pasar
+# ---------------------------------------------------------------------------
+ec="$(validar postgres "WITH a AS (SELECT 1 AS n) SELECT * FROM a;")"
+assert_exit 0 "$ec" "AC19 acepta un CTE"
+
+ec="$(validar postgres "$(printf 'SELECT 1;\nSELECT 2;\nWITH a AS (SELECT 3) SELECT * FROM a;\n')")"
+assert_exit 0 "$ec" "AC19 acepta tres sentencias de lectura seguidas"
+
+# 🔴 ESTE CASO EXISTE POR UN BUG QUE LOS OTROS ONCE NO VIERON: el splitter
+# original partía por `;` y después leía UNA LÍNEA, así que cada renglón de
+# una consulta multilínea se evaluaba como sentencia suelta y una consulta
+# válida se rechazaba en su segundo renglón. Ningún test lo notó porque todos
+# usaban SQL de una sola línea; lo encontró el primer uso real.
+ec="$(validar postgres "$(printf 'WITH lineas AS (\n  SELECT ol.id,\n         ol.descripcion\n    FROM proveedores.orden_compra_linea ol\n   WHERE ol.id_orden_compra = 1\n)\nSELECT count(*)\n  FROM lineas;')")"
+assert_exit 0 "$ec" "AC19 acepta una consulta multilínea, que es como son las de verdad"
+
+# Y el complemento, que es lo que impide "arreglar" ese bug abriendo un
+# agujero: una escritura multilínea tiene que seguir cayendo.
+ec="$(validar postgres "$(printf 'UPDATE proveedores.orden_compra\n   SET moneda = %s\n WHERE id = 1;' "'X'")")"
+assert_exit 4 "$ec" "AC19 sigue rechazando una escritura multilínea"
+
+# ---------------------------------------------------------------------------
+# AC20 — comilla de dólar en postgres
+# ---------------------------------------------------------------------------
+# Un cuerpo entre comillas de dólar no es un literal de comilla simple: la
+# normalización no lo toca, y adentro puede ir cualquier cosa, incluido un
+# `;`. El caso arranca con SELECT a propósito: así lo ÚNICO que lo rechaza es
+# la regla de comilla de dólar, y quitarla lo pone verde.
+ec="$(validar postgres 'SELECT $$texto$$ AS x')"
+assert_exit 4 "$ec" "AC20 rechaza una apertura de comilla de dólar sin etiqueta"
+
+ec="$(validar postgres 'SELECT $cuerpo$ hola $cuerpo$ AS x')"
+assert_exit 4 "$ec" "AC20 rechaza una apertura de comilla de dólar con etiqueta"
+
+# ---------------------------------------------------------------------------
+# AC21 — las reglas propias de sqlserver
+# ---------------------------------------------------------------------------
+ec="$(validar sqlserver 'EXEC dbo.algun_procedimiento')"
+assert_exit 4 "$ec" "AC21 rechaza un EXEC en sqlserver"
+
+ec="$(validar sqlserver 'EXECUTE dbo.algun_procedimiento')"
+assert_exit 4 "$ec" "AC21 rechaza un EXECUTE en sqlserver"
+
+# Los cuatro discriminantes: las reglas comunes los aceptan (se verifica
+# abajo), así que el 4 sólo puede venir de la regla del dialecto.
+while IFS='|' read -r etiqueta sql; do
+  [ -z "$etiqueta" ] && continue
+  ec="$(validar sqlserver "$sql")"
+  assert_exit 4 "$ec" "AC21 rechaza $etiqueta en sqlserver"
+  ec="$(validar postgres "$sql")"
+  assert_exit 0 "$ec" "AC21 (control) postgres acepta $etiqueta — el rechazo de arriba es del dialecto, no del ancla"
+done <<'CASOS'
+un EXEC detrás de una lectura|SELECT 1 EXEC dbo.algun_procedimiento
+un EXECUTE detrás de una lectura|SELECT 1 EXECUTE dbo.algun_procedimiento
+un identificador que empieza con sp_|SELECT * FROM sp_helpdb
+un identificador que empieza con xp_|SELECT * FROM xp_cmdshell
+CASOS
+
+ec="$(validar sqlserver 'SELECT 1; SELECT 2')"
+assert_exit 4 "$ec" "AC21 rechaza cualquier punto y coma en sqlserver"
+
+# El punto y coma se mira DESPUÉS de quitar comentarios y literales: uno que
+# sólo vive dentro de una cadena no rechaza nada.
+ec="$(validar sqlserver "SELECT 'a;b' AS texto")"
+assert_exit 0 "$ec" "AC21 acepta un punto y coma que sólo vive dentro de un literal de texto"
+
+# ---------------------------------------------------------------------------
+# AC22 — la misma entrada, distinto veredicto según el dialecto
+# ---------------------------------------------------------------------------
+ENCADENADAS='SELECT 1; SELECT 2'
+ec="$(validar postgres "$ENCADENADAS")"
+assert_exit 0 "$ec" "AC22 dos lecturas encadenadas con punto y coma se aceptan en postgres"
+ec="$(validar sqlserver "$ENCADENADAS")"
+assert_exit 4 "$ec" "AC22 la misma entrada se rechaza en sqlserver"
+
+# ---------------------------------------------------------------------------
+# AC47 — escrituras embebidas y set_config (contract v16)
+# ---------------------------------------------------------------------------
+# 🔴 EMPEZAR CON SELECT O WITH NO ALCANZA. Un `WITH` puede llevar una
+# escritura adentro, `SELECT ... INTO` crea una tabla, y `set_config` apaga la
+# sesión de solo lectura desde un SELECT. Medido el 23-sep-2026: todos estos
+# casos se ACEPTABAN. Cada uno se afirma por código de salida Y por motivo: el
+# motivo es lo que prueba que el rechazo viene de la regla nueva y no de
+# alguna de las de arriba.
+while IFS='|' read -r dialecto motivo etiqueta sql; do
+  [ -z "$dialecto" ] && continue
+  ec="$(validar "$dialecto" "$sql")"
+  assert_exit 4 "$ec" "AC47 rechaza en $dialecto $etiqueta"
+  assert_contains "$(veredicto "$dialecto" "$sql")" "\"motivo\":\"$motivo\"" \
+    "AC47 el rechazo en $dialecto de $etiqueta tiene motivo $motivo"
+done <<'CASOS'
+postgres|escritura_embebida|un CTE con INSERT|WITH x AS (INSERT INTO t VALUES (1) RETURNING *) SELECT * FROM x
+postgres|escritura_embebida|un CTE con DELETE|WITH x AS (DELETE FROM t RETURNING *) SELECT * FROM x
+postgres|escritura_embebida|un CTE con UPDATE|WITH x AS (UPDATE t SET a = 1 RETURNING *) SELECT * FROM x
+postgres|escritura_embebida|un SELECT INTO|SELECT * INTO nueva FROM t
+postgres|funcion_prohibida|un set_config que apaga la sesión de solo lectura|SELECT set_config('default_transaction_read_only','off',false)
+postgres|funcion_prohibida|un set_config calificado con pg_catalog|SELECT pg_catalog.set_config('a','b',false)
+postgres|funcion_prohibida|un SET_CONFIG en mayúsculas|SELECT SET_CONFIG('a','b',false)
+sqlserver|escritura_embebida|un CTE seguido de DELETE|WITH c AS (SELECT * FROM t) DELETE FROM c
+sqlserver|escritura_embebida|un CTE seguido de UPDATE|WITH c AS (SELECT * FROM t) UPDATE c SET a = 1
+sqlserver|escritura_embebida|un CTE seguido de INSERT|WITH c AS (SELECT * FROM t) INSERT INTO u SELECT * FROM c
+sqlserver|escritura_embebida|un CTE seguido de MERGE|WITH c AS (SELECT * FROM t) MERGE u USING c ON u.id = c.id WHEN MATCHED THEN DELETE
+sqlserver|escritura_embebida|un SELECT INTO|SELECT * INTO nueva FROM t
+postgres|escritura_embebida|un SELECT FOR UPDATE (rechazo de más, a sabiendas)|SELECT * FROM t FOR UPDATE
+CASOS
+
+# Lo que tiene que seguir pasando. El CTE de lectura de AC19 en los dos
+# dialectos, y una palabra de escritura que sólo vive dentro de un literal:
+# este último es el que prueba que el chequeo corre DESPUÉS de normalizar.
+while IFS='|' read -r dialecto etiqueta sql; do
+  [ -z "$dialecto" ] && continue
+  ec="$(validar "$dialecto" "$sql")"
+  assert_exit 0 "$ec" "AC47 acepta en $dialecto $etiqueta"
+done <<'CASOS'
+postgres|el CTE de lectura de AC19|WITH a AS (SELECT 1) SELECT * FROM a
+sqlserver|el CTE de lectura de AC19|WITH a AS (SELECT 1) SELECT * FROM a
+postgres|un delete que sólo vive dentro de un literal|SELECT 'delete' AS x
+sqlserver|un delete que sólo vive dentro de un literal|SELECT 'delete' AS x
+CASOS
+
+# Los dos chequeos van AL FINAL del recorrido: una sentencia que ya caía por
+# una regla existente conserva su motivo aunque también nombre una palabra de
+# escritura.
+while IFS='|' read -r dialecto motivo etiqueta sql; do
+  [ -z "$dialecto" ] && continue
+  assert_contains "$(veredicto "$dialecto" "$sql")" "\"motivo\":\"$motivo\"" \
+    "AC47 un rechazo existente no cambia de motivo: $etiqueta sigue siendo $motivo"
+done <<'CASOS'
+postgres|no_empieza_con_select_ni_with|un DELETE a secas|DELETE FROM t
+postgres|comilla_de_dolar|una comilla de dólar con INTO|SELECT $$x$$ INTO t
+sqlserver|ejecucion_de_procedimiento|un EXEC con INSERT|SELECT 1 EXEC dbo.p INSERT
+sqlserver|procedimiento_de_sistema|un sp_ con DELETE|SELECT * FROM sp_helpdb DELETE
+CASOS
+
+# ---------------------------------------------------------------------------
+# AC51 / AC52 — los casos de la revisión adversarial de Patrick Ocampo (v19)
+# ---------------------------------------------------------------------------
+# 🔴 LOS CASOS VIVEN EN UN SOLO LUGAR Y NO SE COPIAN. El archivo de casos es
+# la revisión tal como Patrick la entregó (contract v19, "Cambios v18 → v19"
+# punto 4): se carga y se recorre, no se transcribe acá. Cada consulta viaja
+# de `require()` directo al stdin del validador —nunca por una variable de
+# bash, nunca por argv— y el assert mira SÓLO el código de salida: el JSON del
+# CLI trae los primeros 90 caracteres de la sentencia, y este output termina
+# en el reporte de gates. El nombre de cada assert cita el caso por su índice
+# en `CASOS` (base 0) y su `motivo`.
+#
+# Dos veredictos parecen errores y no lo son: el comentario de bloque anidado
+# se ACEPTA (para el motor es sólo la lectura que lo precede), y la sección
+# "límite conocido" se acepta a propósito (contract v19, "Riesgos"). Desde
+# v25, el caso 8 de esa sección se RECHAZA: usa `OPENQUERY`, que AC53 rechaza
+# por nombre, y su veredicto esperado cambió en el archivo de Patrick.
+# Recorre un archivo de casos de Patrick Ocampo: <archivo> <export> <prefijo>.
+# El prefijo va en el nombre de cada assert; el de la primera tanda es el que
+# cita el binding de v19, así que no cambia. Las consultas nunca pasan por
+# bash: node las lee del archivo y las escribe directo en el stdin del
+# validador.
+recorrer_casos_adversariales() {
+  local archivo="$1" export_nombre="$2" prefijo="$3"
+  local lista indice dialecto esperado motivo estados ec
+  # Índice, dialecto, veredicto esperado (0 = aceptar, 4 = rechazar) y motivo
+  # de cada caso, uno por línea y separados por tabulador. Un caso mal
+  # formado sale con dialecto `invalido` para que el assert lo marque, no para
+  # saltearlo.
+  lista="$(node -e '
+    var casos = require(process.argv[1])[process.argv[2]];
+    for (var i = 0; i < casos.length; i += 1) {
+      var c = casos[i];
+      var bien = Array.isArray(c) && typeof c[1] === "string" && typeof c[2] === "boolean";
+      var motivo = String(c && c[3]).replace(/[\t\r\n]+/g, " ");
+      process.stdout.write(i + "\t" + (bien ? c[0] : "invalido") + "\t" + (c[2] === true ? 0 : 4) + "\t" + motivo + "\n");
+    }
+  ' "$archivo" "$export_nombre" 2>/dev/null)"
+  # 🔴 UN RECORRIDO QUE NO RECORRE NADA ES UNA MEDICIÓN MUERTA. Si el archivo
+  # no carga, o no exporta casos, el while de abajo no itera y el bloque
+  # quedaría verde sin haber mirado nada. No se congela el total: los
+  # archivos son de Patrick y pueden crecer.
+  assert_eq "$?" "0" "$prefijo el archivo de casos adversariales carga"
+  if [ -n "$lista" ]; then
+    assert_eq "vacio=no" "vacio=no" "$prefijo el archivo de casos adversariales trae casos"
+  else
+    assert_eq "vacio=si" "vacio=no" "$prefijo el archivo de casos adversariales trae casos"
+  fi
+
+  while IFS="$(printf '\t')" read -r indice dialecto esperado motivo; do
+    [ -z "$indice" ] && continue
+    # 🔴 LOS DOS ESTADOS DEL PIPE, NO EL DEL PIPE. Si la consulta no se pudo
+    # leer, el validador recibe stdin vacío y sale 4 (`sin_sentencias`): un
+    # caso de rechazo pasaría sin haber mirado su consulta. Con `pipefail`
+    # ese 4 es lo que devolvería `$?`, así que el productor se comprueba
+    # aparte.
+    node -e 'process.stdout.write(require(process.argv[1])[process.argv[2]][Number(process.argv[3])][1]);' \
+      "$archivo" "$export_nombre" "$indice" | node "$LISTA_BLANCA" "$dialecto" >/dev/null 2>&1
+    estados="${PIPESTATUS[0]} ${PIPESTATUS[1]}"
+    ec="${estados#* }"
+    [ "${estados%% *}" = "0" ] || ec="consulta_ilegible"
+    assert_exit "$esperado" "$ec" "$prefijo caso $indice ($dialecto): $motivo"
+  done <<EOF
+$lista
+EOF
+}
+
+# Primera tanda (contract v19, AC51 y AC52).
+recorrer_casos_adversariales "$REPO_ROOT/SDD/tests/fixtures/casos-adversariales-lista-blanca.js" CASOS "AC51/AC52"
+# Segunda tanda (contract v20, AC51): literales E'…', corchetes, N'…' como
+# control, y construcciones sin cerrar.
+recorrer_casos_adversariales "$REPO_ROOT/SDD/tests/fixtures/casos-adversariales-v20.js" CASOS_V20 "AC51 v20"
+
+# AC51 v20: el rechazo de una construcción sin cerrar lleva el TIPO en el
+# motivo (`construccion_sin_cerrar_<tipo>`). El recorrido de arriba sólo mira
+# el exit code, así que esto lo verifica aparte. Para cada caso de la segunda
+# tanda cuya descripción dice "sin cerrar", el tipo esperado sale de esa
+# descripción (literal / identificador o corchete / bloque), no de índices
+# fijados a mano: el archivo es de Patrick y puede crecer. Se lee sólo el
+# campo `motivo`; la consulta nunca se imprime.
+SIN_CERRAR="$(node -e '
+  var casos = require(process.argv[1]).CASOS_V20;
+  var validar = require(process.argv[2]).validarSql;
+  var n = 0;
+  for (var i = 0; i < casos.length; i += 1) {
+    var d = String(casos[i][3]).toLowerCase();
+    if (d.indexOf("sin cerrar") === -1 || casos[i][2] !== false) continue;
+    n += 1;
+    var tipo = /literal/.test(d) ? "literal" : (/identificador|corchete/.test(d) ? "identificador" : (/bloque/.test(d) ? "comentario" : ""));
+    var motivo = String(validar(casos[i][1], casos[i][0]).motivo);
+    var esperado = "construccion_sin_cerrar_" + tipo;
+    var bien = tipo ? motivo === esperado : motivo.indexOf("construccion_sin_cerrar_") === 0;
+    process.stdout.write(i + "\t" + (tipo || "(tipo no deducible)") + "\t" + (bien ? "si" : "no:" + motivo) + "\n");
+  }
+  if (n === 0) process.exit(3);
+' "$REPO_ROOT/SDD/tests/fixtures/casos-adversariales-v20.js" "$LISTA_BLANCA" 2>/dev/null)"
+assert_eq "$?" "0" "AC51 v20 hay casos de construcción sin cerrar para verificar el motivo"
+while IFS="$(printf '\t')" read -r indice tipo resultado; do
+  [ -z "$indice" ] && continue
+  assert_eq "$resultado" "si" "AC51 v20 caso $indice: el motivo lleva el tipo ($tipo)"
+done <<EOF
+$SIN_CERRAR
+EOF
+
+# ---------------------------------------------------------------------------
+# AC51 mutación (c) — la regla de los corchetes de SQL Server
+# ---------------------------------------------------------------------------
+# Igual que la de los literales E'…' (mutación (b)), esta regla no está para
+# rechazar ataques sino para NO rechazar consultas legítimas: sin ella, una
+# comilla, una comilla doble o un /* dentro de un nombre entre corchetes se lee
+# como una construcción que nunca se cierra. Los casos de Patrick no traían
+# ninguno de esos, y por eso la mutación (c) caía en parte. Estos los escribió
+# el planner (24-sep); son T-SQL válido. El último es el control: un corchete
+# simple, que se acepta con la regla y sin ella.
+while IFS='|' read -r etiqueta sql; do
+  [ -z "$etiqueta" ] && continue
+  ec="$(validar sqlserver "$sql")"
+  assert_exit 0 "$ec" "AC51 (c) acepta en sqlserver $etiqueta"
+done <<'CASOS'
+un nombre entre corchetes con una comilla simple|SELECT 1 AS [it's]
+un nombre entre corchetes con una comilla doble|SELECT 1 AS [a"b]
+un nombre entre corchetes con un /*|SELECT 1 AS [a/*b]
+un nombre entre corchetes con ]] escapado y una comilla|SELECT 1 AS [a]]b's]
+un nombre entre corchetes simple (control)|SELECT [a] FROM t
+CASOS
+
+# ---------------------------------------------------------------------------
+# AC53 (v25) — sentencias de SQL Server que no son lectura, encadenadas sin `;`
+# ---------------------------------------------------------------------------
+# Las propuso la review de gradiel12 en el PR #14 (24-sep). Una por palabra,
+# y el motivo exacto: si se comparara sólo el exit code, una palabra que se
+# cayera de la regla quedaría tapada por otra regla que también rechaza.
+while IFS='|' read -r palabra sql; do
+  [ -z "$palabra" ] && continue
+  assert_contains "$(veredicto sqlserver "$sql")" '"motivo":"sentencia_no_permitida"' \
+    "AC53 rechaza en sqlserver $palabra encadenado detrás de un SELECT"
+done <<'CASOS'
+WAITFOR|SELECT 1 WAITFOR DELAY '00:00:01'
+WHILE|SELECT 1 WHILE 1 = 1 SELECT 2
+GRANT|SELECT 1 GRANT SELECT ON t TO public
+REVOKE|SELECT 1 REVOKE SELECT ON t FROM public
+DENY|SELECT 1 DENY SELECT ON t TO public
+USE|SELECT 1 USE master
+DBCC|SELECT 1 DBCC CHECKDB
+SET|SELECT 1 SET NOCOUNT ON
+DECLARE|SELECT 1 DECLARE @x int
+BEGIN|SELECT 1 BEGIN SELECT 2 END
+BACKUP|SELECT 1 BACKUP DATABASE d TO DISK = 'x'
+RESTORE|SELECT 1 RESTORE DATABASE d FROM DISK = 'x'
+KILL|SELECT 1 KILL 55
+SHUTDOWN|SELECT 1 SHUTDOWN
+OPENROWSET|SELECT * FROM OPENROWSET('p', 'c', 'q')
+OPENQUERY|SELECT * FROM OPENQUERY(s, 'q')
+OPENDATASOURCE|SELECT * FROM OPENDATASOURCE('p', 'c').d.s.t
+CASOS
+
+# Lo que tiene que seguir pasando: la palabra como parte de un nombre (el
+# borde de palabra es la regla), y dentro de un literal (la regla mira el
+# texto normalizado). Y el mismo SQL en postgres, donde AC53 no aplica.
+while IFS='|' read -r dialecto etiqueta sql; do
+  [ -z "$dialecto" ] && continue
+  ec="$(validar "$dialecto" "$sql")"
+  assert_exit 0 "$ec" "AC53 acepta en $dialecto $etiqueta"
+done <<'CASOS'
+sqlserver|las palabras como parte de un nombre|SELECT begin_date, user_set, used, waitfor_x FROM t
+sqlserver|las palabras dentro de un literal|SELECT 'waitfor delay, use master, set x' AS texto
+postgres|un nombre de columna que es una de las palabras|SELECT 1 AS "use"
+CASOS
+
+# ---------------------------------------------------------------------------
+# Uso
+# ---------------------------------------------------------------------------
+printf '%s' 'SELECT 1' | node "$LISTA_BLANCA" >/dev/null 2>&1
+assert_exit 2 "$?" "sin dialecto, explica el uso"
+
+printf '%s' 'SELECT 1' | node "$LISTA_BLANCA" mysql >/dev/null 2>&1
+assert_exit 2 "$?" "con un dialecto desconocido, explica el uso"
+
+test_summary
+exit $?

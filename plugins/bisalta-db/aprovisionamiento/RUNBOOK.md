@@ -1,0 +1,1464 @@
+# Runbook — aprovisionamiento de solo lectura para `bisalta-db`
+
+Contract: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v13, requerimiento R1 (`infra`), AC1–AC10, AC41, AC42, AC43, AC44.
+
+**v13 (decisiones de Patrick Ocampo, Slack 22-sep-2026 11:27)**: cuatro
+puntos sobre lo que esta ronda había dejado listo.
+
+1. **Sale `neo_lectura`. Un solo rol: `claude_lectura`.** Patrick le
+   preguntó directo a NEO: no abre ninguna conexión Postgres, ni hoy ni en
+   su diseño futuro — lee Odoo stg por XML-RPC, contra la aplicación y no
+   contra la base — y corre en la cuenta de producción, no en la de dev.
+   Un rol sin consumidor era una clave que rotar, una cuenta que olvidar y
+   una pista falsa de que los dos mundos estaban conectados. `postgres-
+   parte-a.sql`, `postgres-parte-b.sql` y `postgres-inverso.sql` quedan con
+   un solo rol. **Lo que se resigna (D53, aceptado por Patrick)**:
+   `pg_stat_activity` no va a distinguir consumidores el día que haya más
+   de uno — hoy el único es Ian Vargas, así que no distingue nada que
+   exista. El remedio cuando haga falta un segundo consumidor real: agregar
+   su rol a `postgres-parte-a.sql` (siguiendo el mismo patrón que
+   `claude_lectura`) y volver a correrlo — es idempotente.
+2. **La política IAM va sobre un patrón, no sobre ARNs exactos**:
+   `dev/bd/claude-lectura-*`. Agregar un motor no obliga a tocar IAM, sólo
+   a crear el secreto con un nombre que caiga bajo el patrón. Ver sección
+   "Política IAM" más abajo.
+3. **`AC44`, nuevo**: `sqlserver-parte-a.sql` no tenía guarda de instancia
+   — a diferencia de `postgres-parte-0.sql`, nada decía contra qué servidor
+   corría, y `CREATE LOGIN` es objeto de instancia. Importa porque hay otro
+   SQL Server en juego: NEO lee `BD-PRINCIPAL`, que es producción. Ver
+   sección "AC44" más abajo.
+4. **Para el expediente: el login de Dev SQL NO se unifica con el que NEO
+   usa en `BD-PRINCIPAL`.** No es higiene, es imposibilidad técnica: **un
+   login no existe en dos instancias a la vez** — cada login vive en el
+   `sys.server_principals` de una sola instancia. Unificarlos exigiría
+   darle a uno de los dos el servidor del otro, y uno de los dos es
+   producción (`BD-PRINCIPAL`). Queda escrito, con las palabras de
+   Patrick, "para que dentro de seis meses nadie lo ordene sin saber
+   esto": si algún día alguien pide "un solo login para todo SQL Server",
+   la respuesta no es una decisión de diseño a reconsiderar — es una
+   propiedad de cómo SQL Server modela los logins, y no hay forma de
+   evitarla salvo tener dos logins con el mismo nombre y credenciales
+   independientes en cada instancia (que es exactamente lo que ya existe:
+   `bisalta_lectura` acá, lo que sea que NEO use allá).
+
+Este runbook lo ejecuta **una persona con privilegios de administración** en
+cada motor y en la cuenta de AWS de dev/qa. Ningún script de este directorio
+se corrió contra una base real durante R1: R1 los redacta y deja la
+verificación escrita; la ejecución y sus resultados quedan pendientes hasta
+que alguien con esos privilegios los corra.
+
+**Reapertura v4→v5 (hallazgo de Patrick Ocampo, 18-sep-2026)**: `pg_read_all_data`
+es una membresía DE CLUSTER y Postgres concede `CONNECT` a PUBLIC por
+omisión — un rol creado por `postgres-parte-a.sql` alcanza las **29** bases
+del cluster de dev/qa desde que existe, no las 2 del catálogo de la
+aplicación. `postgres-parte-b.sql` **nunca fue la barrera de acceso**; la
+barrera real es qué cluster es (`postgres-parte-0.sql`, nuevo, corre
+primero — ver "Orden de ejecución" y AC41 abajo). Del lado de SQL Server,
+`db_denydatawriter` se sumó a `db_datareader` como segunda red (AC42): el
+`DENY` le ganaba a cualquier `GRANT` posterior. **Revertido en v10** (ver
+sección "v10" abajo): `db_denydatawriter` sale del loop, y `db_datareader`
+pasa a ser la única garantía.
+
+**v6 (respuestas de Patrick Ocampo, Slack 2026-09-18 15:52 CST)**: `SSISDB`
+queda **fuera** del loop de SQL Server, por nombre — ver sección "`SSISDB`
+queda fuera del loop" más abajo, ya no es una decisión pendiente. El
+aprovisionamiento de Postgres lo sigue escribiendo este runbook —
+`postgres-parte-0.sql` es implementación de referencia hasta que llegue el
+de Patrick — con el hallazgo de la ronda 5 de review ya corregido (PASO 1
+de `postgres-parte-0.sql` ahora discrimina de verdad, ver su comentario).
+
+**v9 (regla de Patrick Ocampo, Slack 21-sep-2026 10:31; lista de Ian
+Vargas, 21-sep-2026)**: el freno de SQL Server se levanta con una regla,
+no con una lista de exclusiones. El alcance de Dev SQL arranca en **cero**
+y se agrega **a pedido nombrado**: `sqlserver-parte-b.sql` deja de
+recorrer `sys.databases` filtrando exclusiones y pasa a recorrer una
+**lista explícita** declarada al principio del script
+(`@bases_permitidas`) — su `INSERT` es la fuente de verdad de qué está
+concedido hoy; este runbook no la retranscribe para no mantener dos
+copias del mismo valor que puedan desincronizarse (el historial de
+pedidos, con fecha y solicitante, vive en `APROBACIONES.md`). `AC7` y
+`AC42` cambian
+de universo con esto: dejan de hablar de "todas las bases de usuario en
+línea salvo `SSISDB`" y pasan a hablar de la lista. Las guardas contra
+`SSISDB`, `master`, `model`, `msdb` y `tempdb` **se mantienen como defensa
+en profundidad**, no como el criterio de alcance: si alguien las escribe
+en la lista por error, el script las rechaza igual y avisa por qué (ver
+`AC7` abajo). La aprobación completa está en `APROBACIONES.md`, que este
+runbook no reemplaza ni resume.
+
+**v10 (decisiones de Patrick Ocampo, Slack 21-sep-2026 12:22 y 12:44)**:
+dos reversiones sobre lo que R1 había dejado `APPROVED`, ninguna un
+rechazo del trabajo — las dos revierten decisiones puntuales.
+
+1. **Sale `db_denydatawriter`.** Cada base concedida lleva `db_datareader`
+   y nada más. Revierte el punto 4 de v4. Patrick pidió explícitamente que
+   quedara escrito con lo que se pierde, no sólo con lo que queda —
+   textual, ya en `APROBACIONES.md` punto 6: *"sin `db_denydatawriter` no
+   queda un `DENY` explícito, así que un `GRANT` de escritura concedido por
+   error en el futuro no tendría nada que lo anule."* La tabla "Garantías
+   por motor" (arriba en el contract, y en `README.md`) vuelve a **una
+   sola garantía** en SQL Server, y la afirmación *"el rol es la única
+   barrera"* pasa de ser una omisión a ser una decisión cierta. `AC42`
+   cambia de propiedad: ya no afirma que el `DENY` le gane a un `GRANT`,
+   afirma que el user no tiene NINGUNA otra membresía además de
+   `db_datareader` — ver sección "AC42" más abajo, reescrita entera.
+2. **El inverso deja de leer la lista: revoca por enumeración.** Patrick
+   rechazó el Procedimiento de baja que R1 había documentado —correr el
+   inverso con la lista completa y editarla después— porque "depende de
+   que alguien recuerde el orden". Su regla, textual: *"Se concede desde
+   una lista explícita, se revoca por enumeración."* `sqlserver-inverso.sql`
+   ahora recorre `sys.databases` entero buscando dónde existe
+   `bisalta_lectura` en `sys.database_principals`, y lo saca de ahí, sin
+   leer `@bases_permitidas` en absoluto — ver comentario de cabecera de ese
+   archivo. Esto **simplifica del todo** el Procedimiento de baja (sección
+   "Inverso" más abajo, reescrita): ya no hace falta ninguna copia de
+   trabajo recortada, y el `DROP LOGIN` incondicional del final deja de
+   ser un caso especial a vigilar, porque después de una enumeración
+   completa es exactamente lo que corresponde.
+
+**v11 (ronda 2 de review sobre v10, dos MAJOR y dos MINOR)**: la decisión
+central del punto 2 de v10 tiene AC propio recién ahora — `AC43`, nuevo,
+sección propia más abajo — porque su única cobertura hasta acá era
+incidental (mismo defecto que el `ESCALATE` de v6 → v7). Además:
+
+1. **MAJOR 1 — la comprobación de "ninguna otra membresía" de `AC42`
+   filtraba por una lista cerrada de nombres de rol** (`r.name IN
+   ('db_datareader','db_denydatawriter','db_datawriter','db_owner')`), que
+   mide "ninguna de estas tres" y no "ninguna otra": una membresía en
+   `db_ddladmin`, `db_securityadmin`, `db_accessadmin`,
+   `db_backupoperator`, `db_denydatareader` o un rol de base a mano
+   pasaba con el mismo verde falso. Corregido quitando el filtro por
+   nombre — ver sección "AC42" más abajo.
+2. **MAJOR 2 — el inverso saca al user de "TODAS" las bases era más de lo
+   que el script sostiene**: una base `NO ONLINE` con el user no se toca
+   (el `PRINT` ya lo decía, sección "SIN SALTOS SILENCIOSOS" del
+   comentario de cabecera de `sqlserver-inverso.sql`), pero el `DROP
+   LOGIN` incondicional del final corre igual — dejando un **huérfano**
+   real si eso pasa. Acotado a "toda base **ONLINE**" en el comentario de
+   cabecera de `sqlserver-inverso.sql` y en `sqlserver-parte-b.sql`, y
+   agregado a la viñeta "Inverso" y al "Procedimiento de baja" (pasos 2 y
+   4) el mandato de revisar las líneas `NO ONLINE:`/el listado de
+   `sys.databases` antes de dar el inverso por completo.
+3. **MINOR — `@estado IS NULL`** en `sqlserver-inverso.sql`: una base
+   borrada entre el `SELECT` del cursor y la re-consulta de `state` caía
+   por `UNKNOWN` al `ELSE` y ejecutaba `USE` sobre una base inexistente.
+   Corregido: el cursor trae `name` y `state` en una sola pasada, sin
+   re-consulta y sin `NULL` posible.
+4. **MINOR — la mutación de `AC42` concede `db_datawriter` sobre todo
+   `EXACTUS`** (395 GB, copia de producción) al login compartido; una
+   interrupción entre conceder y revocar dejaría esa concesión en pie sin
+   que el runbook lo dijera. Declarado en la sección "AC42" más abajo.
+
+Barrido de clase de esta ronda (impact set, no directorio): el mismo
+sobreclamado de "TODAS las bases" para el inverso también vivía en el
+comentario "CÓMO DAR DE BAJA UNA BASE" de `sqlserver-parte-b.sql` —
+corregido ahí también.
+
+## Prerequisitos
+
+- Acceso de administración al cluster Aurora PostgreSQL. Host completo (identificador
+  del cluster + región `us-east-1`, contract v3, fila `Integration` del
+  `Architectural Delta`):
+  `sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com`
+  (dev/qa) — **nunca** `cluster-cr4rbgr7qlr6` (cuenta de producción).
+- Acceso de `sysadmin` a la instancia `Dev SQL` (`10.24.40.137`).
+- Red desde la máquina que ejecuta hacia la VPC de dev/qa y hacia
+  `10.24.40.137`.
+- **`SERVERPROPERTY('MachineName')` ya está medido (contract v17, "Cambios
+  v16 → v17" punto 1, AC44)**: Patrick Ocampo lo corrió el 23-sep-2026 vía
+  SSM contra la instancia de Dev SQL aprovisionada:
+  `SELECT SERVERPROPERTY('MachineName');` → `EC2AMAZ-2RGHL0C`, que **coincide**
+  con la constante `@esperada` que ya llevan `sqlserver-parte-a.sql` y
+  `sqlserver-parte-b.sql`. No hace falta remedirlo para correr los scripts
+  contra esta misma instancia. Si en el futuro se apunta a una instancia
+  distinta de Dev SQL, medirlo de nuevo ahí y actualizar `@esperada` en los
+  dos scripts antes de ejecutar — el valor medido siempre manda sobre la
+  constante (Patrick Ocampo, textual: "si no coincide, el valor manda sobre
+  el mío").
+- Clientes CLI instalados: `psql` (Postgres) y `sqlcmd` (SQL Server). Medido
+  el 18-sep-2026 en la máquina de referencia de este repo: `psql` 14.18
+  presente, `sqlcmd` ausente — instalarlo antes de correr los scripts de
+  SQL Server desde esa máquina.
+- Permisos de escritura en AWS Secrets Manager, región `us-east-1`, cuenta
+  de dev/qa (para AC8). Este runbook **no invoca el binario `aws`**: define
+  la forma del secreto y la política IAM; los dos secretos se crean a mano
+  o con el flujo que la cuenta ya use para Secrets Manager.
+
+## Orden de ejecución
+
+1. `postgres-parte-0.sql` contra el cluster de dev/qa
+   (`sistemas-costruplaza-db.cluster-cfrl3owqzwof`), **antes de crear
+   nada**. **Verificar AC41**: sale 0 y continúa (ver abajo). Si aborta,
+   PARAR — no correr `postgres-parte-a.sql` contra ese cluster bajo
+   ninguna circunstancia.
+2. `postgres-parte-a.sql` contra el mismo cluster (una vez, cluster
+   entero).
+3. `postgres-parte-b.sql` conectado a **`proveedores_dev` primero**.
+4. **Verificar AC1** contra `proveedores_dev` (ver abajo) antes de seguir.
+5. `postgres-parte-b.sql` conectado al resto de las bases del catálogo
+   (`proveedores_qa`, y cualquier base que se agregue después).
+6. **Antes de correr nada de SQL Server**: `SERVERPROPERTY('MachineName')`
+   ya está medido contra `Dev SQL` y coincide con `@esperada` (ver
+   "Prerequisitos" arriba, contract v17). Si se apunta a una instancia
+   distinta de la ya aprovisionada, medir ahí y corregir `@esperada` en
+   `sqlserver-parte-a.sql` y `sqlserver-parte-b.sql` antes de seguir.
+7. `sqlserver-parte-a.sql` contra la instancia `Dev SQL`. **Verificar AC44**
+   (ver abajo): si la instancia no coincide con `@esperada`, el script
+   tiene que abortar sin crear el login — confirmar esto primero contra
+   una instancia de prueba antes de confiar en la corrida real. El mismo
+   script aplica el `DENY VIEW ANY DATABASE` de **AC48** (ver abajo),
+   fuera del bloque que crea el login.
+8. `sqlserver-parte-b.sql` contra la misma instancia (recorre la lista
+   explícita declarada al principio del script, otorgando `db_datareader`
+   —y nada más, desde v10— a cada base nombrada ahí). Lleva la misma
+   guarda de instancia que la parte A (ver "AC44" abajo). El script sale
+   `0` aunque alguna base nombrada no se haya podido cubrir — **revisar la
+   salida por líneas `AUSENTE:` / `NO ONLINE:` / `RECHAZADA` antes de
+   seguir**: cada una nombra una base de la lista que quedó sin el user
+   en esta corrida.
+9. **Verificar AC5** contra `EXACTUS`, **AC42** (ver abajo) y **AC48** (ver
+   abajo) — AC42 y AC48 verifican cosas distintas: AC42 mide membresía, AC48
+   mide qué ve el login conectado como tal.
+10. Crear los dos secretos en Secrets Manager (ver "Forma del secreto" y
+    "Política IAM" abajo) y verificar AC8. **Este paso no depende de los
+    anteriores**: puede correrse en cualquier momento, incluso primero. Si
+    el secreto ya existe cuando se ejecuta la parte A de ese motor, la
+    contraseña del placeholder **sale del secreto** en vez de generarse —
+    ver "Forma del secreto".
+
+## Forma del secreto
+
+Dos secretos, uno por identidad de conexión: `claude_lectura` (Postgres) y
+el login de `Dev SQL`. Un solo rol de Postgres desde v13 (contract,
+"Cambios v12 → v13" punto 1): `neo_lectura` salió porque NEO no abre
+ninguna conexión Postgres. Cada uno en la **forma estándar de RDS**: un
+objeto JSON con exactamente dos campos.
+
+| Campo | Contenido |
+|---|---|
+| `username` | el nombre del rol o login que crea la parte A del motor correspondiente. **No se elige al crear el secreto**: está fijo como literal dentro del `.sql` (`claude_lectura` en Postgres). |
+| `password` | **el mismo valor** que lleva el placeholder de contraseña de esa misma parte A. Los dos lados guardan el mismo secreto; cuál de los dos se fijó primero no importa. |
+
+**Cualquiera de los dos órdenes es válido, y el segundo obliga a leer esto
+al revés.** El "Orden de ejecución" de más arriba pone la creación de los
+secretos al final (paso 10), pero eso es una secuencia cómoda, no un
+requisito: la propiedad que importa es una **igualdad entre dos valores**,
+no cuál se escribió antes.
+
+- Si la parte A corre primero: se genera una contraseña, se sustituye en
+  el placeholder, y **ese mismo valor** se guarda después en el campo
+  `password` del secreto.
+- Si el secreto se crea primero (es lo que pasó con
+  `dev/bd/claude-lectura-postgres`, creado el 22-sep-2026 antes de la
+  parte A): la contraseña **ya existe**, y hay que **recuperarla del
+  secreto** para sustituirla en el placeholder. No se genera una segunda.
+
+Generar una contraseña nueva teniendo el secreto ya creado deja el motor y
+el secreto con valores distintos, y **el síntoma es indistinguible del de
+un rol que todavía no existe**: Postgres contesta
+`FATAL: password authentication failed` en los dos casos, porque desde la
+versión 10 le responde a un rol inexistente con un desafío SCRAM falso
+(*mock authentication*) para impedir la enumeración de usuarios. Separarlos
+requiere una credencial administrativa y una consulta a `pg_roles` — ver
+"Si la conexión falla con `password authentication failed`" más abajo,
+dentro de la verificación de AC1.
+
+Los dos campos van **en el mismo objeto JSON**, cada uno con su propio
+nombre y su propio valor — el punto de este runbook es describir la forma,
+no reproducir un secreto real: por eso esta tabla separa el nombre del
+campo de su contenido en columnas distintas, en vez de escribirlos
+concatenados como `campo` seguido de su valor en la misma celda.
+
+Nombres de secreto (decisión de Patrick Ocampo, contract v12 — él los
+elige y él los crea con estos nombres exactos, propagados a las 12
+entradas de `catalogo.json`): ambiente primero, como los `dev/…` que ya
+existen en la cuenta, y `bd` como categoría, como los `onpremise/bd/…` —
+entra en las dos convenciones que ya usa la cuenta en vez de inventar una
+tercera.
+
+- `dev/bd/claude-lectura-postgres`
+- `dev/bd/claude-lectura-sqlserver`
+
+## Política IAM
+
+**Va sobre un patrón, no sobre ARNs exactos** (contract v13, "Cambios v12
+→ v13" punto 2 — Patrick Ocampo): `dev/bd/claude-lectura-*`, el mismo
+patrón que ya usa el stack de NEO (`${Environment}/neo/accesos-lectura-*`)
+para lo suyo. Consecuencia directa: **agregar un motor no obliga a tocar
+IAM**, sólo a crear el secreto con un nombre que caiga bajo el patrón —
+los dos secretos de arriba ya cumplen (`dev/bd/claude-lectura-postgres`,
+`dev/bd/claude-lectura-sqlserver`), y un tercer motor futuro (por ejemplo
+`dev/bd/claude-lectura-redshift`) quedaría cubierto sin escribir una
+policy nueva.
+
+Una política gestionada (o inline), adjunta al rol o usuario IAM que cada
+proceso consumidor asuma al correr el plugin:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "<accion-secrets-manager>",
+      "Resource": "<arn-patron-claude-lectura>"
+    }
+  ]
+}
+```
+
+El placeholder `<accion-secrets-manager>` se reemplaza, sin espacio ni
+backtick, por la acción `secretsmanager`:`GetSecretValue` — namespace y
+nombre de acción separados acá con un backtick de por medio únicamente
+para que este documento no tenga el literal contiguo de una acción de IAM
+(mismo criterio que los placeholders de contraseña en los `.sql`: la forma
+se documenta partida, el valor real se arma al usarlo).
+
+El placeholder `<arn-patron-claude-lectura>` se arma uniendo, sin espacio
+ni backtick, estos tres tramos — partidos acá por el mismo motivo que el
+de arriba (que este documento no tenga el ARN contiguo):
+`arn:aws:secretsmanager`:`us-east-1:<cuenta-dev-qa>:secret`:`dev/bd/claude-lectura-*`.
+
+- `Resource` es el patrón `dev/bd/claude-lectura-*` (no un wildcard
+  amplio como `dev/bd/*` ni `*`): el
+  threat model del contract (sección "¿Quién puede invocarlo?") pone la
+  barrera real en IAM, no en el plugin — un `Resource` amplio la anula.
+- Sin este permiso sobre el patrón, `consultar` devuelve
+  `{ "error": "secreto_inaccesible" }` (exit 5, contract v3, tabla de
+  comportamiento de error) — ese es el comportamiento esperado de un
+  proceso sin la policy adjunta, no un bug.
+- No se declara una policy separada para `kms:Decrypt`: los dos secretos
+  de este runbook usan la clave por defecto administrada por AWS para
+  Secrets Manager en la cuenta de dev/qa (`aws/secretsmanager`), cuya
+  política de clave ya permite a los principals de la cuenta que tengan
+  la acción `secretsmanager`:`GetSecretValue` (ver nota de arriba sobre el
+  backtick de separación) completar el descifrado. Si algún secreto
+  se crea con una CMK propia, esa policy necesita además `kms:Decrypt`
+  sobre esa clave — no aplica a los dos secretos de este runbook.
+
+## Verificación de AC1–AC8, AC41–AC44
+
+Cada verificación es `manual-only`: ningún harness de este repo puede crear
+un rol de Postgres, alcanzar la VPC de dev/qa, o alcanzar `10.24.40.137`.
+Estado tras esta ronda: **pendiente-de-ejecucion** para las doce (AC1–AC8,
+AC41–AC44).
+
+### AC41 — la Parte 0 aborta por lo que el cluster CONTIENE, no por el nombre de la base
+
+Corrida esperada, contra el cluster de dev/qa (contiene `controlactivos_stg`
+y ninguna `_prod`, `INVENTARIO.md`):
+
+```
+psql -h sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com -U <admin> -d postgres -v ON_ERROR_STOP=1 -f postgres-parte-0.sql
+```
+
+Esperado: exit 0. La consulta del paso 1 imprime, para cada rol con
+`LOGIN` que ya exista en el cluster, dos columnas por base: si puede
+conectar (`has_database_privilege(...,'CONNECT')`, cierta para **cualquier**
+rol en cualquier base por el default de `CONNECT` a PUBLIC, con o sin
+`pg_read_all_data` — sola no discrimina, ver el comentario corregido de
+`postgres-parte-0.sql`, ronda 5 de review, MAJOR 2) y si es miembro de
+`pg_read_all_data` (`pg_has_role(...,'MEMBER')`, membresía de cluster, la
+misma en las 29 bases). Antes de que exista `claude_lectura` esto sólo
+muestra los roles administrativos que ya haya, pero es la misma consulta
+que se vuelve a correr después de `postgres-parte-a.sql`: ahí las **dos
+columnas juntas** confirman que el rol nuevo llega de verdad a las 29
+bases del cluster, no a 2 — `puede_conectar` en `true` sin la membresía no
+probaría lectura, y la membresía sin `puede_conectar` no podría ni abrir
+la conexión. El paso 2 (el `DO $$ ... $$` de control)
+no lanza excepción, así que `psql -v ON_ERROR_STOP=1` no corta el script:
+`-v ON_ERROR_STOP=1` es obligatorio en esta corrida por el mismo motivo
+que en el resto de los `.sql` de este runbook (ver AC3) — sin la bandera,
+un `RAISE EXCEPTION` adentro de un `DO` no necesariamente hace que `psql`
+salga distinto de 0.
+
+> 🔴 **Si la guarda disparó en una sesión interactiva (SSMS), esa sesión queda en
+> `NOEXEC`**: el reintento con `@esperada` ya corregido **no ejecuta nada y no avisa**.
+> Abrí una sesión nueva, o corré `SET NOEXEC OFF;` antes de reintentar. El
+> procedimiento de este runbook usa `sqlcmd -i`, que abre un proceso —y por lo
+> tanto una sesión— por invocación, así que no se ve afectado.
+
+**Mutación declarada** (contract v5, AC41): en una copia de trabajo de
+`postgres-parte-0.sql` (nunca el archivo que se corre contra un cluster
+real sin revertir antes), cambiar la condición de aborto de `_prod` a
+`_stg` (`LIKE '%\_stg' ESCAPE '\'`) y correr esa copia contra el mismo
+cluster de dev/qa:
+
+```
+psql -h sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com -U <admin> -d postgres -v ON_ERROR_STOP=1 -f postgres-parte-0-mutado.sql
+```
+
+Esperado en este paso: el script **aborta** (exit distinto de 0,
+nombrando `controlactivos_stg`) — es la comprobación de que "sale 0 y
+continúa" se pone roja con la condición equivocada, sobre el mismo
+cluster que con la condición correcta (`_prod`) sale 0. Restaurar la
+condición a `_prod` (o simplemente descartar la copia mutada) y volver a
+correr la corrida esperada de arriba para confirmar que vuelve a salir 0.
+
+**Nunca correr ninguna versión de `postgres-parte-0.sql`, mutada o no,
+contra `cluster-cr4rbgr7qlr6`** (cuenta de producción): ese cluster sí
+tiene bases `_prod`, así que la corrida esperada ahí sería abortar — pero
+la Parte 0 no es la forma de comprobar eso, es la salvaguarda que impide
+seguir si alguien la corre ahí por error.
+
+### AC1 — el rol existe y lee de `proveedores_dev`
+
+**Nota para el planner (contract-change-request, no resuelto acá)**: el
+texto vigente de `AC1` en el contract (v13) todavía dice *"existen los
+roles `claude_lectura` y `neo_lectura`... una consulta de lectura...
+devuelve filas con cualquiera de los dos."* La decisión de v13
+("Cambios v12 → v13", punto 1) saca `neo_lectura` del diseño — con un solo
+rol, ese texto queda pidiendo un resultado que el sistema, correctamente
+actualizado, ya no puede producir: no hay forma de verificar que
+`neo_lectura` "existe y lee" sin recrear el rol que la propia decisión
+quitó. Es la misma clase de defecto que causó el `ESCALATE` de v6 → v7 de
+este contract (un AC no reconciliado con un cambio de diseño posterior).
+No se edita el contract acá (regla de single-writer); este runbook
+verifica lo que el diseño vigente sostiene — un solo rol — y deja este
+párrafo como la solicitud formal de que `AC1` se redacte de nuevo
+(propuesta: *"En el cluster de dev/qa existe el rol `claude_lectura`, con
+`LOGIN` y membresía de `pg_read_all_data`, sin `NOINHERIT`; una consulta
+de lectura sobre una tabla de `proveedores_dev` devuelve filas."*).
+
+`information_schema.tables` es un catálogo, no una tabla de
+`proveedores_dev`: verlo no prueba que el rol lea datos reales de esa base.
+Primero identificar una tabla real de la base (`<tabla_real>` abajo —
+`pg_read_all_data` también cubre los catálogos):
+
+```
+psql -h sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com -U claude_lectura -d proveedores_dev -c "\dt"
+```
+
+y después leer de ella:
+
+```
+psql -h sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com -U claude_lectura -d proveedores_dev -c "SELECT * FROM <tabla_real> LIMIT 1;"
+```
+
+Esperado: `\dt` lista al menos una tabla base (si `proveedores_dev` no
+tiene ninguna todavía, el AC no se puede verificar hasta que exista una —
+avisarlo en el estado, no forzar la lectura contra un catálogo); elegir
+`<tabla_real>` con al menos una fila (una tabla legible pero vacía da
+rojo falso: cero filas de una tabla vacía no se distingue de cero filas
+por falta de permiso). La conexión abre y la consulta sobre `<tabla_real>`
+termina sin error de permiso y devuelve esa fila.
+Adicional: `SELECT rolname, rolinherit FROM pg_roles WHERE rolname = 'claude_lectura';`
+tiene que devolver `rolinherit = true` (nunca `NOINHERIT`).
+
+#### Si la conexión falla con `password authentication failed`
+
+Ese error **no identifica una causa**: significa "el rol no existe" **o**
+"la contraseña del rol no es la del secreto", sin distinguirlas. Postgres
+responde igual a las dos a propósito — desde la versión 10, a un rol
+inexistente le contesta con un desafío SCRAM falso (*mock
+authentication*) para que nadie pueda enumerar usuarios probando nombres.
+
+Nada de lo de arriba sirve para separarlas: todos esos comandos se
+conectan **como** `claude_lectura`, que es justo lo que no funciona. Hace
+falta una credencial **administrativa** (una que ya pueda leer `pg_roles`)
+y una sola consulta:
+
+```
+SELECT rolname, rolcanlogin, rolinherit,
+       pg_has_role(rolname, 'pg_read_all_data', 'member') AS lee_todo,
+       has_database_privilege(rolname, 'proveedores_dev', 'CONNECT') AS conecta
+FROM pg_roles WHERE rolname = 'claude_lectura';
+```
+
+| Resultado | Qué pasó |
+|---|---|
+| cero filas | el rol no existe — falta correr `postgres-parte-a.sql` |
+| `rolcanlogin = f` | existe sin `LOGIN`: el `CREATE ROLE` perdió esa cláusula |
+| `rolinherit = f` | entró `NOINHERIT`: no vería una sola tabla aunque conecte (ver la nota de `pg_read_all_data` en `postgres-parte-a.sql`) |
+| `lee_todo = f` | falta el `GRANT pg_read_all_data` |
+| todo `t`, `conecta = f` | parte A completa; falta `postgres-parte-b.sql` sobre esa base |
+| **todo `t`, `conecta = t`** | el rol `claude_lectura` está bien: entonces **lo que el cliente manda no coincide con él**. Puede ser la contraseña (ver "Forma del secreto", los dos órdenes de creación) **o el `username` del secreto** — ver abajo |
+
+**Esta consulta fija el nombre `claude_lectura` en el código.** Si el `username`
+del secreto está mal escrito, la consulta igual encuentra el rol bueno, cae en la
+última fila y hace concluir que la contraseña no coincide, cuando el problema es
+el nombre. Por eso, antes de leer la tabla, descartar las dos causas que dan
+**este mismo error** — el mock authentication responde igual a un usuario
+inexistente que a una contraseña equivocada:
+
+- **el `username` del secreto**: leerlo y compararlo con `claude_lectura`,
+  carácter por carácter;
+- **la contraseña con espacios o saltos alrededor**: es otro valor, así que no
+  coincide con la del rol aunque "sea la misma". Comparar el largo con y sin
+  recortar.
+
+Y dos causas que **no** dan este error, sino otro, y que por eso se reconocen
+solas: un `secret_id` del catálogo instalado distinto del del repo da
+`secreto_inaccesible` (ver `README.md`, la nota sobre la copia que deja
+`/plugin install`), y un puerto del endpoint `cluster-ro-` que no abre da un
+timeout de conexión.
+
+### AC2 — un `INSERT` con `claude_lectura` falla
+
+**Mutación declarada** (contract v3, AC2): antes de verificar el
+comportamiento negativo real, otorgar `INSERT` a `claude_lectura` sobre una
+tabla de scratch creada para la prueba:
+
+```
+psql ... -U <admin> -d proveedores_dev -c "CREATE TABLE zz_scratch_ac2 (id int); GRANT INSERT ON zz_scratch_ac2 TO claude_lectura;"
+psql ... -U claude_lectura -d proveedores_dev -c "INSERT INTO zz_scratch_ac2 VALUES (1);"
+```
+
+Esperado en este paso: el `INSERT` **tiene que ponerse en verde** (entra la
+fila) — es la comprobación de que la mutación realmente cambió el permiso,
+no que el AC ya estaba roto de otra forma.
+
+Después, revocar sólo el `INSERT` — **la tabla de scratch sigue viva**: la
+comprobación real tiene que correr sobre la misma relación que la
+mutación tocó, nunca sobre otra — y volver a correr exactamente el mismo
+`INSERT`:
+
+```
+psql ... -U <admin> -d proveedores_dev -c "REVOKE INSERT ON zz_scratch_ac2 FROM claude_lectura;"
+psql ... -U claude_lectura -d proveedores_dev -c "INSERT INTO zz_scratch_ac2 VALUES (1);"
+```
+
+Esperado: el segundo `INSERT` falla con `ERROR: permission denied`.
+(`INSERT INTO information_schema.tables` **no sirve para esta
+comprobación**: es una vista, y Postgres corta con `cannot insert into
+view` antes de llegar a chequear el privilegio del rol — el AC pasaría por
+un motivo que no tiene nada que ver con el permiso.) Recién ahora, con la
+comprobación real ya corrida, borrar la tabla de scratch:
+
+```
+psql ... -U <admin> -d proveedores_dev -c "DROP TABLE zz_scratch_ac2;"
+```
+
+### AC3 — la parte A corrida dos veces deja el mismo estado
+
+```
+psql ... -U <admin> -d postgres -v ON_ERROR_STOP=1 -f postgres-parte-a.sql   # 1ra corrida
+psql ... -U <admin> -d postgres -c "SELECT rolname FROM pg_roles WHERE rolname = 'claude_lectura';"
+psql ... -U <admin> -d postgres -v ON_ERROR_STOP=1 -f postgres-parte-a.sql   # 2da corrida
+psql ... -U <admin> -d postgres -c "SELECT rolname FROM pg_roles WHERE rolname = 'claude_lectura';"
+```
+
+`-v ON_ERROR_STOP=1` es obligatorio en las dos corridas: sin él, `psql -f`
+sale 0 aunque cada sentencia adentro haya fallado, y el AC afirma
+literalmente "sale 0 las dos veces" — sin la bandera esa afirmación no
+mide nada.
+
+Esperado: exit 0 en las dos corridas del `.sql`, y las dos consultas
+devuelven exactamente el mismo nombre de rol (`claude_lectura`).
+
+### AC4 — tras el inverso, `claude_lectura` no conecta
+
+```
+psql ... -U <admin> -d proveedores_dev -v ON_ERROR_STOP=1 -f postgres-inverso.sql
+psql ... -U <admin> -d proveedores_qa  -v ON_ERROR_STOP=1 -f postgres-inverso.sql
+psql ... -U <admin> -d postgres -c "SELECT 1 FROM pg_roles WHERE rolname = 'claude_lectura';"
+```
+
+Esperado: el `.sql` inverso corrido contra cada base sale 0 (tolera roles
+ya ausentes); el `DROP ROLE` tiene efecto real recién en la última base
+pendiente (ver comentario en `postgres-inverso.sql`). La comprobación real
+es la consulta de catálogo de arriba, corrida como `<admin>`: tiene que
+devolver **cero filas**. Un intento de conexión con `claude_lectura`
+(`psql -h sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com -U claude_lectura -d proveedores_dev -c "SELECT 1;"`)
+**no prueba la revocación por sí solo**: `password authentication failed`
+lo produce lo mismo una contraseña mal tipeada con el rol todavía
+intacto, así que no distingue "el rol no existe" de "el rol existe pero
+tipeé mal la contraseña" — usarlo únicamente como confirmación adicional
+después de que la consulta de catálogo ya dio cero filas. (El mecanismo
+por el que no distingue está en "Si la conexión falla con `password
+authentication failed`", dentro de la verificación de AC1: es
+*mock authentication*, deliberado, no una casualidad de este caso.)
+
+### AC5 — el login de `Dev SQL` lee de `EXACTUS`
+
+La contraseña **nunca** viaja por `argv` (contract v3, sección "Entrega de
+la credencial al cliente"): `-P` la deja visible en la tabla de procesos
+de la máquina, y este runbook lo corre alguien con `sysadmin` en una
+máquina compartida. En vez de `-P`, la contraseña va en `SQLCMDPASSWORD`,
+asignada sólo para ese proceso hijo (prefijo `VAR=valor comando`, no
+`export`).
+
+`sys.tables` es un catálogo del sistema, no una tabla de `EXACTUS`: leerlo
+no prueba que el login lea datos reales de esa base (mismo motivo que AC1
+descarta `information_schema.tables`). Primero identificar una tabla real
+de `EXACTUS` (`<tabla_real>` abajo):
+
+```
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d EXACTUS -Q "SELECT name FROM sys.tables;"
+```
+
+y después leer de ella con el login:
+
+```
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d EXACTUS -Q "SELECT TOP 1 * FROM <tabla_real>;"
+```
+
+Esperado: la primera consulta lista al menos una tabla base (si
+`EXACTUS` no tuviera ninguna, el AC no se puede verificar hasta que
+exista una — avisarlo en el estado, no forzar la lectura contra un
+catálogo); elegir `<tabla_real>` con al menos una fila (una tabla legible
+pero vacía da rojo falso — mismo criterio que AC1). La segunda consulta
+sobre `<tabla_real>` termina sin error de permiso y devuelve esa fila. El
+mismo patrón (`SQLCMDPASSWORD=... sqlcmd ...`, nunca `-P`) aplica a todas las
+invocaciones de `sqlcmd` de abajo que autentican como `bisalta_lectura`.
+
+### AC6 — un `INSERT` con ese login falla
+
+**Mutación declarada** (contract v3, AC6): en una base de scratch,
+agregar el user a `db_datawriter`:
+
+```
+sqlcmd -S 10.24.40.137 -E -Q "CREATE DATABASE zz_scratch_ac6;"
+sqlcmd -S 10.24.40.137 -E -d zz_scratch_ac6 -Q "CREATE USER bisalta_lectura FOR LOGIN bisalta_lectura; ALTER ROLE db_datareader ADD MEMBER bisalta_lectura; ALTER ROLE db_datawriter ADD MEMBER bisalta_lectura; CREATE TABLE t (id int);"
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d zz_scratch_ac6 -Q "INSERT INTO t VALUES (1);"
+```
+
+`db_datareader` se agrega junto con `db_datawriter` porque es la membresía
+que `sqlserver-parte-b.sql` deja en producción: si el estado final de la
+comprobación negativa fuera un login sin ninguna membresía, la prueba
+mediría "un principal sin roles no puede hacer `INSERT`", no "el login
+aprovisionado por este runbook, con `db_datareader`, no puede hacer
+`INSERT`" — que es lo que AC6 afirma (mismo criterio que AC2, donde
+`claude_lectura` conserva `pg_read_all_data` durante toda la comprobación).
+
+Esperado en este paso: el `INSERT` **se pone en verde** (confirma que la
+mutación cambió el permiso). Después, revocar sólo la membresía de
+`db_datawriter` — **`db_datareader` sigue asignada y la base de scratch
+sigue viva**: la comprobación real tiene que correr sobre la misma tabla
+`t`, no sobre `EXACTUS`, con el login dejado exactamente como lo deja
+producción — y volver a correr exactamente el mismo `INSERT`:
+
+```
+sqlcmd -S 10.24.40.137 -E -d zz_scratch_ac6 -Q "ALTER ROLE db_datawriter DROP MEMBER bisalta_lectura;"
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d zz_scratch_ac6 -Q "INSERT INTO t VALUES (1);"
+```
+
+Esperado: falla con `The INSERT permission was denied`.
+(`INSERT INTO sys.tables` **no sirve para esta comprobación**, ni en
+`EXACTUS` ni en ninguna otra base: `sys.tables` es un catálogo del
+sistema, y SQL Server rechaza cualquier `INSERT` ahí con
+`Msg 259, Ad hoc updates to system catalogs are not allowed` — un error
+que no tiene nada que ver con el permiso del login.) Recién ahora, con la
+comprobación real ya corrida, borrar la base de scratch:
+
+```
+sqlcmd -S 10.24.40.137 -E -Q "DROP DATABASE zz_scratch_ac6;"
+```
+
+### AC7 — el user existe exactamente en las bases de la lista y en ninguna otra
+
+**Nota (contract v17, "Cambios v16 → v17" punto 2)**: esta verificación mide
+**membresía** — dónde el login tiene un `user` propio en
+`sys.database_principals` —, no **visibilidad**. El login puede ver nombres
+de bases donde no tiene ningún user (entra a `master` por `guest`); lo que
+el login ve lo verifica `AC48`, no esta sección.
+
+**Estado de arranque de la instancia de prueba** (aplica a los dos pasos
+de abajo, "Lista vacía" y "Mutación declarada"): el paso de lista vacía
+sólo mide lo que declara si la instancia de prueba **nunca fue
+aprovisionada antes con el user `bisalta_lectura` en ninguna base** — el
+**login** sí tiene que existir, y este mismo bloque manda crearlo abajo
+(si el user ya existiera en
+alguna base de una corrida previa, `tiene_user` seguiría en `1` ahí y no
+en `0` en absolutamente todas las filas, sin que la copia recién corrida
+tenga nada que ver). El paso de mutación, al revés, sólo llega a correr
+si el **login** `bisalta_lectura` **ya existe** en esa instancia antes de
+la corrida — `sqlserver-parte-b-mutada-v8.sql`, igual que el real, sólo
+hace `CREATE USER ... FOR LOGIN bisalta_lectura` dentro de cada base y
+nunca crea el login del servidor; sin él, `sqlcmd` falla con `Msg 15007`
+antes de tocar ninguna base y el rojo esperado no aparece. Aprovisionar
+el login con `sqlserver-parte-a.sql` real contra esa instancia de prueba
+antes de arrancar la secuencia de este AC.
+
+`AC7` (contract v9) ya no habla de "todas las bases de usuario en línea
+salvo `SSISDB`": habla de la lista explícita que declara
+`sqlserver-parte-b.sql` (`@bases_permitidas`). La comprobación real tiene
+dos mitades y las dos se leen del mismo bloque `##ac7_check` de abajo —
+nunca una consulta distinta contra `master` sola: un `LEFT JOIN ... ON
+1=0` no sirve acá — `sys.database_principals` es un catálogo **por
+base**, así que desde una sola conexión a `master` nunca se ve el
+principal de otra base, con o sin aprovisionamiento. La comprobación
+recorre las bases con un cursor explícito y consulta
+`sys.database_principals` **dentro de cada una**, acumulando el resultado
+en una tabla temporal global (visible entre cambios de `USE` dentro de la
+misma sesión). `@db_name` va como parámetro de `sp_executesql`, no
+concatenado crudo dentro del literal de cadena: una base con un apóstrofo
+en el nombre rompería el batch si se concatenara.
+
+El cursor de esta comprobación filtra `state = 0` (`ONLINE`): al momento
+de esta ronda eso alcanza para ver el universo negativo entero (todo lo
+que no está en la lista, más `SSISDB` y las cuatro de sistema) en la
+misma corrida que el universo positivo, porque **las 32 bases de la
+instancia están `ONLINE`** (`INVENTARIO.md:146`) — no hay ninguna
+`OFFLINE`/`RESTORING` que el filtro deje afuera hoy. Si en el futuro
+existiera una base fuera de la lista que no esté `ONLINE`, este filtro
+no la mide: listarla aparte (con el mismo `SELECT name, state FROM
+sys.databases WHERE state <> 0`) y declararla explícitamente **no
+medida** por esta comprobación, en vez de asumir que su ausencia de la
+tabla `##ac7_check` es un verde.
+
+```
+sqlcmd -S <instancia> -E -b -Q "
+CREATE TABLE ##ac7_check (db_name SYSNAME, tiene_user BIT);
+DECLARE @db_name SYSNAME;
+DECLARE @sql NVARCHAR(MAX);
+DECLARE db_cursor CURSOR LOCAL FAST_FORWARD FOR SELECT name FROM sys.databases WHERE state = 0;
+OPEN db_cursor;
+FETCH NEXT FROM db_cursor INTO @db_name;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+  SET @sql = N'USE ' + QUOTENAME(@db_name) + N'; INSERT INTO ##ac7_check (db_name, tiene_user) SELECT @p_db_name, CASE WHEN EXISTS (SELECT 1 FROM sys.database_principals WHERE name = ''bisalta_lectura'') THEN 1 ELSE 0 END;';
+  EXEC sp_executesql @sql, N'@p_db_name SYSNAME', @p_db_name = @db_name;
+  FETCH NEXT FROM db_cursor INTO @db_name;
+END
+CLOSE db_cursor;
+DEALLOCATE db_cursor;
+SELECT db_name, tiene_user FROM ##ac7_check ORDER BY db_name;
+DROP TABLE ##ac7_check;
+"
+```
+
+Qué contar como "está en la lista" al leer el resultado: la lista misma,
+tal como la declara `sqlserver-parte-b.sql` al momento de la corrida —
+este runbook no retranscribe una copia independiente de esos nombres para
+no mantener el mismo valor en dos lugares que puedan desincronizarse
+(ver la nota de cabecera sobre `@bases_permitidas`). Abrir el archivo,
+mirar su bloque `INSERT INTO @bases_permitidas`, y usar esos nombres
+exactos como el universo positivo esperado.
+
+**Comprobación real (verde), contra `Dev SQL`**, con `sqlserver-parte-b.sql`
+real ya corrido: correr el bloque de arriba con `-S 10.24.40.137`.
+Esperado: `tiene_user = 1` en cada fila cuyo `db_name` esté en
+`@bases_permitidas` del script vigente, y `tiene_user = 0` en absolutamente
+cualquier otra fila — incluidas `SSISDB`, `master`, `model`, `msdb`,
+`tempdb`, y cualquier base de usuario que no haya sido pedida por nombre.
+
+**Lista vacía, parte del mismo AC** (contract v9: *"con la lista vacía, el
+script no crea ningún user y sale 0"*): sobre una instancia de prueba, en
+una copia de trabajo `sqlserver-parte-b-lista-vacia.sql`, borrar el
+statement `INSERT INTO @bases_permitidas (nombre) VALUES (...);`
+**completo**, dejando sólo el `DECLARE @bases_permitidas TABLE (nombre
+SYSNAME PRIMARY KEY);` — un `INSERT ... VALUES` sin ninguna fila (ya sea
+`VALUES;` o `VALUES` seguido de nada) **no es T-SQL válido**: `sqlcmd`
+sale con `Msg 102, Level 15` (error de sintaxis) antes de llegar siquiera
+a abrir el cursor, que es lo contrario del `exit 0` que este paso espera.
+Correrla:
+
+```
+sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-parte-b-lista-vacia.sql
+echo $?
+```
+
+Esperado: exit `0`. Correr después el bloque `##ac7_check` contra esa
+misma instancia: `tiene_user = 0` en absolutamente todas las filas —
+ningún `bisalta_lectura` en ninguna base. Es el estado de arranque que
+`APROBACIONES.md` describe (punto 1: "el login arranca sin acceso a
+ninguna base de negocio").
+
+**Mutación declarada** (contract v9, AC7): sobre una instancia de prueba
+(no `Dev SQL`), en una copia de trabajo `sqlserver-parte-b-mutada-v8.sql`,
+reemplazar el cursor sobre `@bases_permitidas` por el cursor que el
+script tenía hasta v8 — un recorrido de `sys.databases` con el filtro de
+exclusión de esa época (`database_id > 4 AND name <> 'SSISDB' AND state =
+0`), sin tocar el resto del script (las guardas de `@bases_prohibidas`
+siguen ahí, ya sin efecto porque ya no se filtra por lista). Correr esa
+copia contra la instancia de prueba:
+
+```
+sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-parte-b-mutada-v8.sql
+```
+
+Correr el mismo bloque `##ac7_check` de arriba contra esa instancia.
+Esperado en este paso: aparecen filas con `tiene_user = 1` en bases de
+usuario de esa instancia que **no** están en `@bases_permitidas` — es la
+comprobación de "en ninguna otra" poniéndose roja, porque el cursor
+mutado concede a todo salvo las exclusiones (`database_id > 4`, no
+`SSISDB`), exactamente la forma que v9 dejó atrás.
+
+**Limpiar antes de dar por cerrado el rojo**: correr de nuevo
+`sqlserver-parte-b.sql` real (el que usa la lista) sobre esa instancia
+**no alcanza** para volver al verde — es aditivo e idempotente sobre las
+bases de su propia lista, pero nunca toca ni revierte una base que la
+corrida mutada haya tocado fuera de la lista (mismo motivo de fondo que
+`SDD/debt.md` D40, ya registrado para el AC7 de versiones anteriores: un
+script que sólo agrega no limpia lo que otro agregó de más). Por eso el
+cierre real necesita un paso de reversión explícito — pero desde v10 ya
+**no hace falta ninguna copia de trabajo del inverso**: `sqlserver-
+inverso.sql` real revoca por enumeración (recorre `sys.databases` entero
+buscando `bisalta_lectura` en `sys.database_principals`, sin leer
+`@bases_permitidas`), así que encuentra y saca al user de **cualquier**
+base donde la corrida mutada lo haya dejado, esté o no esté en la lista
+real, sin necesitar saber cuál fue el filtro de la mutación. Correrlo tal
+cual, sin modificar, contra la instancia de prueba:
+
+```
+sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-inverso.sql
+```
+
+Esto deja la instancia de prueba **sin ningún** `bisalta_lectura` en
+ninguna base, y **sin el login** (el inverso real termina con `DROP
+LOGIN` incondicional — ver su comentario de cabecera: tras una
+enumeración completa, esa incondicionalidad es correcta, no un caso
+especial a vigilar). Por eso el cierre del rojo tiene dos pasos más, no
+uno: recrear el login y volver a conceder por lista, **en ese orden**:
+
+```
+sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-parte-a.sql
+sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-parte-b.sql
+```
+
+(la sustitución del placeholder de contraseña de `sqlserver-parte-a.sql`
+aplica igual que en cualquier otra corrida — ver su comentario de
+cabecera). Recién ahora volver a correr el bloque `##ac7_check` para
+confirmar el verde de cierre — `tiene_user = 1` sólo en las bases de
+`@bases_permitidas`, `0` en todo lo demás — antes de tocar `Dev SQL` con
+los archivos reales. Descartar las dos copias de trabajo que sí siguen
+haciendo falta (`sqlserver-parte-b-lista-vacia.sql`,
+`sqlserver-parte-b-mutada-v8.sql`): ninguna se commitea.
+
+`SSISDB` sigue sin ser una decisión pendiente (contract v6, "Cambios v5 →
+v6", punto 1, decisión de Patrick Ocampo): en v9 queda fuera porque nunca
+está en `@bases_permitidas`, y si alguien la agregara por error,
+`@bases_prohibidas` la rechaza igual (ver comentario de
+`sqlserver-parte-b.sql` y sección "`SSISDB` queda fuera del loop" más
+abajo).
+
+### AC42 — el user tiene `db_datareader` y ninguna otra membresía en cada base de la lista
+
+**Nota (contract v17, "Cambios v16 → v17" punto 2)**: esta verificación mide
+**membresía** — qué rol tiene el `user` dentro de cada base —, no
+**visibilidad**. Lo que el login ve sin tener membresía en ningún lado
+(nombres de base vía `master`/`guest`) lo verifica `AC48`, no esta sección.
+
+`AC42` cambió de propiedad en v10 (decisión de Patrick Ocampo): ya no
+afirma que un `DENY` le gane a un `GRANT` — afirma que el user **no tiene
+ninguna otra membresía** además de `db_datareader`: ni `db_denydatawriter`
+(que ya no existe en el loop), ni `db_datawriter`, ni `db_owner`. Un
+`INSERT` falla por **ausencia de permiso**, nunca por `DENY`.
+
+Comprobación real, sobre `EXACTUS` en `Dev SQL` — una de las bases
+nombradas en `@bases_permitidas`, ya aprovisionada por
+`sqlserver-parte-b.sql` real:
+
+**Sin filtro de nombres de rol** (ronda 2 de review, MAJOR 1): `AC42`
+afirma `db_datareader` **y ninguna otra** — no "ninguna de una lista
+cerrada de tres". Filtrar `r.name IN (...)` mide sólo esas tres y deja
+pasar cualquier otra membresía de base (`db_ddladmin`, `db_securityadmin`,
+`db_accessadmin`, `db_backupoperator`, `db_denydatareader`, o un rol de
+base definido a mano) con el mismo verde falso: la fila que la consulta
+devolvería seguiría siendo una sola (`db_datareader`), sin que la
+propiedad que `AC42` afirma fuera cierta. La consulta sin filtro es el
+enunciado literal del AC: `public` es implícito y **no** aparece en
+`sys.database_role_members`, así que no hace falta excluirlo a mano.
+
+```
+sqlcmd -S 10.24.40.137 -E -d EXACTUS -Q "
+SELECT r.name AS rol
+FROM sys.database_role_members drm
+JOIN sys.database_principals r ON drm.role_principal_id = r.principal_id
+JOIN sys.database_principals m ON drm.member_principal_id = m.principal_id
+WHERE m.name = 'bisalta_lectura'
+ORDER BY r.name;
+"
+```
+
+Esperado: **una sola fila**, `db_datareader` — ninguna otra, sin importar
+su nombre. Repetir la misma consulta cambiando `-d EXACTUS` por cada una
+de las demás bases que declare `@bases_permitidas` en
+`sqlserver-parte-b.sql` vigente (abrir el script para ver cuáles son, no
+retranscribirlas acá): una sola fila en cada una.
+
+**Con la lista explícita (v9), y desde v10 sin necesidad de ninguna copia
+de trabajo del script**: a diferencia de la ronda anterior, la mutación
+de AC42 ya no necesita una base de scratch nueva agregada a una copia de
+`sqlserver-parte-b.sql` — usa directamente una de las bases **ya
+concedidas de verdad** (`EXACTUS`), con una tabla de scratch adentro, y
+**sin ningún `GRANT` de objeto**: el acceso de escritura tiene que venir
+únicamente de la membresía de rol (`db_datawriter`), igual que AC6 — un
+`GRANT INSERT` puntual sobre la tabla dejaría pasar el `INSERT` con o sin
+esa membresía, y no probaría nada sobre lo que AC42 afirma.
+
+```
+sqlcmd -S 10.24.40.137 -E -d EXACTUS -Q "CREATE TABLE zz_scratch_ac42 (id int);"
+```
+
+**Comprobación real (verde), sobre la tabla recién creada**, con el user
+tal como lo deja `sqlserver-parte-b.sql` real (sólo `db_datareader`):
+
+```
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d EXACTUS -Q "INSERT INTO zz_scratch_ac42 VALUES (1);"
+```
+
+Esperado: falla con `The INSERT permission was denied` — ausencia de
+permiso, sin que nada lo deniegue explícitamente.
+
+**Mutación declarada** (contract v10, AC42): otorgar `db_datawriter` al
+user sobre esta misma base de scratch. **Ojo (ronda 2 de review,
+MINOR)**: `ALTER ROLE db_datawriter ADD MEMBER` no acota el permiso a
+`zz_scratch_ac42` — concede escritura sobre **todo `EXACTUS`**, la copia
+de producción completa (395 GB), al login vivo compartido
+(`bisalta_lectura`), no sólo sobre la tabla de scratch. El camino feliz de
+este procedimiento revoca esa membresía dos pasos más abajo y nadie
+escribe nada en el medio, pero si algo interrumpe la corrida entre estos
+dos comandos (la sesión se corta, alguien más usa la misma instancia), la
+concesión sobre toda la base queda en pie sin que este runbook lo declare
+en ningún lado hasta ese momento — quien retome tiene que revisar
+`sys.database_role_members` en `EXACTUS` antes de asumir el estado
+esperado:
+
+```
+sqlcmd -S 10.24.40.137 -E -d EXACTUS -Q "ALTER ROLE db_datawriter ADD MEMBER bisalta_lectura;"
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d EXACTUS -Q "INSERT INTO zz_scratch_ac42 VALUES (1);"
+```
+
+Esperado en este paso: el `INSERT` **pasa** — es la comprobación de que
+"falla" se pone roja con `db_datawriter` de más en el rol, sobre una base
+que la parte B real nunca le da.
+
+Restaurar quitando **sólo** `db_datawriter` — `db_datareader` sigue
+asignada, la tabla de scratch sigue viva, la comprobación real tiene que
+correr sobre la misma tabla:
+
+```
+sqlcmd -S 10.24.40.137 -E -d EXACTUS -Q "ALTER ROLE db_datawriter DROP MEMBER bisalta_lectura;"
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d EXACTUS -Q "INSERT INTO zz_scratch_ac42 VALUES (1);"
+```
+
+Esperado: el `INSERT` **vuelve a fallar**, con `The INSERT permission was
+denied` — otra vez por **ausencia de permiso** (sin `db_datawriter` y sin
+ningún `DENY` que lo bloquee expresamente): es exactamente lo que v10
+dejó — que la única capacidad del login es leer. Recién ahora, con el
+triple completo (verde real → rojo de mutación → verde de cierre)
+corrido, limpiar:
+
+```
+sqlcmd -S 10.24.40.137 -E -d EXACTUS -Q "DROP TABLE zz_scratch_ac42;"
+```
+
+### AC43 — el inverso revoca por enumeración, no lee `@bases_permitidas`
+
+**Nota (contract v17, "Cambios v16 → v17" punto 2)**: esta verificación mide
+**membresía** — si el `user` sigue existiendo en `sys.database_principals`
+de cada base tras correr el inverso —, no **visibilidad**. Lo que el login
+ve lo verifica `AC48`, no esta sección; el inverso no lo toca (`DENY VIEW
+ANY DATABASE` se va con el login al `DROP LOGIN` final, ver comentario de
+cabecera de `sqlserver-inverso.sql`).
+
+`AC43` (contract v11) es el AC propio que le faltaba a la decisión central
+de v10: hasta ahora, que `sqlserver-inverso.sql` revoca por enumeración en
+vez de leer la lista sólo tenía cobertura **incidental** (el verde de
+cierre de la mutación de `AC7`, sección de arriba, sería imposible si el
+inverso leyera únicamente `@bases_permitidas` — pero ningún AC lo afirmaba
+por sí mismo, y eso es exactamente el defecto que causó el `ESCALATE` de
+v6 → v7 de este mismo contract). Afirma dos cosas: (a) el inverso saca al
+user de toda base **ONLINE** donde exista, estén o no en la lista,
+incluidas las cuatro de sistema; (b) el script **no lee
+`@bases_permitidas` en su cuerpo ejecutable** — el string sólo aparece en
+el comentario de cabecera que documenta justamente que no se lee (líneas
+6 y 23 de `sqlserver-inverso.sql`), y ese comentario no cuenta como
+lectura. Confirmable acotando el grep a lo que no es comentario:
+`grep -n "bases_permitidas" sqlserver-inverso.sql | grep -v '^[0-9]*:--'`,
+que **no tiene que devolver nada** (el `grep -v` filtra cualquier línea
+cuyo contenido, después de los dos puntos del número de línea, empiece
+con `--`).
+
+**Comprobación real (verde), sobre una instancia de prueba** (no `Dev
+SQL` directamente): crear a mano el user `bisalta_lectura` en una base
+que **no** esté en `@bases_permitidas` de `sqlserver-parte-b.sql`
+vigente — `CONSTRUPLAZA_EFLOW` (`INVENTARIO.md`, 266.92 GB) sirve de
+ejemplo porque es una base real de `Dev SQL` que la lista nunca nombra —
+y también en `msdb`, una de las cuatro bases de sistema que (a) nombra
+explícitamente: sin este segundo user, esa mitad de (a) sólo se sostiene
+por inspección del cursor sin filtro (`SELECT name, state FROM
+sys.databases`, sin condición sobre `database_id` ni sobre el nombre),
+nunca por una corrida real (ronda 3 de review, MINOR — `D40` se cerró
+apoyándose en esa afirmación sin ejercitarla). Requiere que el login
+`bisalta_lectura` ya exista en esa instancia (aprovisionarlo con
+`sqlserver-parte-a.sql` real si hace falta, igual que en AC7):
+
+```
+sqlcmd -S <instancia-de-prueba> -E -d CONSTRUPLAZA_EFLOW -Q "CREATE USER bisalta_lectura FOR LOGIN bisalta_lectura;"
+sqlcmd -S <instancia-de-prueba> -E -d msdb -Q "CREATE USER bisalta_lectura FOR LOGIN bisalta_lectura;"
+```
+
+Correr el inverso real, sin modificar:
+
+```
+sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-inverso.sql
+```
+
+Esperado: el `DROP USER bisalta_lectura` corre también dentro de
+`CONSTRUPLAZA_EFLOW` y dentro de `msdb` — confirmar con
+
+```
+sqlcmd -S <instancia-de-prueba> -E -d CONSTRUPLAZA_EFLOW -Q "SELECT 1 FROM sys.database_principals WHERE name = 'bisalta_lectura';"
+sqlcmd -S <instancia-de-prueba> -E -d msdb -Q "SELECT 1 FROM sys.database_principals WHERE name = 'bisalta_lectura';"
+```
+
+que tienen que devolver **cero filas** las dos. La primera es la
+comprobación de que el inverso saca al user de una base que nunca estuvo
+en la lista y que nadie tuvo que nombrar; la segunda es la comprobación
+de que también lo saca de una base **de sistema**, ejercitando de verdad
+la mitad de (a) que hasta esta ronda sólo se afirmaba por lectura del
+script.
+
+**Mutación declarada** (contract v11, AC43): en una copia de trabajo
+`sqlserver-inverso-mutado.sql`, reemplazar el cursor `SELECT name, state
+FROM sys.databases` por uno que recorra `@bases_permitidas` — la forma
+que el script tenía hasta v9 (mismo patrón de cursor sobre la variable de
+tabla que usa hoy `sqlserver-parte-b.sql`, declarando la misma lista de
+bases con `INSERT INTO @bases_permitidas`, y sin filtro `state` porque
+esa forma vieja no lo necesitaba para revocar por lista). Repetir el paso
+de crear a mano al user en `CONSTRUPLAZA_EFLOW` (si ya se limpió en el
+paso anterior) y correr la copia mutada:
+
+```
+sqlcmd -S <instancia-de-prueba> -E -b -i sqlserver-inverso-mutado.sql
+```
+
+Esperado en este paso: la comprobación se pone **roja** —
+`bisalta_lectura` **sobrevive** en `CONSTRUPLAZA_EFLOW` (la consulta de
+`sys.database_principals` de arriba devuelve una fila), porque el cursor
+mutado sólo recorre las bases de `@bases_permitidas` y esa base nunca
+estuvo ahí. Restaurar la enumeración real (descartar la copia mutada, no
+commitearla nunca) y volver a correr `sqlserver-inverso.sql` real contra
+la instancia de prueba para confirmar el verde de cierre —
+`bisalta_lectura` fuera de `CONSTRUPLAZA_EFLOW` otra vez.
+
+`manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
+
+### AC44 — `sqlserver-parte-a.sql` aborta si no corre contra la instancia declarada
+
+`AC44` (contract v13, "Cambios v12 → v13" punto 3) es el equivalente en
+SQL Server de lo que `postgres-parte-0.sql` hace para Postgres (AC41):
+`sqlserver-parte-a.sql` crea un `login`, objeto **de instancia**, y hasta
+esta ronda nada adentro decía contra qué servidor corría — lo único que lo
+mantenía en Dev SQL era quién escribía la cadena de conexión. Importa
+porque hay otro SQL Server en juego: NEO lee `BD-PRINCIPAL`, que es
+producción, y el script no sabía distinguirlas.
+
+**Valor medido (contract v17)**: la guarda compara `SERVERPROPERTY('MachineName')`
+contra `EC2AMAZ-2RGHL0C`. Patrick Ocampo lo midió el 23-sep-2026 vía SSM
+contra la instancia real de Dev SQL ya aprovisionada, y **coincide** con el
+valor que llevan los dos scripts — la precondición que este AC dejaba
+abierta (dependencia circular: hacía falta el login para medir, y medir
+antes de crear el login) queda cerrada; no hace falta remedirlo para correr
+contra esta misma instancia. Si en el futuro se apunta a una instancia
+distinta, medirlo de nuevo ahí y corregir `@esperada` en
+`sqlserver-parte-a.sql` **y** en `sqlserver-parte-b.sql` (ver sección "AC44
+en la parte B" más abajo) antes de seguir.
+
+**Comprobación real (verde), contra `Dev SQL` con el nombre correcto ya
+confirmado**:
+
+```
+sqlcmd -S 10.24.40.137 -E -b -i sqlserver-parte-a.sql
+echo $?
+sqlcmd -S 10.24.40.137 -E -Q "SELECT 1 FROM sys.server_principals WHERE name = 'bisalta_lectura';"
+```
+
+Esperado: exit `0`, y la consulta devuelve una fila (el login se creó).
+
+**Mutación declarada** (contract v13, AC44): en una copia de trabajo
+`sqlserver-parte-a-mutado.sql`, cambiar `@esperada` por el nombre de
+cualquier otra instancia (por ejemplo `N'OTRA-INSTANCIA'`) y correrla
+contra `Dev SQL`:
+
+```
+sqlcmd -S 10.24.40.137 -E -b -i sqlserver-parte-a-mutado.sql
+echo $?
+sqlcmd -S 10.24.40.137 -E -Q "SELECT 1 FROM sys.server_principals WHERE name = 'bisalta_lectura';"
+```
+
+Esperado en este paso: el `RAISERROR` de severidad 16 corre, `-b` hace que
+`sqlcmd` salga distinto de `0`, y la consulta de catálogo **no** devuelve
+ninguna fila si el login no existía antes de esta corrida (si ya existía
+de una corrida anterior, seguirá existiendo — la mutación prueba que **no
+se crea uno nuevo**, no que se borre el que ya había; correrla sobre una
+instancia de prueba sin el login previo, no sobre `Dev SQL` con el login
+ya provisionado, para que el paso sea legible sin ambigüedad). Es la
+comprobación de "crea el login" poniéndose roja. Restaurar `@esperada` al
+valor correcto (o descartar la copia mutada, no commitearla nunca) y
+volver a correr la comprobación real de arriba para confirmar el verde de
+cierre.
+
+`manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
+
+#### AC44 en la parte B
+
+`sqlserver-parte-b.sql` no crea un login — crea users por base y los
+mete en `db_datareader` —, así que `AC44` en sentido estricto no la
+alcanza (su motivo es "un login es objeto de instancia"). Se decidió
+llevar la misma guarda ahí igual, como **defensa en profundidad**: Parte B
+corre contra la misma instancia, y correrla por error contra
+`BD-PRINCIPAL` concedería lectura sobre bases de producción reales de
+forma directa — un daño más inmediato que crear un login sin usar. El
+mismo triple de arriba (real → mutado → real) aplica igual si se quiere
+ejercitar la guarda de la parte B específicamente; no es un AC nuevo, es
+la misma guarda repetida por el mismo argumento.
+
+### AC48 — el login no enumera las bases del servidor
+
+`AC48` (contract v17, "Cambios v16 → v17" punto 2) nace porque Patrick
+Ocampo, verificando `AC7`/`AC42`/`AC43` **como administrador**, no vio que
+`bisalta_lectura` podía listar los 36 nombres de base del servidor: esas
+tres verificaciones miran `sys.database_principals` — dónde el login **tiene
+usuario** —, y la enumeración entra por `master`, vía `guest`, sin crear
+ningún usuario ahí. La pregunta correcta es otra: qué ve el login, no dónde
+tiene membresía. Por eso este AC se verifica **conectado como el login**,
+nunca como administrador, y es el único de los cuatro que contesta esa
+pregunta.
+
+`sqlserver-parte-a.sql` aplica `DENY VIEW ANY DATABASE TO [bisalta_lectura]`
+después de crear el login y fuera de su bloque condicional (`DENY` es
+idempotente, así que cada corrida lo reaplica).
+
+**Comprobación real (verde), conectado como el login**:
+
+```
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -Q "SELECT name FROM sys.databases ORDER BY name;"
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d COMPRAS -Q "SELECT TOP 1 TABLE_SCHEMA, TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_SCHEMA, TABLE_NAME;"
+SQLCMDPASSWORD='<contraseña real>' sqlcmd -S 10.24.40.137 -U bisalta_lectura -d COMPRAS -Q "SELECT COUNT(*) AS filas FROM <esquema>.<tabla_real>;"
+```
+
+Esperado: la primera consulta devuelve **exactamente** `master` y `tempdb`
+(nunca las bases de negocio ni las de sistema restantes). **Esto vale porque va
+sin `-d`**: la sesión arranca en la base por omisión del login, que es `master`.
+Conectado a otra base, la lista suma **esa** base y ninguna más — medido el
+23-sep a través del plugin: desde `COMPRAS` se ven `COMPRAS`, `master` y
+`tempdb`; desde `EXACTUS`, `EXACTUS`, `master` y `tempdb`. La propiedad es
+"`master`, `tempdb` y la base propia", no una lista fija; la segunda identifica
+una tabla de usuario real de `COMPRAS`, y la tercera la cuenta: tiene que
+devolver un número, no `permission denied` — el `DENY` restringe qué
+metadatos se ven, no la lectura ya concedida por `AC42`. **No leer
+`sys.tables`** (lo hacía hasta v17): es un catálogo, y leerlo no prueba acceso
+a datos reales, como dice la verificación de `AC1` más arriba. Se usa un
+conteo y no `SELECT *` porque las bases de Dev SQL son copias de producción:
+prueba el permiso sin traer filas a la terminal, y una tabla vacía da `0` en
+vez de un falso rojo. Medido el 23-sep a través del plugin:
+`dbo.ABASTECEDOR_COMPRADOR` devuelve un conteo (v18).
+
+**Mutación declarada** (contract v17, AC48): sin el `DENY`, la misma
+consulta como el login lista todas las bases del servidor. **Evidencia
+mínima aceptada** (no hay instancia de prueba para volver al rojo sin tocar
+`Dev SQL` en vivo): el par antes/después que Patrick Ocampo midió el
+23-sep-2026 — **36** nombres de base antes de aplicar el `DENY`, `master` y
+`tempdb` después —, que cubre la mitad rojo → verde del triple. La mitad
+verde → rojo exigiría quitar el `DENY` en la instancia real, y no hay
+instancia de prueba para SQL Server (ver "Prerequisitos" arriba, sandbox
+`N/A`). El par vive hoy en Slack (Patrick Ocampo, 23-sep-2026 13:04 y
+13:05); pegarlo textual en el verification report de R1 es parte de `D61`.
+
+`manual-only: requiere la instancia de Dev SQL; misma razón que AC5.`
+
+### AC49 — el `ALTER ROLE` de los cuatro valores está en el script, no sólo en el rol
+
+`AC49` (contract v19, "Cambios v18 → v19" punto 2) nace del mismo patrón que
+`AC48`: un ajuste que Patrick Ocampo fijó a mano en el rol (`claude_lectura`)
+el 22-sep desaparece en silencio la próxima vez que alguien recree el rol, si
+no está en el script que lo crea. `postgres-parte-a.sql` aplica
+`ALTER ROLE claude_lectura SET` con los cuatro valores —
+`default_transaction_read_only = on`, `statement_timeout = '60s'`,
+`idle_in_transaction_session_timeout = '30s'`, `lock_timeout = '5s'` —
+**fuera** del bloque `DO $$ ... $$` condicional que crea el rol, para que
+cada corrida los vuelva a aplicar (`ALTER ROLE ... SET` es idempotente).
+
+**Comprobación real, conectado como el rol** (sin que el cliente mande
+ninguno de los cuatro parámetros — ni `PGOPTIONS`, ni `-c`):
+
+```
+psql -h sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com -U claude_lectura -d proveedores_dev -c "SELECT current_setting('default_transaction_read_only'), current_setting('statement_timeout'), current_setting('idle_in_transaction_session_timeout'), current_setting('lock_timeout');"
+```
+
+Esperado: `on`, `60s`, `30s`, `5s`, en ese orden — los cuatro valores del
+rol, no los que el cliente no mandó.
+
+`manual-only: requiere el cluster; misma razón que AC1.`
+
+**Evidencia mínima aceptada**: la lectura de `pg_db_role_setting` del
+23-sep-2026, que ya muestra los cuatro valores sobre el rol (Slack, Patrick
+Ocampo) — cubre que el rol los tiene hoy; la corrida de arriba, cuando se
+ejecute, confirma que el script los vuelve a dejar así si el rol se recrea.
+
+### AC50 — el esquema `public`: `GRANT` explícito antes del `REVOKE` de `PUBLIC`
+
+`AC50` (contract v19, "Cambios v18 → v19" punto 3) cierra el mismo hueco que
+`AC49` para el esquema `public`: el `REVOKE CREATE ON SCHEMA public FROM
+PUBLIC` que Patrick aplicó a mano el 22-sep en las seis bases no estaba en
+ningún script, así que una base nueva agregada con `postgres-parte-b.sql`
+volvía a tener el hueco (PG 14 concede `CREATE` en `public` a `PUBLIC` por
+omisión — "Cambios v14 → v15" punto 2). `postgres-parte-b.sql`, en cada base
+que recorre, ahora primero concede `CREATE ON SCHEMA public` al dueño de la
+base **y** a todo rol que ya tenga objetos en `public` —enumerados desde
+`pg_class`, no escritos a mano, porque son distintos por base
+(`INVENTARIO.md`; `D42`: en `proveedores_dev` y `proveedores_qa` es
+`ian.vargas`)— y **después** revoca `CREATE ON SCHEMA public FROM PUBLIC`.
+El orden es la condición: revocar primero rompería las migraciones de quien
+ya crea ahí.
+
+**Comprobación real, conectado como `claude_lectura`**:
+
+```
+psql -h sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com -U claude_lectura -d proveedores_dev -c "CREATE TABLE zz_scratch_ac50 (id int);"
+```
+
+Esperado: falla con `ERROR: permission denied for schema public` — el rol
+lee (`pg_read_all_data`), no crea. Ningún GRANT explícito nombra a
+`claude_lectura`, así que le queda el default que `postgres-parte-b.sql`
+revoca de `PUBLIC`.
+
+Control positivo, conectado como el dueño de la base (o cualquier rol que
+ya tenga objetos en `public`): el mismo `CREATE TABLE` de scratch tiene que
+**pasar** — confirma que el `GRANT` explícito de arriba sostuvo el acceso de
+quien ya crea ahí, y que el `REVOKE` no le pegó a todo el mundo por igual.
+Descartar la tabla de scratch (`DROP TABLE zz_scratch_ac50;`) después de
+probar.
+
+`manual-only: requiere el cluster.`
+
+**El `REVOKE CONNECT` sobre la base `postgres` — paso explícito de este
+runbook, no de ningún script**: `postgres-parte-b.sql` corre "por base"
+sobre el catálogo de la aplicación (`proveedores_dev`, `proveedores_qa`,
+…), y la base de mantenimiento `postgres` nunca está en ese catálogo — por
+eso este paso no puede vivir en un script que itera el catálogo, y Patrick
+lo aplicó a mano el 22-sep directamente contra `postgres`:
+
+```
+psql -h sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com -U <admin> -d postgres -c "REVOKE CONNECT ON DATABASE postgres FROM PUBLIC;"
+```
+
+**Verificación**, conectado como `claude_lectura` (que nunca tuvo un
+`GRANT CONNECT` explícito sobre `postgres` — sólo el default de `PUBLIC`
+que la línea de arriba revoca):
+
+```
+psql -h sistemas-costruplaza-db.cluster-cfrl3owqzwof.us-east-1.rds.amazonaws.com -U claude_lectura -d postgres -c "SELECT 1;"
+```
+
+Esperado: falla con `FATAL: permission denied for database "postgres"` — la
+conexión ni siquiera abre. Cualquier rol administrativo con `GRANT CONNECT`
+explícito sobre `postgres` (o superusuario) sigue entrando: el `REVOKE` es
+de `PUBLIC`, no le pega a un `GRANT` puntual.
+
+### AC8 — cada secreto existe, tiene los dos campos, y es legible con la política IAM
+
+Para cada uno de los dos secretos (ver "Forma del secreto"):
+
+```
+aws secretsmanager get-secret-value --secret-id dev/bd/claude-lectura-postgres --region us-east-1
+aws secretsmanager get-secret-value --secret-id dev/bd/claude-lectura-sqlserver --region us-east-1
+```
+
+Esperado, corriendo con la identidad IAM que tiene la policy de la sección
+"Política IAM" (patrón `dev/bd/claude-lectura-*`) adjunta: las dos
+llamadas devuelven `SecretString` con un JSON de exactamente dos campos,
+uno de nombre `username` y otro de nombre `password`, ninguno vacío.
+
+## AC9 — `secret-scan.sh` (triple de mutación, no manual-only)
+
+Cubierto en el verification report del ciclo, no acá: es el único AC
+automatizable de R1 junto con AC10, y su triple (verde → rojo → verde) se
+corre y se pega con comando y exit code en
+`SDD/verification/feat-GEN-108-mcp-bisalta-db-R1.md`.
+
+## AC10 — el hueco de una base nueva (o recién disponible) en SQL Server
+
+`db_datareader` es permiso **por base** en SQL Server, a diferencia de
+`pg_read_all_data` en Postgres, que es un permiso de **cluster**. Con la
+lista explícita de v9 esto se vuelve doblemente cierto: **una base
+agregada a `Dev SQL`, o pedida por nombre pero todavía no escrita en
+`@bases_permitidas`, NO queda cubierta automáticamente**: `bisalta_lectura`
+no tendrá `CREATE USER` ni `db_datareader` ahí hasta que alguien (a)
+agregue esa base al `INSERT INTO @bases_permitidas` de
+`sqlserver-parte-b.sql` y (b) vuelva a correr el script completo — y
+mientras tanto esa base nueva no tiene ninguna lectura. No hay manera de
+evitar esto en SQL Server sin un trigger de servidor sobre `CREATE
+DATABASE` — fuera del scope de este runbook — así que la asimetría se
+documenta acá en vez de compensarse con código nuevo (contract v10,
+sección "Garantías por motor (asimetría declarada, no disimulada)").
+
+El mismo hueco existe, por el mismo motivo, para una base que **ya está
+en la lista pero estaba `OFFLINE` o `RESTORING`** al momento de correr
+`sqlserver-parte-b.sql`: el script la nombra por `PRINT` en vez de
+saltearla en silencio (ver comentario del script, "SIN SALTOS
+SILENCIOSOS"), pero no le crea nada en esa corrida, y queda tan
+descubierta como una base recién pedida. **Acción operativa**: cada vez
+que se pida una base nueva, o que una base ya listada pase a estar
+`ONLINE` después de haber estado en otro estado durante la última
+corrida, (a) agregarla (si no estaba) al `INSERT` de
+`sqlserver-parte-b.sql` (desde v10, `sqlserver-inverso.sql` **no tiene
+ninguna lista que actualizar en paralelo** — enumera `sys.databases`
+solo, ver su comentario de cabecera), (b) registrar el pedido con fecha
+y solicitante en `APROBACIONES.md`, y (c) re-correr `sqlserver-parte-b.sql`
+— en ese orden, antes de agregar esa base al catálogo de `bisalta-db`.
+
+## `SSISDB` queda fuera del loop
+
+`SSISDB` (`database_id = 36`, 5.77 GB, `INVENTARIO.md`) es el catálogo de
+SQL Server Integration Services, no una base de negocio: guarda los
+proyectos desplegados con sus parámetros y connection managers —un lugar
+donde viven cadenas de conexión— más los logs de ejecución.
+
+**Decisión tomada** (contract v6, "Cambios v5 → v6", punto 1 — Patrick
+Ocampo, Slack 2026-09-18 15:52 CST): `SSISDB` queda **fuera** del loop de
+SQL Server. Su razón, textual: *"guarda los proyectos desplegados con sus
+parámetros y connection managers, o sea que es un lugar donde viven
+cadenas de conexión, más los logs de ejecución. Cero dato de negocio y sí
+credenciales."* Un servidor MCP cuyo propósito es que ninguna credencial
+pase por el contexto no puede alcanzar el lugar donde viven las cadenas de
+conexión — es una razón más fuerte que la de "no es una base de negocio"
+que este runbook tenía antes de v6, y no depende de si `SSISDB` entraría o
+no al catálogo de la aplicación: aunque nunca se agregara a
+`catalogo.json`, dejarla dentro del loop igual le daría a `bisalta_lectura`
+acceso de lectura a credenciales, sin que el catálogo lo medie.
+
+**Desde v9, el criterio de alcance es la lista** (`@bases_permitidas`), no
+un filtro de exclusión sobre `sys.databases` — `SSISDB` queda fuera
+simplemente porque nunca fue pedida por nombre, igual que cualquier otra
+base de `Dev SQL` que tampoco esté en la lista. Lo que v9 agrega es la
+**defensa en profundidad**: `SSISDB` sigue estando además en
+`@bases_prohibidas`, así que si alguien la escribiera por error en
+`@bases_permitidas`, el script la rechaza igual y lo dice por `PRINT` (ver
+comentario de `sqlserver-parte-b.sql`) — nunca la procesa en silencio, ni
+siquiera si quedara nombrada en la lista por accidente. Tras cualquier
+corrida, `bisalta_lectura` no existe como user en `SSISDB` — AC7 la
+cuenta junto a las cuatro bases de sistema con `tiene_user = 0` (ver
+sección de AC7 más arriba), no entre las bases de la lista. No entra
+tampoco al catálogo de la aplicación (`plugins/bisalta-db/catalogo.json`)
+— nadie la agregó ahí.
+
+## Inverso
+
+- Postgres: `postgres-inverso.sql`, conectado a cada base donde se corrió
+  la parte B, en orden (ver comentario del archivo sobre por qué el `DROP
+  ROLE` requiere limpiar todas las bases primero).
+- SQL Server: `sqlserver-inverso.sql`, una sola corrida contra la
+  instancia. **Desde v10 no lee ninguna lista** (decisión de Patrick
+  Ocampo: "se concede desde una lista explícita, se revoca por
+  enumeración") — recorre `sys.databases` entero, busca en cada base
+  **ONLINE** si `sys.database_principals` tiene a `bisalta_lectura`, y lo
+  saca de ahí; al final borra el login, siempre, incondicionalmente. No
+  hace falta agregar ni quitar nada de `sqlserver-inverso.sql` cuando se
+  edita la lista de `sqlserver-parte-b.sql`: no tiene lista propia que
+  mantener en sincronía (ver comentario de cabecera de ese archivo).
+  **Antes de correrlo** (ronda 2 de review, MAJOR 2), revisar si alguna
+  base relevante está `NO ONLINE` — `SELECT name, state FROM
+  sys.databases WHERE state <> 0` (misma consulta que la sección "AC7"
+  prescribe para lo que su cursor no puede ver): una base así **no** se
+  toca en esta corrida — el script la reporta por `PRINT` y sigue, pero
+  el `DROP LOGIN` incondicional del final corre igual. El resultado es un
+  **user huérfano**: `bisalta_lectura` sigue existiendo en esa base sin
+  ningún login de servidor detrás, hasta que alguien la vuelva a poner
+  `ONLINE`. La limpieza de ese huérfano **no es volver a correr
+  `sqlserver-inverso.sql` completo** contra la instancia: para entonces el
+  script ya borró el login y ya revocó al user de todas las demás bases
+  que estaban `ONLINE` en esa corrida, así que una segunda corrida
+  completa no tiene nada más que hacer sobre esas otras bases — y si
+  alguna de ellas fue re-concedida después (por ejemplo, con
+  `sqlserver-parte-a.sql` + `sqlserver-parte-b.sql`, como en un alta o en
+  el "Procedimiento de baja" más abajo), esa segunda corrida se la
+  revoca otra vez y vuelve a borrar el login, deshaciendo trabajo ya
+  hecho. La limpieza correcta es dirigida, contra la base huérfana sola:
+
+  ```
+  sqlcmd -S <instancia> -E -d <base> -Q "IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'bisalta_lectura') DROP USER bisalta_lectura;"
+  ```
+
+  Si en cambio alguien repara ese huérfano con la rutina estándar
+  (`ALTER USER ... WITH LOGIN` contra el login vivo), esa base recupera
+  `db_datareader` sin haber estado nunca en `@bases_permitidas` ni haber
+  sido pedida de nuevo — dejarla anotada como pendiente de limpieza
+  dirigida (no de "reintentar el inverso") evita ese resultado.
+- AWS: los dos secretos se borran a mano desde la cuenta de dev/qa (no
+  hay script: crear/borrar secretos está fuera del scope de este runbook,
+  igual que crearlos).
+
+### Procedimiento de baja (sacar una base de la lista de SQL Server)
+
+Desde v10 esto se simplifica del todo: ya no hace falta ninguna copia de
+trabajo recortada, ni cuidar en qué orden se editan dos listas, porque
+`sqlserver-inverso.sql` ya no tiene una lista propia — encuentra
+`bisalta_lectura` donde sea que esté por enumeración. El costo de esa
+simplicidad es que el inverso, corrido tal cual, es una revocación
+**total**: saca al user de **todas** las bases donde exista, no sólo de
+la que se quiere dar de baja, y borra el login. El procedimiento por eso
+tiene tres pasos donde antes había una copia de trabajo cuidadosamente
+recortada:
+
+Orden para dar de baja una base (por ejemplo, `Ecommerce_qa`, con
+`COMPRAS`, `COMPRAS_STG`, `Ecommerce`, `EXACTUS` y `BI` quedando activas):
+
+0. **Antes de revocar nada**, sacar la entrada correspondiente de
+   `plugins/bisalta-db/catalogo.json` (para `Ecommerce_qa`, la entrada
+   `"nombre": "ecommerce-qa"`) — documentar el paso acá, **no editar el
+   archivo** como parte de este runbook. Seguido en cualquier otro orden,
+   la entrada queda apuntando a una base donde `bisalta_lectura` ya no
+   tiene user, y el MCP falla en runtime con error de login la próxima
+   vez que alguien la consulte.
+1. Sacar la fila `(N'Ecommerce_qa')` del `INSERT INTO @bases_permitidas`
+   de `sqlserver-parte-b.sql` (única lista que existe: `sqlserver-
+   inverso.sql` no tiene una propia) y registrar la baja en
+   `APROBACIONES.md` (fecha y quién la pidió), igual que un alta.
+2. **Antes de correr**, revisar si alguna base está `NO ONLINE` (`SELECT
+   name, state FROM sys.databases WHERE state <> 0` — la misma consulta
+   de la sección "AC7"): si `COMPRAS`, `COMPRAS_STG`, `Ecommerce`,
+   `EXACTUS` o `BI` aparecen ahí, este paso **no** las va a limpiar de
+   verdad — el script las reporta por `PRINT` y las salta, pero el `DROP
+   LOGIN` del final corre igual — y quedarían con un `bisalta_lectura`
+   huérfano hasta que vuelvan a estar `ONLINE`. **No** queda pendiente de
+   "reintentar el inverso": para cuando se note esto ya pasó el paso 3,
+   que re-concede desde cero a `COMPRAS`, `COMPRAS_STG`, `Ecommerce`,
+   `EXACTUS` y `BI` — correr `sqlserver-inverso.sql` completo otra vez
+   revocaría a esas cinco de nuevo y borraría el login que el paso 3
+   acaba de recrear. Anotar cualquier base así como pendiente de limpieza
+   **dirigida**, con:
+   ```
+   sqlcmd -S 10.24.40.137 -E -d <base> -Q "IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'bisalta_lectura') DROP USER bisalta_lectura;"
+   ```
+   **Anotarla antes de seguir**; el comando se corre después, cuando esa base
+   vuelva a estar `ONLINE` — con la base caída no se puede, y esperar a que
+   vuelva frenaría la baja sin necesidad.
+
+   Correr `sqlserver-inverso.sql` **real, sin modificar**, contra la
+   instancia:
+   ```
+   sqlcmd -S 10.24.40.137 -E -b -i sqlserver-inverso.sql
+   ```
+   Esto revoca a `bisalta_lectura` de **todas las bases ONLINE** donde
+   exista hoy —incluidas `COMPRAS`, `COMPRAS_STG`, `Ecommerce`, `EXACTUS`
+   y `BI`, que se querían mantener— y borra el login. Es a propósito: la
+   enumeración no distingue "esta base sale" de "estas otras se quedan".
+3. Correr `sqlserver-parte-a.sql` real (recrea el login — con una
+   contraseña nueva, que hay que cargar de nuevo en el secreto
+   `dev/bd/claude-lectura-sqlserver`) y `sqlserver-parte-b.sql` real
+   (recorre la lista, ya sin `Ecommerce_qa` desde el paso 1, y re-concede
+   exactamente esas cinco). El mecanismo para conservar las bases que se
+   quedan no es "no tocarlas": es volver a concederlas desde la
+   declaración — que es lo único que `sqlserver-parte-b.sql` sabe hacer
+   bien, y ya está pensado para correrse las veces que haga falta
+   (idempotente, ver su comentario "Idempotente").
+4. Confirmar con el bloque `##ac7_check` (sección "AC7" de arriba):
+   `tiene_user = 0` para `Ecommerce_qa`, y `tiene_user = 1` en las cinco
+   bases que siguen en la lista. Correr también `SELECT name, state FROM
+   sys.databases WHERE state <> 0` (misma consulta que la sección "AC7"
+   prescribe para lo que el cursor de `##ac7_check` no puede ver, y la
+   misma del paso 2): cualquier base que aparezca ahí no quedó cubierta
+   por esta confirmación. Para este punto el paso 3 ya recreó el login y
+   ya re-concedió las cinco bases activas, así que la pendiente **no** se
+   resuelve reintentando `sqlserver-inverso.sql` completo — eso repetiría
+   la revocación total sobre las cinco que este mismo paso acaba de
+   confirmar en `ONLINE` y volvería a borrar el login recién recreado.
+   Queda pendiente de limpieza **dirigida** (mismo comando `DROP USER`
+   del paso 2, contra esa base sola) para cuando vuelva a estar `ONLINE`.
+
+**Decomiso completo** (ninguna base sigue activa): son los mismos cuatro
+pasos, salvo que el paso 1 deja la lista de `sqlserver-parte-b.sql`
+**vacía**, y el paso 3 se reduce a correr sólo `sqlserver-parte-a.sql`
+(para dejar el login existente, si se quiere conservar para un alta
+futura) o directamente omitirse (si no queda ninguna base ni se planea
+ninguna a corto plazo) — ya no es un caso especial del inverso, como lo
+era hasta v9: es la misma revocación total del paso 2, sin nada que
+re-conceder después.
+
+Ningún script de R1 se corrió contra una base real: no hay estado externo
+pendiente de revertir además de lo que este runbook ya describe.

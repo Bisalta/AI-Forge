@@ -54,6 +54,25 @@ assert_contains() {
   esac
 }
 
+# assert_no_contains <haystack> <needle> [mensaje]
+# El negativo de assert_contains: falla si la aguja SÍ está. Existe para los
+# casos donde la forma prohibida se ve correcta — un assert positivo sobre la
+# forma buena pasa igual aunque la mala siga presente al lado.
+assert_no_contains() {
+  local haystack="$1"
+  local needle="$2"
+  local msg="${3:-assert_no_contains}"
+  case "$haystack" in
+    *"$needle"*)
+      printf '  FAIL  %s — encontré [%s] y no debería estar\n' "$msg" "$needle"
+      TEST_FAILURES=$((TEST_FAILURES + 1))
+      ;;
+    *)
+      printf '  ok    %s\n' "$msg"
+      ;;
+  esac
+}
+
 # assert_exit <exit_code_esperado> <exit_code_obtenido> [mensaje]
 # No corre ningún comando: el caller ya lo corrió y capturó "$?" (así el
 # caller puede además inspeccionar stdout/stderr por separado con

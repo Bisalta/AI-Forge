@@ -1,0 +1,260 @@
+[
+  {
+    "nombre": "proveedores-dev",
+    "dialecto": "postgres",
+    "ambiente": "dev",
+    "host": "sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com",
+    "puerto": 5432,
+    "base": "proveedores_dev",
+    "secret_id": "dev/bd/claude-lectura-postgres",
+    "region": "us-east-1",
+    "garantias": [
+      {
+        "nombre": "endpoint-replica-lectura",
+        "nivel": "incondicional"
+      },
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "pg_read_all_data no otorga escritura, pero un GRANT futuro sí puede. En PG 14 el esquema public traía CREATE concedido a PUBLIC — el rol podía crear tablas propias; revocado por Patrick Ocampo el 22-sep-2026."
+      },
+      {
+        "nombre": "sesion-read-only",
+        "nivel": "condicional",
+        "condicion": "el plugin no la comprueba: la pide al abrir la sesión y no verifica que rija. Dentro de una llamada no se puede apagar (medido el 23-sep-2026: 'transaction read-write mode must be set before any query'), y el rol la tiene además fijada por ALTER ROLE."
+      }
+    ]
+  },
+  {
+    "nombre": "proveedores-qa",
+    "dialecto": "postgres",
+    "ambiente": "qa",
+    "host": "sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com",
+    "puerto": 5432,
+    "base": "proveedores_qa",
+    "secret_id": "dev/bd/claude-lectura-postgres",
+    "region": "us-east-1",
+    "garantias": [
+      {
+        "nombre": "endpoint-replica-lectura",
+        "nivel": "incondicional"
+      },
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "pg_read_all_data no otorga escritura, pero un GRANT futuro sí puede. En PG 14 el esquema public traía CREATE concedido a PUBLIC — el rol podía crear tablas propias; revocado por Patrick Ocampo el 22-sep-2026."
+      },
+      {
+        "nombre": "sesion-read-only",
+        "nivel": "condicional",
+        "condicion": "el plugin no la comprueba: la pide al abrir la sesión y no verifica que rija. Dentro de una llamada no se puede apagar (medido el 23-sep-2026: 'transaction read-write mode must be set before any query'), y el rol la tiene además fijada por ALTER ROLE."
+      }
+    ]
+  },
+  {
+    "nombre": "smartcheck-dev",
+    "dialecto": "postgres",
+    "ambiente": "dev",
+    "host": "sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com",
+    "puerto": 5432,
+    "base": "smartcheck_dev",
+    "secret_id": "dev/bd/claude-lectura-postgres",
+    "region": "us-east-1",
+    "garantias": [
+      {
+        "nombre": "endpoint-replica-lectura",
+        "nivel": "incondicional"
+      },
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "pg_read_all_data no otorga escritura, pero un GRANT futuro sí puede. En PG 14 el esquema public traía CREATE concedido a PUBLIC — el rol podía crear tablas propias; revocado por Patrick Ocampo el 22-sep-2026."
+      },
+      {
+        "nombre": "sesion-read-only",
+        "nivel": "condicional",
+        "condicion": "el plugin no la comprueba: la pide al abrir la sesión y no verifica que rija. Dentro de una llamada no se puede apagar (medido el 23-sep-2026: 'transaction read-write mode must be set before any query'), y el rol la tiene además fijada por ALTER ROLE."
+      }
+    ]
+  },
+  {
+    "nombre": "smartcheck-qa",
+    "dialecto": "postgres",
+    "ambiente": "qa",
+    "host": "sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com",
+    "puerto": 5432,
+    "base": "smartcheck_qa",
+    "secret_id": "dev/bd/claude-lectura-postgres",
+    "region": "us-east-1",
+    "garantias": [
+      {
+        "nombre": "endpoint-replica-lectura",
+        "nivel": "incondicional"
+      },
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "pg_read_all_data no otorga escritura, pero un GRANT futuro sí puede. En PG 14 el esquema public traía CREATE concedido a PUBLIC — el rol podía crear tablas propias; revocado por Patrick Ocampo el 22-sep-2026."
+      },
+      {
+        "nombre": "sesion-read-only",
+        "nivel": "condicional",
+        "condicion": "el plugin no la comprueba: la pide al abrir la sesión y no verifica que rija. Dentro de una llamada no se puede apagar (medido el 23-sep-2026: 'transaction read-write mode must be set before any query'), y el rol la tiene además fijada por ALTER ROLE."
+      }
+    ]
+  },
+  {
+    "nombre": "smartfleet-dev",
+    "dialecto": "postgres",
+    "ambiente": "dev",
+    "host": "sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com",
+    "puerto": 5432,
+    "base": "smartfleet_dev",
+    "secret_id": "dev/bd/claude-lectura-postgres",
+    "region": "us-east-1",
+    "garantias": [
+      {
+        "nombre": "endpoint-replica-lectura",
+        "nivel": "incondicional"
+      },
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "pg_read_all_data no otorga escritura, pero un GRANT futuro sí puede. En PG 14 el esquema public traía CREATE concedido a PUBLIC — el rol podía crear tablas propias; revocado por Patrick Ocampo el 22-sep-2026."
+      },
+      {
+        "nombre": "sesion-read-only",
+        "nivel": "condicional",
+        "condicion": "el plugin no la comprueba: la pide al abrir la sesión y no verifica que rija. Dentro de una llamada no se puede apagar (medido el 23-sep-2026: 'transaction read-write mode must be set before any query'), y el rol la tiene además fijada por ALTER ROLE."
+      }
+    ]
+  },
+  {
+    "nombre": "smartfleet-qa",
+    "dialecto": "postgres",
+    "ambiente": "qa",
+    "host": "sistemas-costruplaza-db.cluster-ro-cfrl3owqzwof.us-east-1.rds.amazonaws.com",
+    "puerto": 5432,
+    "base": "smartfleet_qa",
+    "secret_id": "dev/bd/claude-lectura-postgres",
+    "region": "us-east-1",
+    "garantias": [
+      {
+        "nombre": "endpoint-replica-lectura",
+        "nivel": "incondicional"
+      },
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "pg_read_all_data no otorga escritura, pero un GRANT futuro sí puede. En PG 14 el esquema public traía CREATE concedido a PUBLIC — el rol podía crear tablas propias; revocado por Patrick Ocampo el 22-sep-2026."
+      },
+      {
+        "nombre": "sesion-read-only",
+        "nivel": "condicional",
+        "condicion": "el plugin no la comprueba: la pide al abrir la sesión y no verifica que rija. Dentro de una llamada no se puede apagar (medido el 23-sep-2026: 'transaction read-write mode must be set before any query'), y el rol la tiene además fijada por ALTER ROLE."
+      }
+    ]
+  },
+  {
+    "nombre": "compras",
+    "dialecto": "sqlserver",
+    "ambiente": "dev",
+    "host": "10.24.40.137",
+    "puerto": 1433,
+    "base": "COMPRAS",
+    "secret_id": "dev/bd/claude-lectura-sqlserver",
+    "region": "us-east-1",
+    "garantias": [
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48). El rechazo de una escritura es por privilegio (Msg 262: CREATE TABLE permission denied in database, medido por Patrick Ocampo conectado como el login el 23-sep-2026), y el consumidor no lo puede apagar — a diferencia de Postgres, donde el primer freno es un parámetro de sesión que el rol sí apaga con un SET (contract v17, punto 4)."
+      }
+    ]
+  },
+  {
+    "nombre": "compras-stg",
+    "dialecto": "sqlserver",
+    "ambiente": "dev",
+    "host": "10.24.40.137",
+    "puerto": 1433,
+    "base": "COMPRAS_STG",
+    "secret_id": "dev/bd/claude-lectura-sqlserver",
+    "region": "us-east-1",
+    "garantias": [
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48). El rechazo de una escritura es por privilegio (Msg 262: CREATE TABLE permission denied in database, medido por Patrick Ocampo conectado como el login el 23-sep-2026), y el consumidor no lo puede apagar — a diferencia de Postgres, donde el primer freno es un parámetro de sesión que el rol sí apaga con un SET (contract v17, punto 4)."
+      }
+    ]
+  },
+  {
+    "nombre": "ecommerce",
+    "dialecto": "sqlserver",
+    "ambiente": "dev",
+    "host": "10.24.40.137",
+    "puerto": 1433,
+    "base": "Ecommerce",
+    "secret_id": "dev/bd/claude-lectura-sqlserver",
+    "region": "us-east-1",
+    "garantias": [
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48). El rechazo de una escritura es por privilegio (Msg 262: CREATE TABLE permission denied in database, medido por Patrick Ocampo conectado como el login el 23-sep-2026), y el consumidor no lo puede apagar — a diferencia de Postgres, donde el primer freno es un parámetro de sesión que el rol sí apaga con un SET (contract v17, punto 4)."
+      }
+    ]
+  },
+  {
+    "nombre": "ecommerce-qa",
+    "dialecto": "sqlserver",
+    "ambiente": "dev",
+    "host": "10.24.40.137",
+    "puerto": 1433,
+    "base": "Ecommerce_qa",
+    "secret_id": "dev/bd/claude-lectura-sqlserver",
+    "region": "us-east-1",
+    "garantias": [
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48). El rechazo de una escritura es por privilegio (Msg 262: CREATE TABLE permission denied in database, medido por Patrick Ocampo conectado como el login el 23-sep-2026), y el consumidor no lo puede apagar — a diferencia de Postgres, donde el primer freno es un parámetro de sesión que el rol sí apaga con un SET (contract v17, punto 4)."
+      }
+    ]
+  },
+  {
+    "nombre": "exactus",
+    "dialecto": "sqlserver",
+    "ambiente": "dev",
+    "host": "10.24.40.137",
+    "puerto": 1433,
+    "base": "EXACTUS",
+    "secret_id": "dev/bd/claude-lectura-sqlserver",
+    "region": "us-east-1",
+    "garantias": [
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48). El rechazo de una escritura es por privilegio (Msg 262: CREATE TABLE permission denied in database, medido por Patrick Ocampo conectado como el login el 23-sep-2026), y el consumidor no lo puede apagar — a diferencia de Postgres, donde el primer freno es un parámetro de sesión que el rol sí apaga con un SET (contract v17, punto 4)."
+      }
+    ]
+  },
+  {
+    "nombre": "bi",
+    "dialecto": "sqlserver",
+    "ambiente": "dev",
+    "host": "10.24.40.137",
+    "puerto": 1433,
+    "base": "BI",
+    "secret_id": "dev/bd/claude-lectura-sqlserver",
+    "region": "us-east-1",
+    "garantias": [
+      {
+        "nombre": "rol-solo-lectura",
+        "nivel": "condicional",
+        "condicion": "db_datareader es la única barrera. Sin db_denydatawriter no queda un DENY que anule un GRANT de escritura concedido por error en el futuro (contract v10, deuda D48). El rechazo de una escritura es por privilegio (Msg 262: CREATE TABLE permission denied in database, medido por Patrick Ocampo conectado como el login el 23-sep-2026), y el consumidor no lo puede apagar — a diferencia de Postgres, donde el primer freno es un parámetro de sesión que el rol sí apaga con un SET (contract v17, punto 4)."
+      }
+    ]
+  }
+]

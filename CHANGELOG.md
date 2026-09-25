@@ -2,6 +2,130 @@
 
 Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero).
 
+## bisalta-db
+
+### 0.1.0 — 2026-09-18
+
+Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v26).
+Consulta de solo lectura a las bases de dev/qa de Bisalta desde Claude Code, **sin que
+ninguna credencial entre en el contexto de la sesión**. La credencial no desaparece: pasa de un
+archivo que hoy hay que leerle al modelo —y que queda archivado en el transcript— a un secreto de
+AWS que el proceso resuelve, usa y tira.
+
+- **Servidor MCP propio sobre stdio, cero dependencias npm.** JSON-RPC 2.0 escrito a mano; `psql`,
+  `sqlcmd` y `aws` invocados como CLI. No hay `package.json`, ni lockfile, ni `node_modules`, ni
+  `npx`. El paquete que resolvería esto no sirve: `@modelcontextprotocol/server-postgres` está
+  **deprecado desde 2025 y tiene inyección SQL que se salta su propio modo de solo lectura** —
+  pasa el SQL sin parametrizar y permite salir de la transacción read-only para ejecutar DDL/DML
+  con todos los privilegios de la conexión. Sigue con ~21k descargas semanales.
+- **Lista blanca, no lista negra, y anclada al principio de la sentencia.** Port de la lógica ya
+  probada en `Bisalta/Proveedores-Back` (`scripts/consulta-lectura.sh`), con sus doce casos. Un
+  bloque `DO` puede hacer cualquier cosa y una lista negra lo deja pasar entero; y la palabra tiene
+  que estar **al principio**: la versión laxa pasaba once de los doce tests originales, y el caso
+  que la mató fue `DELETE … WHERE id IN (SELECT …)`. Una lista blanca **por dialecto**: en
+  `sqlserver` se rechazan además `EXEC`/`EXECUTE`, los identificadores `sp_`/`xp_` y cualquier `;`;
+  en `postgres`, la apertura de comilla de dólar.
+- **Producción irrepresentable, no rechazada.** `ambiente` admite `dev` y `qa` y nada más: no hay
+  valor que la nombre. Rechazar por nombre es red, no barrera. El validador rechaza además el
+  catálogo entero si una entrada apunta a un host de la cuenta de producción. **Ojo con el
+  identificador**: `cfrl3owqzwof` y `cr4rbgr7qlr6` son sufijos DNS **de cuenta**, no de cluster —
+  la cuenta de dev tiene cuatro Aurora. Y una letra separa los dos entornos: dev es
+  `sistemas-co`**`s`**`truplaza-db`, prod es `sistemas-co`**`ns`**`truplaza-db`.
+- **La credencial nunca por `argv`.** Postgres: archivo temporal en modo 600 apuntado por la
+  variable de archivo de credenciales de libpq, borrado en un `finally` que corre también cuando la
+  consulta falla. SQL Server: variable de entorno acotada al proceso hijo, porque `sqlcmd` no tiene
+  equivalente de archivo — la asimetría queda escrita, no disimulada.
+- **El catálogo no tiene usuario ni contraseña**: los dos salen del secreto, en la forma estándar de
+  RDS. Se relee en cada invocación, así que borrar una entrada es un kill switch inmediato.
+- **Topes duros**: 1000 filas y 1 MiB de `filas` serializado. Truncar no es un error: la respuesta
+  declara `truncado` y cuál de los dos topes se alcanzó primero. Es la única barrera entre las filas
+  y el transcript — riesgo aceptado con dueño, no control.
+- **Bitácora** de una línea JSON por invocación, con la consulta **por hash y nunca en claro**. No
+  rota; registrado como deuda.
+- **Dos estrategias de aprovisionamiento, no una.** `pg_read_all_data` donde el cluster es un lugar
+  de trabajo; `GRANT SELECT` por base donde es un archivo de clones fechados. En SQL Server, **`db_datareader` y nada más**: cada
+  base concedida lleva esa membresía y ninguna otra. `db_denydatawriter` se evaluó y se descartó
+  (decisión de Patrick Ocampo, 21-sep-2026), y lo que se pierde queda dicho porque él pidió que
+  quedara dicho: **sin `DENY` explícito, un `GRANT` de escritura concedido por error no tendría nada
+  que lo anule.** En ese motor el rol es la única barrera — ahora por decisión, no por omisión.
+- **`SSISDB` fuera del loop**, por nombre y no sólo por `database_id > 4`: es el catálogo de
+  Integration Services, donde viven parámetros y connection managers. Un servidor cuyo propósito es
+  que ninguna credencial pase por el contexto no puede alcanzar el lugar donde viven las cadenas de
+  conexión.
+- `aprovisionamiento/` trae el runbook, el inventario medido de los dos motores y los `.sql` de
+  roles, logins y secretos (R1). Los corre una persona con privilegios de administración en cada
+  motor; este repo no los ejecuta.
+
+**Lo que la medición corrigió, entre v2 y v8**: el ciclo cerró con ocho ratificaciones de contract,
+y las tres que más movieron el diseño no salieron de un review sino de que la persona que iba a
+ejecutar el aprovisionamiento midiera el sistema. `pg_read_all_data` alcanza **todo el cluster**
+desde que el rol existe, porque Postgres concede `CONNECT` a PUBLIC por omisión: los `GRANT` por
+base no son la barrera. El identificador que ambos lados tratábamos como cluster resultó ser el
+sufijo de la cuenta. Y ni el tamaño ni el nombre clasifican el riesgo de una base — `portalrh_qa`
+pesa 55 MB y tiene 3.458 planillas completas con cédulas y salarios, mientras `rrhh`, señalada por
+el nombre, está vacía. La guarda por nombre del aprovisionamiento queda declarada **freno, no
+clasificador**. Detalle en `SDD/retro.md` RT23-RT33.
+
+**Lo que corrigió el sistema real, entre v12 y v15**: tres de esas cuatro versiones (v12, v13 y
+v15) salieron de medir contra AWS y contra las bases, no de revisar el diseño; v14 salió de un
+`contract-change-request` de `AGENT_r1`, que encontró dos ACs sin reconciliar con v13. **Un solo rol**, `claude_lectura` (v13): NEO lee
+Odoo por XML-RPC y no abre ninguna conexión Postgres, así que un segundo rol era una clave sin
+consumidor. **Nombres de secreto** elegidos por Patrick Ocampo con la convención que la cuenta ya
+usaba (`dev/bd/claude-lectura-*`, v12), y la política IAM sobre el patrón y no sobre ARNs exactos.
+**Guarda de instancia** en el script de SQL Server (`AC44`, v13), que crea un login —objeto de
+instancia— y no tenía nada que dijera contra qué servidor corría. Y dos que sólo aparecieron con la
+base enfrente (v15): `application_name` salía `psql` y no el usuario del secreto, porque psql le gana
+al `-c` de `PGOPTIONS` — corregido con `PGAPPNAME`, y el test ahora prohíbe explícitamente la forma
+que se ve bien y no funciona; y **cada garantía declara su nivel**. Patrick midió el peor caso y la
+sesión de solo lectura se apaga con un `SET`, y en PG 14 `public` traía `CREATE` para todo rol: de las
+tres garantías de Postgres, **sólo el endpoint de réplica es incondicional**, y el catálogo lo dice
+entrada por entrada. Detalle en `SDD/retro.md` RT42-RT49.
+
+**Lo que la lista blanca no frenaba (v16)**: aceptaba escrituras dentro de un `WITH` en los dos
+dialectos —`WITH x AS (DELETE … RETURNING *) SELECT …` en Postgres, `WITH c AS (…) DELETE FROM c`
+en SQL Server—, `SELECT … INTO`, que crea una tabla, y `set_config` para apagar la sesión de solo
+lectura. Sobrevivió a 17 triples de mutación y a tres rondas de review, porque los tests
+verificaban bien lo que enumeraban y nadie había enumerado esto. No hubo exposición: en Postgres lo
+frenaban tres barreras detrás, medidas con cinco sondas sin efecto posible, y en SQL Server se
+encontró antes de que existiera el login. v16 lo rechaza en la lista blanca (`AC47`) y **comprueba la
+réplica en cada consulta** (`AC46`): el endpoint `cluster-ro-` apunta al writer si el cluster se queda
+sin réplicas, y hoy tiene una sola. La lección, en `SDD/retro.md` RT50: una mutación prueba que el
+test detecta que la barrera se quitó; no prueba que la barrera cubra la amenaza.
+
+**Lo que encontró quien ejecutó el aprovisionamiento (v17)**: al crear el login de SQL Server,
+Patrick Ocampo vio que podía **listar los 36 nombres de base del servidor** entrando a `master` por
+`guest` — sin abrirlas, pero la lista dice qué sistemas existen. Su propia verificación no lo veía,
+porque buscaba dónde el login tenía usuario, y ese camino no crea ninguno: medía membresía cuando
+la propiedad era visibilidad. `DENY VIEW ANY DATABASE` queda en el script (`AC48`). En Postgres el
+equivalente no se puede cerrar igual: `pg_database` es legible por todo rol, y queda como riesgo
+aceptado.
+
+**Lo que encontró la revisión adversarial (v19 y v20)**: Patrick Ocampo intentó romper la lista
+blanca y encontró doce formas de pasarla, **ninguna brecha** — todas chocan después con el privilegio
+o con la réplica. Con eso quedó medido lo que la lista blanca es: la capa que da un error temprano y
+claro, no la que impide el daño. Se arreglaron un defecto de normalización que venía del código
+original, las sentencias de SQL Server sin separador y dos regresiones que introdujo el primer arreglo;
+dos clases quedan como límite conocido. v20 —la normalización que conoce el comillado de cada
+dialecto— la escribió Patrick, casos y función: ningún agente pudo hacer ese trabajo (`RT54`). También
+en v19: el límite de tiempo pasa al rol, y el `ALTER ROLE` y el esquema `public` que Patrick había
+configurado a mano entran a los scripts. Las cuatro mutaciones declaradas de `AC51` caen. Dos no caían del todo —la de los literales `E'…'` no caía, y la de los corchetes caía en parte— porque esas reglas existen para aceptar consultas legítimas y ningún caso lo era: la primera se cerró con seis casos de Patrick (v23), y la segunda con cinco que escribió el planner (v24).
+
+**Review de seguridad de gradiel12 (v25)**: TLS obligatorio en los dos motores, todavía sin verificar
+el certificado del servidor; `sqlcmd -t 60`; diecisiete sentencias de SQL Server que no son lectura,
+rechazadas por nombre; y los temporales huérfanos, borrados al arrancar. En v26, Postgres pasa a
+`verify-full` con el bundle de certificados de RDS, que viaja con el plugin: autentica al servidor. Al medir apareció un defecto
+que ninguna review había visto: `sqlcmd` escribe sus errores en stdout, el plugin sólo leía stderr, y
+todo error de SQL Server llegaba sin mensaje. El stub del test era una copia del de `psql` (`RT55`).
+
+**Lo que dejó el kilometraje**: dos defectos que la suite encontró y que valen por separado. (1) El
+tope de bytes salía vacío porque `process.exit()` **corta lo que `process.stdout` todavía tiene en
+el buffer** cuando la salida va a un pipe — y la respuesta que se perdía era justamente la más
+grande, la que llega al tope. El test de AC27 lo encontró; el arreglo (`process.exitCode`) se aplicó
+a los tres CLI del plugin y al servidor, no sólo a la línea señalada. (2) Tres literales del propio
+código disparaban el gate 9 (`secret-scan`) contra sí mismos — y el comentario escrito para
+explicar el primero reprodujo el problema al citarlo. Se partieron los literales; **ninguna
+exclusión por path**, que es la única mitigación que el repo tiene prohibida ahí.
+
 ## project-foundation
 
 ### 0.1.0 — 2026-08-03
