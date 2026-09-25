@@ -531,3 +531,20 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
 | `AC56` | `SDD/tests/test_servidor_mcp.sh`: `AC56 …` (5: huérfano, reciente, ajeno, con el prefijo pero sin el nombre de `mkdtemp`, y el symlink) |
 | `AC57` | `SDD/tests/test_servidor_mcp.sh`: `AC57 …` (11: mensaje, credencial redactada y su control, error después de filas —dos—, error largo sin `Msg` —tres: el final, el principio afuera y la credencial partida por el corte—, corte por `-t` y corrida exitosa con el dato); más la parte `manual-only` del §3 |
 | `AC51`, caso 8 | Cambió su veredicto esperado en `casos-adversariales-lista-blanca.js`; su consulta no se tocó. Verificado cargando los dos archivos y comparando los 21 casos campo por campo: difieren sólo el veredicto del 8 y la nota de su descripción |
+
+## 5. Verificación a través del plugin **instalado** (sección del planner, 25-sep-2026, 12:00)
+
+Se reinstalaron `bisalta-db` y `sdd-flow` desde el marketplace local a las 09:41. La copia instalada tiene el código de v25: `PGSSLMODE`, `-t 60`, `errorDeSqlcmd(redactar(...))`, `lstatSync`, `SENTENCIA_NO_LECTURA_SQLSERVER`, la limpieza al arrancar y la `description` nueva de `consultar`.
+
+**La primera prueba, a las 09:45, salió con el código viejo.** El error de permiso llegó con `mensaje` vacío. Los servidores MCP de la sesión eran de las 06:25, anteriores a la reinstalación, y reinstalar no los reemplaza (`D56`). Después de reiniciar Claude Code, los dos servidores arrancaron a las 12:00 desde la copia instalada. Las pruebas se hicieron a través de las herramientas del plugin, desde la sesión de Claude Code:
+
+| Prueba | Resultado |
+|---|---|
+| `AC57`: un error de permiso en `compras` | `conexion_fallida`, código 6, **con el mensaje del motor** (`Msg 300 … VIEW SERVER STATE permission was denied`). Es la misma consulta que a las 09:45, con el código viejo, había llegado vacía |
+| `AC55` y los de antes, en `proveedores-dev`: `pg_stat_ssl`, `pg_is_in_recovery()` y los parámetros de sesión | `ssl = t`, `TLSv1.3`; réplica `t`; `default_transaction_read_only = on`; `statement_timeout = 1min`; `application_name = claude_lectura` |
+| `AC55` y `AC48` en `compras`: base, instancia y bases visibles | `COMPRAS`, `EC2AMAZ-2RGHL0C`, 3 bases visibles. Conecta con `-N true -C -t 60` |
+| `AC53`: `WAITFOR` encadenado | `no_es_lectura`, código 4, `sentencia_no_permitida`. No conecta |
+| `AC53`, control: una columna `begin_date` | Se acepta y responde |
+| `AC56`: temporales del plugin en el tmpdir | Ninguno |
+
+**La `description` que ve la sesión**: el esquema que la sesión guardó de la herramienta sigue mostrando la `description` vieja aunque el servidor nuevo la sirva nueva. Es un caché de la sesión, no del plugin: el archivo instalado tiene la nueva, y el comportamiento que se midió es el nuevo.
