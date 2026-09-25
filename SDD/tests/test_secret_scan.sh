@@ -156,5 +156,47 @@ remove_fixture "SDD/contracts/2026-09-01-nueva-feature.md"
 run_scan >/dev/null 2>&1; ec6_after=$?
 assert_exit 0 "$ec6_after" "forma6 secreto bajo SDD-contracts - verde tras remover"
 
+# --- formas 7 a 9 (GEN-108 v26, AC59): certificados públicos ---------------
+# El literal con forma de clave de AWS se arma en dos piezas, por el mismo
+# motivo que plant_kv: escrito entero, este archivo fuente se detectaría a sí
+# mismo.
+CLAVE_AWS="$(printf '%s%s' 'AK' 'IAQWERTYUIOPASDFGH')"
+INICIO_CERT='-----BEGIN CERTIFICATE-----'
+FIN_CERT='-----END CERTIFICATE-----'
+
+# forma 7: el patrón dentro de una línea base64 de un certificado -> verde.
+{
+  printf '%s\n' "$INICIO_CERT"
+  printf 'MIIEBjCCAu6gAwIBAgIJ%sQWERTYzAN\n' "$CLAVE_AWS"
+  printf '%s\n' "$FIN_CERT"
+} > "$TMP_DIR/form7.pem"
+( cd "$TMP_DIR" && git add -A )
+run_scan >/dev/null 2>&1; ec7=$?
+assert_exit 0 "$ec7" "forma7 base64 de un certificado con forma de clave AWS - verde (es un certificado público)"
+remove_fixture "form7.pem"
+
+# forma 8: la misma línea FUERA de un bloque de certificado -> rojo.
+printf 'MIIEBjCCAu6gAwIBAgIJ%sQWERTYzAN\n' "$CLAVE_AWS" > "$TMP_DIR/form8.txt"
+( cd "$TMP_DIR" && git add -A )
+out8="$(run_scan 2>&1)"; ec8=$?
+assert_exit 1 "$ec8" "forma8 la misma línea fuera de un certificado - rojo"
+assert_contains "$out8" "form8.txt" "forma8 la misma línea fuera de un certificado - rojo"
+remove_fixture "form8.txt"
+
+# forma 9: dentro del bloque, una línea que NO es base64 se sigue escaneando.
+{
+  printf '%s\n' "$INICIO_CERT"
+  printf 'aws_key = %s\n' "$CLAVE_AWS"
+  printf '%s\n' "$FIN_CERT"
+} > "$TMP_DIR/form9.pem"
+( cd "$TMP_DIR" && git add -A )
+out9="$(run_scan 2>&1)"; ec9=$?
+assert_exit 1 "$ec9" "forma9 una línea que no es base64 dentro de un certificado - rojo"
+assert_contains "$out9" "form9.pem:2:" "forma9 el número de línea es el del archivo"
+remove_fixture "form9.pem"
+
+run_scan >/dev/null 2>&1; ec_final=$?
+assert_exit 0 "$ec_final" "secret-scan.sh sale limpio tras remover las formas 7 a 9"
+
 test_summary
 exit $?

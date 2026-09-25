@@ -95,7 +95,21 @@ while IFS= read -r f; do
   # matcheado (nunca la línea completa) -> a la salida sólo le llega el
   # número de línea (campo 1); el valor detectado (campo 2+) se descarta acá
   # mismo y nunca se imprime — threat model contract v2 punto 3.
-  line_numbers="$(grep -iInEo "$PATTERN" "$REPO_ROOT/$f" 2>/dev/null | cut -d: -f1)"
+  #
+  # Certificados públicos (GEN-108 v26, AC59): dentro de un bloque
+  # `-----BEGIN CERTIFICATE-----` … `-----END CERTIFICATE-----`, las líneas
+  # que son base64 PURO se vacían antes del grep. Son datos de un certificado
+  # público, y el base64 al azar puede formar `AKIA` + 16 caracteres: pasó
+  # en el bundle de autoridades de RDS. La regla es por CONTENIDO, no por
+  # path: una línea que no sea base64 dentro del bloque se sigue escaneando,
+  # y fuera de un bloque de certificado no cambia nada. Se vacían, no se
+  # borran, para que los números de línea sigan siendo los del archivo.
+  line_numbers="$(awk '
+    /^-----BEGIN CERTIFICATE-----$/ { en_cert = 1; print; next }
+    /^-----END CERTIFICATE-----$/   { en_cert = 0; print; next }
+    en_cert && /^[A-Za-z0-9+\/=]+$/ { print ""; next }
+    { print }
+  ' "$REPO_ROOT/$f" 2>/dev/null | grep -iInEo "$PATTERN" 2>/dev/null | cut -d: -f1)"
   if [ -n "$line_numbers" ]; then
     printf '%s\n' "$line_numbers" | while IFS= read -r ln; do
       printf '%s:%s: posible secreto (standards/security.md §3) — valor no impreso\n' "$f" "$ln"
