@@ -148,6 +148,17 @@ case "${BISALTA_STUB_PSQL_MODO:-normal}" in
     printf 'Msg 300, Level 14, State 1, Server EC2X, Line 1\nVIEW SERVER STATE permission was denied (%s)\n' "$BISALTA_STUB_VALOR"
     exit 1
     ;;
+  # Un error largo sin línea `Msg`, con la credencial partida justo donde
+  # caen los últimos 500 caracteres: los 10 primeros quedan antes del corte y
+  # los 20 últimos después. Prueba el tramo final y el orden redactar-y-cortar.
+  larga-sin-msg)
+    printf 'INICIO-LARGO'
+    head -c 600 /dev/zero | tr '\0' 'x'
+    printf '%s' "$BISALTA_STUB_VALOR"
+    head -c 467 /dev/zero | tr '\0' 'y'
+    printf 'FIN-DEL-ERROR'
+    exit 1
+    ;;
   # Falla después de emitir filas: primero los datos, después el Msg.
   filas-y-error)
     printf 'texto\nTimeout expired\nMsg 245, Level 16, State 1, Server EC2X, Line 1\nConversion failed\n'
@@ -671,7 +682,7 @@ assert_contains "$lineas_arg" "ARG -C|" "AC55 sqlcmd lleva -C (el certificado de
 # ---------------------------------------------------------------------------
 # AC57 (v25) — el error de sqlcmd sale por stdout
 # ---------------------------------------------------------------------------
-for modo in falla-stdout filas-y-error timeout-stdout datos-con-timeout; do
+for modo in falla-stdout filas-y-error larga-sin-msg timeout-stdout datos-con-timeout; do
   BISALTA_STUB_PSQL_MODO=$modo
   export BISALTA_STUB_PSQL_MODO
   reiniciar_registros
@@ -682,6 +693,11 @@ for modo in falla-stdout filas-y-error timeout-stdout datos-con-timeout; do
       assert_contains "$cuerpo" "VIEW SERVER STATE permission was denied" "AC57 el mensaje de un error de sqlcmd no llega vacío"
       assert_no_contains "$cuerpo" "$VALOR_CREDENCIAL" "AC57 la credencial no sale en el mensaje tomado de stdout"
       assert_contains "$cuerpo" "[redactado]" "AC57 (control) el mensaje tomado de stdout pasa por la redacción"
+      ;;
+    larga-sin-msg)
+      assert_contains "$cuerpo" "FIN-DEL-ERROR" "AC57 sin Msg, el mensaje es el final de stdout"
+      assert_no_contains "$cuerpo" "INICIO-LARGO" "AC57 sin Msg, el principio de un stdout largo queda afuera"
+      assert_no_contains "$cuerpo" "A1B2C3D4E5" "AC57 una credencial partida por el corte no deja ver su final (se redacta antes de cortar)"
       ;;
     filas-y-error)
       assert_contains "$cuerpo" '"error":"conexion_fallida"' "AC57 un error después de filas no se lee como corte por el dato que dice Timeout expired"
@@ -718,7 +734,11 @@ HUERFANO="$SYSTMP/bisalta-db-Hu3rf0"
 RECIENTE="$SYSTMP/bisalta-db-R3c1en"
 AJENO="$SYSTMP/otro-programa-viejo-prueba"
 CON_PREFIJO="$SYSTMP/bisalta-db-respaldo-viejo"
+# Un symlink con el nombre de mkdtemp que apunta a un directorio viejo: con
+# `lstat` no es un directorio y se saltea; con `stat` se seguiría y se borraría.
+ENLACE="$SYSTMP/bisalta-db-L1nk00"
 mkdir -p "$HUERFANO" "$RECIENTE" "$AJENO" "$CON_PREFIJO"
+ln -s "$AJENO" "$ENLACE"
 : > "$HUERFANO/passfile"
 # Fecha fija y vieja: `date -v` es de BSD y `date -d` de GNU; `touch -t` es de los dos.
 touch -t 202001010000 "$HUERFANO" "$AJENO" "$CON_PREFIJO"
@@ -727,7 +747,8 @@ assert_eq "$([ -e "$HUERFANO" ] && echo queda || echo borrado)" "borrado" "AC56 
 assert_eq "$([ -e "$RECIENTE" ] && echo queda || echo borrado)" "queda" "AC56 no borra el temporal reciente (puede ser de otra sesión)"
 assert_eq "$([ -e "$AJENO" ] && echo queda || echo borrado)" "queda" "AC56 no borra directorios que no son del plugin"
 assert_eq "$([ -e "$CON_PREFIJO" ] && echo queda || echo borrado)" "queda" "AC56 no borra un directorio viejo con el prefijo que no tiene el nombre de mkdtemp"
-rm -rf "$HUERFANO" "$RECIENTE" "$AJENO" "$CON_PREFIJO"
+assert_eq "$([ -L "$ENLACE" ] && echo queda || echo borrado)" "queda" "AC56 no sigue un symlink con el nombre del plugin (lstat)"
+rm -rf "$HUERFANO" "$RECIENTE" "$AJENO" "$CON_PREFIJO" "$ENLACE"
 
 test_summary
 exit $?

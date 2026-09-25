@@ -512,4 +512,4 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
 | `AC55` | `SDD/tests/test_servidor_mcp.sh`: `AC55 sqlcmd exige el cifrado con -N true`, `AC55 sqlcmd lleva -C …` y `AC55 psql exige TLS …`; más la parte `manual-only` del §3 |
 | `AC56` | `SDD/tests/test_servidor_mcp.sh`: `AC56 …` (4: huérfano, reciente, ajeno, y con el prefijo pero sin el nombre de `mkdtemp`) |
 | `AC57` | `SDD/tests/test_servidor_mcp.sh`: `AC57 …` (8: mensaje, credencial redactada y su control, error después de filas —dos—, corte por `-t` y corrida exitosa con el dato); más la parte `manual-only` del §3 |
-| `AC51`, caso 8 | Cambió su veredicto esperado en `casos-adversariales-lista-blanca.js`; su consulta no se tocó. Verificado cargando los dos archivos y comparando los 21 casos campo por campo: sólo difiere el veredicto del 8 |
+| `AC51`, caso 8 | Cambió su veredicto esperado en `casos-adversariales-lista-blanca.js`; su consulta no se tocó. Verificado cargando los dos archivos y comparando los 21 casos campo por campo: difieren sólo el veredicto del 8 y la nota de su descripción |

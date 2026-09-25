@@ -328,7 +328,10 @@ function ejecutarConsulta(entrada, sql) {
     // `tiempo_agotado`. Sólo cuando el proceso falló: en una corrida exitosa,
     // stdout son datos.
     const textoError = (entrada.dialecto === 'sqlserver' && r.status !== 0 && String(r.stderr || '').trim() === '')
-      ? errorDeSqlcmd(r.stdout) : r.stderr;
+      // Se redacta stdout ENTERO antes de elegir el tramo: si se cortara
+      // primero, una credencial partida por el corte dejaría pasar su final
+      // sin redactar (review de v25, ronda 2).
+      ? errorDeSqlcmd(redactar(r.stdout, sensibles)) : r.stderr;
     const salidaError = redactar(textoError, sensibles);
     // 🔴 LA GUARDA DE RÉPLICA SE CLASIFICA PRIMERO (AC46), antes del tiempo
     // agotado y del genérico `conexion_fallida`: si la sesión cayó en el
