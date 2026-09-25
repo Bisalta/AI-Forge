@@ -727,7 +727,7 @@ Casos de prueba: los 21 de la revisión de Patrick Ocampo (`SDD/tests/fixtures/c
 **AC58** (detección, v26) — El comando de `psql` lleva `PGSSLROOTCERT` apuntando a `plugins/bisalta-db/certificados/rds-global-bundle.pem`, dentro del propio plugin, y ese archivo existe, trae certificados y no trae ninguna clave privada. **Mutaciones declaradas**: (a) volver a `require` pone rojo el assert del modo; (b) quitar `PGSSLROOTCERT` pone rojo el assert de la ruta; (c) apuntarla a un archivo que no existe pone rojo el assert de existencia. **Parte `manual-only`**, contra las bases reales, desde el servidor del repo: las seis conexiones de Postgres conectan con `verify-full`; y con el bundle reemplazado por una autoridad ajena, la conexión falla con `certificate verify failed`.
 
 **AC59** (detección, v26) — `SDD/tests/secret-scan.sh` no escanea las líneas de **base64 puro** que están dentro de un bloque **cerrado** `-----BEGIN CERTIFICATE-----` … `-----END CERTIFICATE-----`. Escanea todo lo demás, y los números de línea informados siguen siendo los del archivo. No hay ninguna exclusión por path. Las condiciones son cuatro:
-(1) **Bloque cerrado**: las líneas del bloque se vacían recién cuando llega el `END`; si el archivo termina sin `END`, todas se escanean tal cual.
+(1) **Bloque cerrado**: las líneas del bloque se vacían recién cuando llega el `END`. Si el archivo termina sin `END`, todas se escanean tal cual. Si llega otro `BEGIN` con el bloque abierto, las del bloque abierto se escanean tal cual y el bloque se reabre.
 (2) **Base64 puro**: la línea, sin CR ni espacios finales, tiene entre 1 y 76 caracteres de `A–Z`, `a–z`, `0–9`, `+` y `/`, con a lo sumo dos `=` y sólo al final. `clave=valor` no lo es.
 (3) **CR y espacios al final** se toleran al reconocer las líneas `BEGIN`/`END` y al decidir si una línea es base64.
 (4) **Los binarios** se saltean antes, como antes de `AC59`.
@@ -738,7 +738,8 @@ Casos en `SDD/tests/test_secret_scan.sh`, formas 7 a 13:
 - la forma 10: un `BEGIN` sin `END` seguido de un `clave=valor` y de una clave de AWS da rojo, con las dos líneas;
 - la forma 11: un `clave=valor` alfanumérico dentro de un bloque cerrado da rojo;
 - la forma 12: un binario no se escanea;
-- la forma 13: un certificado con CRLF se reconoce.
+- la forma 13: un certificado con CRLF se reconoce;
+- la forma 14: un PEM truncado, una clave de AWS y después un certificado completo da rojo en la línea de la clave.
 **Mutaciones declaradas**, cada una pone rojo la forma indicada:
 - (a) quitar la regla: la 7;
 - (b) vaciar toda línea del bloque: la 9 y la 11;
@@ -746,8 +747,9 @@ Casos en `SDD/tests/test_secret_scan.sh`, formas 7 a 13:
 - (d) tratar el fin de archivo como `END`: la 10;
 - (e) una clase de base64 que acepte `=` en cualquier lugar: la 11;
 - (f) no saltear los binarios: la 12;
-- (g) no tolerar CR: la 13.
-**Límite conocido**: un identificador de clave de AWS escrito solo en su línea, dentro de un bloque de certificado bien formado y cerrado, no se detecta. Esconderlo así exige armar a propósito un certificado falso, y el patrón de identificador de clave nunca detectó por sí solo la clave secreta.
+- (g) no tolerar CR: la 13;
+- (h) no reabrir el bloque ante un segundo `BEGIN`: la 14.
+**Límite conocido**: un identificador de clave de AWS escrito solo en su línea, entre un `BEGIN CERTIFICATE` y el `END` que lo cierra sin otro `BEGIN` en el medio, no se detecta. Con la definición de base64 de (2), es la única alternativa del patrón que puede caer en una línea vaciada: un `clave=valor` necesita el `=` en el medio. Y el identificador de clave no es la clave secreta.
 
 **AC56** (detección, v25) — Al arrancar, el servidor borra de su tmpdir los directorios con el nombre que da `mkdtemp` al plugin —el prefijo y seis caracteres— y más de 10 minutos de antigüedad. No toca los recientes, ni los que no son del plugin, ni uno viejo que tenga el prefijo pero no ese nombre, y no sigue symlinks (`lstat`). **Mutaciones declaradas**: (a) quitar la llamada al arrancar; (b) borrar sin mirar la edad; (c) borrar sin mirar el nombre; (d) aceptar cualquier nombre con el prefijo; (e) `stat` en lugar de `lstat`. Cada una pone rojo su assert.
 

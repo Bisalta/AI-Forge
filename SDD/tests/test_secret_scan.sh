@@ -247,8 +247,26 @@ run_scan >/dev/null 2>&1; ec13=$?
 assert_exit 0 "$ec13" "forma13 un certificado con CRLF se reconoce - verde"
 remove_fixture "form13.pem"
 
+# forma 14: un PEM truncado, una clave AWS sola en su línea y después un
+# certificado completo -> rojo en la línea de la clave. El BEGIN del segundo
+# no puede estirar el primero hasta su END.
+{
+  printf '%s\n' "$INICIO_CERT"
+  printf 'MIIEBjCCAu6gAwIBAgIJ\n'
+  printf 'texto de un ejemplo truncado\n'
+  printf '%s\n' "$CLAVE_AWS"
+  printf '%s\n' "$INICIO_CERT"
+  printf 'MIIEBjCCAu6gAwIBAgIJ\n'
+  printf '%s\n' "$FIN_CERT"
+} > "$TMP_DIR/form14.md"
+( cd "$TMP_DIR" && git add -A )
+out14="$(run_scan 2>&1)"; ec14=$?
+assert_exit 1 "$ec14" "forma14 un PEM truncado seguido de uno completo no forma un solo bloque - rojo"
+assert_contains "$out14" "form14.md:4:" "forma14 detecta la clave AWS entre los dos bloques"
+remove_fixture "form14.md"
+
 run_scan >/dev/null 2>&1; ec_final=$?
-assert_exit 0 "$ec_final" "secret-scan.sh sale limpio tras remover las formas 7 a 13"
+assert_exit 0 "$ec_final" "secret-scan.sh sale limpio tras remover las formas 7 a 14"
 
 test_summary
 exit $?

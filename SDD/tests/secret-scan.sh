@@ -126,6 +126,11 @@ while IFS= read -r f; do
     {
       l = limpia($0)
       if (!en_cert && l == "-----BEGIN CERTIFICATE-----") { en_cert = 1; n = 1; buf[1] = $0; next }
+      # Un BEGIN con el bloque ya abierto: el anterior no cerró, así que sus
+      # líneas se escanean tal cual, y el bloque se reabre acá (review de v26,
+      # ronda 2). Si no, un PEM truncado seguido de uno completo formaría un
+      # solo bloque, y lo que quedara en el medio no se escanearía.
+      if (en_cert && l == "-----BEGIN CERTIFICATE-----") { for (k = 1; k <= n; k++) print buf[k]; n = 1; buf[1] = $0; next }
       if (en_cert && l == "-----END CERTIFICATE-----") {
         print buf[1]
         for (k = 2; k <= n; k++) { if (es_base64(buf[k])) print ""; else print buf[k] }
