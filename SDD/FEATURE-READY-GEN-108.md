@@ -88,7 +88,8 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 6. ~~Review §7.5 de v25~~ — ronda 1 `REJECTED` (dos MAJOR de documentación); ronda 2 `APPROVED` con cuatro MINOR, corregidos; **ronda 3 `APPROVED`**, sin hallazgos.
 7. ~~Tu gate de Feature Ready, otra vez, sobre v25~~ — **aprobado el 25-sep**, después de la prueba a través del plugin instalado.
 7b. ~~v26, el bundle de RDS~~ (pedido en la misma aprobación): review §7.5 en tres rondas. Ronda 1 `REJECTED`, porque la primera regla del secret-scan tenía dos huecos. Ronda 2 `APPROVED` con un tercer hueco, corregido. **Ronda 3 `APPROVED`**, con dos MINOR de prosa a deuda (`D79`, `D80`).
-7c. **Probar v26 a través del plugin instalado** (reinstalar y reiniciar), y confirmar Feature Ready sobre v26, que cambia qué mira un gate de seguridad.
+7c. ~~Probar v26 a través del plugin instalado~~ — hecho el 25-sep a las 14:04: las seis conexiones de Postgres conectan con `verify-full`, y SQL Server responde igual (report de v26, §5).
+7d. **Confirmar Feature Ready sobre v26**, que cambia qué mira un gate de seguridad (`AC59`).
 8. **Merge.** Requiere la review de un code owner (`@Bisalta/construplaza-admin`). No habilita nada al equipo por sí solo.
 
 Para **habilitarlo al equipo** hace falta además la aprobación de Esteban o Sebastián.

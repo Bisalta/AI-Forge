@@ -618,3 +618,17 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
 | `AC59` | `SDD/tests/test_secret_scan.sh`: formas 7 a 14 (`forma7 …`, `forma8 …` —dos—, `forma9 …` —dos—, `forma10 …` —tres—, `forma11 …` —dos—, `forma12 …`, `forma13 …` y `forma14 …` —dos—), y el control final de árbol limpio |
 
 El resto del binding de `AC53` a `AC57` no cambió: está en el report de v25, §4.
+
+## 5. Verificación a través del plugin **instalado** (sección del planner, 25-sep-2026, 14:04)
+
+Se reinstalaron `bisalta-db` y `sdd-flow` desde el marketplace local a las 14:02. La copia instalada tiene el código de v26: `certificados/rds-global-bundle.pem` con sha256 `e5bb2084ccf45087…`, y `PGSSLMODE: 'verify-full'` en `conexion.js`. Después de reiniciar Claude Code queda un solo servidor MCP, arrancado a las 14:03, después de la reinstalación. Las pruebas se hicieron a través de las herramientas del plugin, desde la sesión:
+
+| Prueba | Resultado |
+|---|---|
+| `AC58`: las seis conexiones de Postgres, `pg_stat_ssl` de la propia sesión | las seis conectan: `ssl = t`, `TLSv1.3` |
+| En `proveedores-dev`, además: réplica, sesión y nombre | réplica `t`, `default_transaction_read_only = on`, `statement_timeout = 1min`, `application_name = claude_lectura` |
+| SQL Server, `compras`: base, instancia y bases visibles | `COMPRAS`, `EC2AMAZ-2RGHL0C`, 3 |
+| `AC57`: un error de permiso | llega con el mensaje del motor |
+| `AC53`: `WAITFOR` encadenado | `no_es_lectura`, `sentencia_no_permitida`; no conecta |
+
+El control negativo de `AC58` (el bundle cambiado por una autoridad ajena) no se repitió sobre la copia instalada, para no tocarla a mano. Está en el §3, sobre el mismo código.
