@@ -159,6 +159,7 @@ mano en DBeaver, donde una persona ve lo que va a pasar antes de que pase.
 | `EXEC`, `EXECUTE`, identificador `sp_`/`xp_` | n/a | **rechazados** |
 | `TRUNCATE`, `DROP`, `CREATE`, `ALTER` en cualquier posición (v19, `AC52`) | n/a | **rechazadas** |
 | Literal, identificador o comentario de bloque sin cerrar (v20, `AC51`) | **rechazado**, con el tipo en el motivo | **rechazado**, con el tipo en el motivo |
+| `WAITFOR`, `WHILE`, `GRANT`, `REVOKE`, `DENY`, `USE`, `DBCC`, `SET`, `DECLARE`, `BEGIN`, `BACKUP`, `RESTORE`, `KILL`, `SHUTDOWN`, `OPENROWSET`, `OPENQUERY`, `OPENDATASOURCE` en cualquier posición (v25, `AC53`) | n/a | **rechazadas** (`sentencia_no_permitida`) |
 
 En `sqlserver` se manda **una sola sentencia y sin punto y coma**: no existe
 equivalente de sesión de solo lectura que contenga un batch de T-SQL. La lista
@@ -210,7 +211,7 @@ si algo no cierra.
 | `nombre` | minúsculas, dígitos y guiones; único en el arreglo |
 | `dialecto` | `postgres` o `sqlserver` |
 | `ambiente` | `dev` o `qa` — **no hay valor que nombre producción** |
-| `host` | cadena no vacía; se rechaza si contiene el cluster o el host de la cuenta de producción |
+| `host` | cadena no vacía; se rechaza si contiene el cluster o el host de la cuenta de producción. **Es un freno, no la barrera**: compara por substring, así que un CNAME o una IP distinta del mismo servidor no la dispara. La barrera real es IAM: sin permiso sobre el secreto de producción, no hay credencial |
 | `puerto` | entero entre 1 y 65535 |
 | `base` | cadena no vacía |
 | `secret_id` | identificador o ARN del secreto |
@@ -268,6 +269,22 @@ Dos precisiones sobre estos valores:
   tiene equivalente de archivo, y su bandera de contraseña la dejaría visible
   en la tabla de procesos de toda la máquina.
 - En los dos casos, **la contraseña nunca viaja por `argv`**.
+- **Archivos huérfanos** (v25, `AC56`): si el proceso muere con `SIGKILL`, el
+  `finally` no corre y el archivo queda en el tmpdir. Al arrancar, el servidor
+  borra los directorios del plugin de más de 10 minutos.
+- **Un secreto por motor** cubre a la vez `dev` y `qa`: si se filtra, abre las
+  seis bases de ese motor. Riesgo aceptado (contract v25): el aislamiento es por
+  política IAM, según la regla de Patrick Ocampo (v12).
+
+## Cifrado en tránsito (v25, `AC55`)
+
+- **Postgres**: `PGSSLMODE=require`. Cifra o no conecta; con el `prefer` por
+  omisión, caía a texto plano si el servidor no ofrecía TLS. **Todavía no
+  verifica el certificado** (`verify-full` con el bundle de RDS, `D70`).
+- **SQL Server**: `-N true -C`. Exige el cifrado, pero confía en el
+  certificado sin validarlo: medido el 25-sep, sin `-C` la conexión falla
+  porque el certificado de la instancia no es de una autoridad conocida.
+  **Cifra, pero no autentica al servidor** (`D71`).
 
 ## Respuesta y topes
 
@@ -301,8 +318,8 @@ plugin al equipo, no algo que este código controle.
 | Nombre ausente del catálogo | 3 | `conexion_desconocida`, con la lista de nombres válidos |
 | Sentencia rechazada por la lista blanca | 4 | `no_es_lectura`, con los primeros 90 caracteres de la sentencia ofensora |
 | El secreto no resuelve | 5 | `secreto_inaccesible`, con la conexión y el `secret_id`, **sin la salida cruda de `aws`** |
-| Conexión rechazada o caída | 6 | `conexion_fallida`, con el mensaje del cliente, sin la credencial |
-| Tiempo agotado: el motor corta por su propio límite de sentencia (Postgres: `statement_timeout` del rol, 60s — v19), o el plugin corta el proceso (125 s, los dos motores) | 7 | `tiempo_agotado` |
+| Conexión rechazada o caída | 6 | `conexion_fallida`, con el mensaje del cliente, sin la credencial. En SQL Server el mensaje sale de stdout, porque `sqlcmd` escribe ahí sus errores (v25, `AC57`) |
+| Tiempo agotado: el motor corta por su propio límite de sentencia (Postgres: `statement_timeout` del rol, 60s — v19), `sqlcmd` corta la consulta (`-t 60`, v25), o el plugin corta el proceso (125 s, los dos motores) | 7 | `tiempo_agotado` |
 | Binario del cliente ausente | 8 | `cliente_ausente`, nombrando el binario |
 | La conexión Postgres no llegó a una réplica de lectura (v16) | 9 | `no_es_replica`, con el nombre de la conexión. **El SQL del consumidor no se ejecutó** |
 

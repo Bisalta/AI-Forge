@@ -6,7 +6,7 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ### 0.1.0 — 2026-09-18
 
-Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v24).
+Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v25).
 Consulta de solo lectura a las bases de dev/qa de Bisalta desde Claude Code, **sin que
 ninguna credencial entre en el contexto de la sesión**. La credencial no desaparece: pasa de un
 archivo que hoy hay que leerle al modelo —y que queda archivado en el transcript— a un secreto de
@@ -109,6 +109,12 @@ dos clases quedan como límite conocido. v20 —la normalización que conoce el 
 dialecto— la escribió Patrick, casos y función: ningún agente pudo hacer ese trabajo (`RT54`). También
 en v19: el límite de tiempo pasa al rol, y el `ALTER ROLE` y el esquema `public` que Patrick había
 configurado a mano entran a los scripts. Las cuatro mutaciones declaradas de `AC51` caen. Dos no caían del todo —la de los literales `E'…'` no caía, y la de los corchetes caía en parte— porque esas reglas existen para aceptar consultas legítimas y ningún caso lo era: la primera se cerró con seis casos de Patrick (v23), y la segunda con cinco que escribió el planner (v24).
+
+**Review de seguridad de gradiel12 (v25)**: TLS obligatorio en los dos motores, todavía sin verificar
+el certificado del servidor; `sqlcmd -t 60`; diecisiete sentencias de SQL Server que no son lectura,
+rechazadas por nombre; y los temporales huérfanos, borrados al arrancar. Al medir apareció un defecto
+que ninguna review había visto: `sqlcmd` escribe sus errores en stdout, el plugin sólo leía stderr, y
+todo error de SQL Server llegaba sin mensaje. El stub del test era una copia del de `psql` (`RT55`).
 
 **Lo que dejó el kilometraje**: dos defectos que la suite encontró y que valen por separado. (1) El
 tope de bytes salía vacío porque `process.exit()` **corta lo que `process.stdout` todavía tiene en
