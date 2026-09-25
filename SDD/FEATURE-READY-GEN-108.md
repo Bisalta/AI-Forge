@@ -73,7 +73,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 | **v25** | Review de seguridad de gradiel12: `AC53` a `AC57`, 29 mutaciones que caen, cifrado verificado en vivo. **En review** (§7.5) |
 | **Aprovisionamiento** | Postgres ejecutado por Patrick el 22-sep y SQL Server el 23-sep, verificados desde el plugin. Parte de su evidencia vive en Slack (`D61`) |
 | **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep, **iniciales para probar la herramienta**, no definitivas |
-| **Deuda, retro y escalaciones del ciclo** | 45 ítems de deuda (31 abiertos), 33 entradas de retro hasta `RT55` y 12 escalaciones hasta `E20` |
+| **Deuda, retro y escalaciones del ciclo** | 47 ítems de deuda (33 abiertos), 33 entradas de retro hasta `RT55` y 12 escalaciones hasta `E20` |
 
 **Lo que este PR NO hace**: no crea ningún rol, no toca ninguna base, no carga ningún secreto. Es código y procedimientos. Lo que ya existe en AWS y en las bases lo hizo Patrick a mano.
 

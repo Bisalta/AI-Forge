@@ -224,6 +224,10 @@ const HERRAMIENTAS = [
       'Rechaza, antes de conectar, toda sentencia que no empiece con SELECT o WITH, y también las que ' +
       'llevan una escritura embebida: INSERT, UPDATE, DELETE, MERGE o INTO en cualquier posición ' +
       '(un WITH con escritura adentro, SELECT ... INTO) y, en Postgres, set_config. ' +
+      'En SQL Server se manda una sola sentencia, sin punto y coma, y se rechazan además TRUNCATE, DROP, ' +
+      'CREATE, ALTER, EXEC, sp_/xp_ y las sentencias que no son lectura (WAITFOR, WHILE, GRANT, REVOKE, ' +
+      'DENY, USE, DBCC, SET, DECLARE, BEGIN, BACKUP, RESTORE, KILL, SHUTDOWN, OPENROWSET, OPENQUERY, ' +
+      'OPENDATASOURCE), con un límite de 60 s por consulta. ' +
       'En Postgres, si la conexión no llegó a una réplica de lectura, se niega con no_es_replica sin ' +
       'ejecutar el SQL. Tope de ' + LIMITE_FILAS + ' filas y ' + LIMITE_BYTES + ' bytes.',
     inputSchema: {

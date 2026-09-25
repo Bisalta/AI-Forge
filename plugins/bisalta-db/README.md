@@ -159,7 +159,7 @@ mano en DBeaver, donde una persona ve lo que va a pasar antes de que pase.
 | `EXEC`, `EXECUTE`, identificador `sp_`/`xp_` | n/a | **rechazados** |
 | `TRUNCATE`, `DROP`, `CREATE`, `ALTER` en cualquier posición (v19, `AC52`) | n/a | **rechazadas** |
 | Literal, identificador o comentario de bloque sin cerrar (v20, `AC51`) | **rechazado**, con el tipo en el motivo | **rechazado**, con el tipo en el motivo |
-| `WAITFOR`, `WHILE`, `GRANT`, `REVOKE`, `DENY`, `USE`, `DBCC`, `SET`, `DECLARE`, `BEGIN`, `BACKUP`, `RESTORE`, `KILL`, `SHUTDOWN`, `OPENROWSET`, `OPENQUERY`, `OPENDATASOURCE` en cualquier posición (v25, `AC53`) | n/a | **rechazadas** (`sentencia_no_permitida`) |
+| `WAITFOR`, `WHILE`, `GRANT`, `REVOKE`, `DENY`, `USE`, `DBCC`, `SET`, `DECLARE`, `BEGIN`, `BACKUP`, `RESTORE`, `KILL`, `SHUTDOWN`, `OPENROWSET`, `OPENQUERY`, `OPENDATASOURCE` en cualquier posición (v25, `AC53`). Dentro de un nombre entre corchetes o comillas dobles (`[set]`, `"use"`) también: rechazo de más, a sabiendas | n/a | **rechazadas** (`sentencia_no_permitida`) |
 
 En `sqlserver` se manda **una sola sentencia y sin punto y coma**: no existe
 equivalente de sesión de solo lectura que contenga un batch de T-SQL. La lista
@@ -280,7 +280,9 @@ Dos precisiones sobre estos valores:
 
 - **Postgres**: `PGSSLMODE=require`. Cifra o no conecta; con el `prefer` por
   omisión, caía a texto plano si el servidor no ofrecía TLS. **Todavía no
-  verifica el certificado** (`verify-full` con el bundle de RDS, `D70`).
+  verifica el certificado** (`verify-full` con el bundle de RDS, `D70`). Ojo:
+  si existe `~/.postgresql/root.crt`, libpq lo usa aunque el modo sea `require`
+  y se comporta como `verify-ca`; un `root.crt` de otra cosa impide conectar.
 - **SQL Server**: `-N true -C`. Exige el cifrado, pero confía en el
   certificado sin validarlo: medido el 25-sep, sin `-C` la conexión falla
   porque el certificado de la instancia no es de una autoridad conocida.

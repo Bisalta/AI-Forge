@@ -143,7 +143,14 @@ case "${BISALTA_STUB_PSQL_MODO:-normal}" in
   # AC57 (v25): sqlcmd escribe sus errores en stdout y deja stderr vacío
   # (medido el 25-sep contra la instancia real).
   falla-stdout)
-    printf 'Msg 300, Level 14, State 1, Server EC2X, Line 1\nVIEW SERVER STATE permission was denied\n'
+    # Con la credencial dentro del mensaje, para que el assert de redacción
+    # tenga algo que tapar (review de v25, MINOR 2).
+    printf 'Msg 300, Level 14, State 1, Server EC2X, Line 1\nVIEW SERVER STATE permission was denied (%s)\n' "$BISALTA_STUB_VALOR"
+    exit 1
+    ;;
+  # Falla después de emitir filas: primero los datos, después el Msg.
+  filas-y-error)
+    printf 'texto\nTimeout expired\nMsg 245, Level 16, State 1, Server EC2X, Line 1\nConversion failed\n'
     exit 1
     ;;
   timeout-stdout)
@@ -664,7 +671,7 @@ assert_contains "$lineas_arg" "ARG -C|" "AC55 sqlcmd lleva -C (el certificado de
 # ---------------------------------------------------------------------------
 # AC57 (v25) — el error de sqlcmd sale por stdout
 # ---------------------------------------------------------------------------
-for modo in falla-stdout timeout-stdout datos-con-timeout; do
+for modo in falla-stdout filas-y-error timeout-stdout datos-con-timeout; do
   BISALTA_STUB_PSQL_MODO=$modo
   export BISALTA_STUB_PSQL_MODO
   reiniciar_registros
@@ -673,6 +680,12 @@ for modo in falla-stdout timeout-stdout datos-con-timeout; do
     falla-stdout)
       assert_contains "$cuerpo" '"error":"conexion_fallida"' "AC57 un error de sqlcmd se informa como conexion_fallida"
       assert_contains "$cuerpo" "VIEW SERVER STATE permission was denied" "AC57 el mensaje de un error de sqlcmd no llega vacío"
+      assert_no_contains "$cuerpo" "$VALOR_CREDENCIAL" "AC57 la credencial no sale en el mensaje tomado de stdout"
+      assert_contains "$cuerpo" "[redactado]" "AC57 (control) el mensaje tomado de stdout pasa por la redacción"
+      ;;
+    filas-y-error)
+      assert_contains "$cuerpo" '"error":"conexion_fallida"' "AC57 un error después de filas no se lee como corte por el dato que dice Timeout expired"
+      assert_contains "$cuerpo" '"mensaje":"Msg 245' "AC57 el mensaje empieza en el Msg, no en los datos"
       ;;
     timeout-stdout)
       assert_contains "$cuerpo" '"error":"tiempo_agotado"' "AC57 el corte por -t de sqlcmd se informa como tiempo_agotado"
@@ -699,18 +712,22 @@ assert_contains "$(grep '^PGSSLMODE ' "$TMP_DIR/psql-invocado.log")" "PGSSLMODE 
 # Tres directorios en el tmpdir que usa el servidor: uno del plugin y viejo
 # (huérfano), uno del plugin y reciente (de una consulta que otra sesión
 # puede estar corriendo), y uno viejo que no es del plugin.
-HUERFANO="$SYSTMP/bisalta-db-huerfano-prueba"
-RECIENTE="$SYSTMP/bisalta-db-reciente-prueba"
+# Los del plugin tienen el nombre que da `mkdtemp`: el prefijo y seis
+# caracteres. `bisalta-db-respaldo-viejo` tiene el prefijo pero no es del plugin.
+HUERFANO="$SYSTMP/bisalta-db-Hu3rf0"
+RECIENTE="$SYSTMP/bisalta-db-R3c1en"
 AJENO="$SYSTMP/otro-programa-viejo-prueba"
-mkdir -p "$HUERFANO" "$RECIENTE" "$AJENO"
+CON_PREFIJO="$SYSTMP/bisalta-db-respaldo-viejo"
+mkdir -p "$HUERFANO" "$RECIENTE" "$AJENO" "$CON_PREFIJO"
 : > "$HUERFANO/passfile"
 # Fecha fija y vieja: `date -v` es de BSD y `date -d` de GNU; `touch -t` es de los dos.
-touch -t 202001010000 "$HUERFANO" "$AJENO"
+touch -t 202001010000 "$HUERFANO" "$AJENO" "$CON_PREFIJO"
 servidor_jsonrpc '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"listar_conexiones"}}' "$PATH_CON_STUBS" >/dev/null
 assert_eq "$([ -e "$HUERFANO" ] && echo queda || echo borrado)" "borrado" "AC56 al arrancar, el servidor borra el temporal huérfano del plugin"
 assert_eq "$([ -e "$RECIENTE" ] && echo queda || echo borrado)" "queda" "AC56 no borra el temporal reciente (puede ser de otra sesión)"
 assert_eq "$([ -e "$AJENO" ] && echo queda || echo borrado)" "queda" "AC56 no borra directorios que no son del plugin"
-rm -rf "$HUERFANO" "$RECIENTE" "$AJENO"
+assert_eq "$([ -e "$CON_PREFIJO" ] && echo queda || echo borrado)" "queda" "AC56 no borra un directorio viejo con el prefijo que no tiene el nombre de mkdtemp"
+rm -rf "$HUERFANO" "$RECIENTE" "$AJENO" "$CON_PREFIJO"
 
 test_summary
 exit $?

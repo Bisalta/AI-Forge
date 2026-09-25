@@ -69,8 +69,8 @@ const ESCRITURA_EMBEBIDA_SQLSERVER = /(^|[^A-Za-z0-9_])(INSERT|UPDATE|DELETE|MER
 // OPEN* abren una conexión a otro servidor desde el motor. Se rechazan todas
 // acá, que es la capa que da el error temprano. Como la palabra se busca en la
 // sentencia normalizada, una que vive dentro de un literal no cuenta, pero una
-// dentro de un nombre entre corchetes sí: `[set]` se rechaza de más, a
-// sabiendas.
+// dentro de un nombre entre corchetes o entre comillas dobles sí: `[set]` y
+// `"set"` se rechazan de más, a sabiendas.
 const SENTENCIA_NO_LECTURA_SQLSERVER = /(^|[^A-Za-z0-9_])(WAITFOR|WHILE|GRANT|REVOKE|DENY|USE|DBCC|SET|DECLARE|BEGIN|BACKUP|RESTORE|KILL|SHUTDOWN|OPENROWSET|OPENQUERY|OPENDATASOURCE)([^A-Za-z0-9_]|$)/i;
 
 /**

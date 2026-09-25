@@ -43,6 +43,7 @@ const PREFIJO_TEMP = 'bisalta-db-';
 // encima del corte de proceso (TIMEOUT_PROCESO_MS), así que no se borra el de
 // una consulta que otra sesión todavía está corriendo.
 const EDAD_HUERFANO_MS = 10 * 60 * 1000;
+const NOMBRE_TEMP = new RegExp('^' + PREFIJO_TEMP + '[A-Za-z0-9]{6}$');
 // AC54 (v25): límite de consulta de SQL Server, del lado del cliente con `-t`.
 // Es el mismo valor que el `statement_timeout` del rol de Postgres (AC49):
 // SQL Server no tiene un equivalente por login, y sin esto una sentencia
@@ -327,7 +328,7 @@ function ejecutarConsulta(entrada, sql) {
     // `tiempo_agotado`. Sólo cuando el proceso falló: en una corrida exitosa,
     // stdout son datos.
     const textoError = (entrada.dialecto === 'sqlserver' && r.status !== 0 && String(r.stderr || '').trim() === '')
-      ? r.stdout : r.stderr;
+      ? errorDeSqlcmd(r.stdout) : r.stderr;
     const salidaError = redactar(textoError, sensibles);
     // 🔴 LA GUARDA DE RÉPLICA SE CLASIFICA PRIMERO (AC46), antes del tiempo
     // agotado y del genérico `conexion_fallida`: si la sesión cayó en el
@@ -365,6 +366,19 @@ function ejecutarConsulta(entrada, sql) {
 }
 
 /**
+ * AC57 (v25): el error de sqlcmd dentro de su stdout. Si falló después de
+ * haber emitido filas, stdout trae primero los datos y después el `Msg`: se
+ * toma desde la primera línea `Msg <n>, Level <n>`, para que el mensaje no
+ * sean datos y un dato que diga "Timeout expired" no se lea como corte. Si no
+ * hay ninguna, se toma el final de stdout, que es donde sqlcmd escribe.
+ */
+function errorDeSqlcmd(stdout) {
+  const s = String(stdout === null || stdout === undefined ? '' : stdout);
+  const m = /^Msg \d+, Level \d+/m.exec(s);
+  return m ? s.slice(m.index) : s.slice(-500);
+}
+
+/**
  * AC56 (v25): borra los directorios temporales del plugin que quedaron de un
  * proceso muerto sin pasar por el `finally`. Se llama al arrancar el
  * servidor. Sólo toca directorios con el prefijo del plugin y más viejos que
@@ -380,10 +394,14 @@ function limpiarTemporalesHuerfanos(directorio, edadMinimaMs, ahoraMs) {
   let nombres = [];
   try { nombres = fs.readdirSync(dir); } catch (e) { return 0; }
   for (let i = 0; i < nombres.length; i += 1) {
-    if (nombres[i].indexOf(PREFIJO_TEMP) !== 0) continue;
+    // Sólo lo que crea `mkdtemp`: el prefijo más sus seis caracteres. Un
+    // `bisalta-db-respaldo-viejo` del usuario no coincide.
+    if (!NOMBRE_TEMP.test(nombres[i])) continue;
     const ruta = path.join(dir, nombres[i]);
     try {
-      const st = fs.statSync(ruta);
+      // `lstat` y no `stat`: un symlink con ese nombre no es un directorio del
+      // plugin, y no se sigue.
+      const st = fs.lstatSync(ruta);
       if (!st.isDirectory() || ahora - st.mtimeMs < edad) continue;
       fs.rmSync(ruta, { recursive: true, force: true });
       borrados += 1;

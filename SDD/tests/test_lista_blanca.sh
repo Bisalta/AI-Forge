@@ -272,7 +272,9 @@ CASOS
 #
 # Dos veredictos parecen errores y no lo son: el comentario de bloque anidado
 # se ACEPTA (para el motor es sólo la lectura que lo precede), y la sección
-# "límite conocido" se acepta a propósito (contract v19, "Riesgos").
+# "límite conocido" se acepta a propósito (contract v19, "Riesgos"). Desde
+# v25, el caso 8 de esa sección se RECHAZA: usa `OPENQUERY`, que AC53 rechaza
+# por nombre, y su veredicto esperado cambió en el archivo de Patrick.
 # Recorre un archivo de casos de Patrick Ocampo: <archivo> <export> <prefijo>.
 # El prefijo va en el nombre de cada assert; el de la primera tanda es el que
 # cita el binding de v19, así que no cambia. Las consultas nunca pasan por
