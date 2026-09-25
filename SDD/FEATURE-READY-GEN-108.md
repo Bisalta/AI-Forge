@@ -70,7 +70,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 | **v20 a v22** | Casos y función de Patrick, integración del planner; v21 y v22 cierran la ronda 1 de review. 42 de 42 casos. Mutaciones: (d) cae; **(b) abierta**; **(c) abierta en parte**; (a) declarada con adaptador. La evidencia de mutaciones sobre el árbol de v22, **pendiente** a cargo de una persona. `APPROVED` (ronda 3), con las mutaciones abiertas registradas como deuda (`D63`–`D65`) |
 | **v23** | Seis casos más de Patrick para la mutación (b), que ahora cae. 48 de 48 casos. Review §7.5: `APPROVED` en la ronda 2. El caso 13 nombra su tipo (`D67`): `ESCALATE` en la ronda 3 por evidencia faltante, ratificado por el planner con la escalera sellada (`E20`). Después, la (a) sobre el árbol actual (`D65`), con review `APPROVED` en la ronda 3 |
 | **v24** | Cinco casos del planner para la mutación (c), que ahora cae (`D64`). Las cuatro mutaciones de `AC51` caen sobre el árbol actual. Review §7.5: `APPROVED` en la ronda 3 |
-| **v25** | Review de seguridad de gradiel12: `AC53` a `AC57`, 34 mutaciones que caen, cifrado verificado en vivo. **En review** (§7.5) |
+| **v25** | Review de seguridad de gradiel12: `AC53` a `AC57`, 34 mutaciones que caen, cifrado verificado en vivo. Review §7.5: `APPROVED` en la ronda 3 |
 | **Aprovisionamiento** | Postgres ejecutado por Patrick el 22-sep y SQL Server el 23-sep, verificados desde el plugin. Parte de su evidencia vive en Slack (`D61`) |
 | **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep, **iniciales para probar la herramienta**, no definitivas |
 | **Deuda, retro y escalaciones del ciclo** | 47 ítems de deuda (33 abiertos), 33 entradas de retro hasta `RT55` y 12 escalaciones hasta `E20` |
@@ -84,7 +84,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 3. ~~Tu gate de Feature Ready~~ — **aprobado el 24-sep sobre v22**. **No se reconfirma sobre v23**: v23 sólo agrega casos al fixture y cierra una deuda que la aprobación ya aceptaba abierta (`D63`); no cambia código, alcance ni riesgos. Si querés reconfirmarlo igual, es tu decisión. Lo que se aprobó abierto quedó cerrado después: **(b) en v23, la evidencia de (a) sobre el árbol actual, y (c) en v24** (`D63`–`D65`). v24 tampoco cambia código, alcance ni riesgos: agrega casos al test.
 4. ~~Review §7.5 de v23~~ — ronda 1 `REJECTED`, sólo por documentos; **ronda 2 `APPROVED`**, sin hallazgos. Después, el caso 13 de Patrick pasó a nombrar su tipo (`D67`, `e0a70bb`): sólo la descripción, con su triple en el report de v23, §4. Por ser posterior a `APPROVED`, volvió a review: `ESCALATE` en la ronda 3, porque la escalera sellada no cubría el fixture nuevo. El planner lo ratificó corriendo el runner sobre ese árbol (`E20`). La (a) sobre el árbol actual: tres rondas, `APPROVED` en la tercera.
 5. ~~Review §7.5 de v24~~ — ronda 1 `REJECTED`, sólo por documentos; ronda 2 `APPROVED` con un MINOR, corregido; **ronda 3 `APPROVED`**, sin hallazgos.
-6. **Review §7.5 de v25** — pendiente.
+6. ~~Review §7.5 de v25~~ — ronda 1 `REJECTED` (dos MAJOR de documentación); ronda 2 `APPROVED` con cuatro MINOR, corregidos; **ronda 3 `APPROVED`**, sin hallazgos.
 7. **Tu gate de Feature Ready, otra vez, sobre v25**: v25 cambia código.
 8. **Merge.** Requiere la review de un code owner (`@Bisalta/construplaza-admin`). No habilita nada al equipo por sí solo.
 
