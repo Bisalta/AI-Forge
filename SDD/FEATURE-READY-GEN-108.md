@@ -1,9 +1,9 @@
 # Feature Ready — `bisalta-db` v0.1.0 · consulta de solo lectura sin credencial en contexto
 
-**Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v27** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
+**Branch**: `feat-GEN-108-mcp-bisalta-db` → `prod` · **Contract**: `SDD/contracts/2026-09-18-bisalta-db-mcp.md` **v28** · **Proxima**: `GEN-108` (`GEN-108.1`, `GEN-108.2`)
 **Quién hizo qué**: `AGENT_r1` (infra) y `AGENT_r2` (third-party-integration) hasta v19 · **v20 lo escribió Patrick Ocampo** (casos y función de normalización), Ian los pegó y lo integró el planner · v21 y v22 los hizo el planner a pedido de Ian, porque ningún agente pudo tocar esa parte (ver "Dónde está el riesgo") · v19 a v22 **en review**: ronda 1 `REJECTED` (`E19`), ronda 2 `REJECTED` sólo por documentos, **ronda 3 `APPROVED`**
 **Feature Ready: APROBADO por Ian Vargas, 24-sep-2026** sobre v22, con las mutaciones (b) y (c) abiertas y su evidencia pendiente (`D63`–`D65`). **Después de aprobar**: v23 cerró la (b) con seis casos de Patrick y corrió (b), (c) y (d) sobre su árbol (`76f258e`); por ser una corrección posterior a `APPROVED`, v23 volvió a review (§7.5) y quedó `APPROVED` en la ronda 2. Después, el caso 13 pasó a nombrar su tipo (`D67`, `e0a70bb`); su review escaló en la ronda 3 por falta de la escalera sellada sobre ese árbol, y el planner la ratificó corriendo el runner (`E20`). Después se corrió la (a), con adaptador, sobre el árbol de entonces (`D65`). Después, v24 cerró la (c) con cinco casos del planner (`D64`). **Por último, v25 cambia código** a partir de la review de seguridad de gradiel12 en el PR: TLS obligatorio, límite de consulta en SQL Server y más sentencias rechazadas. **Feature Ready: APROBADO de nuevo por Ian Vargas sobre v25, el 25-sep-2026**, después de probarlo a través del plugin instalado. En la misma aprobación pidió sumar ya el bundle de RDS (`D70`): eso es **v26**, donde Postgres pasa a autenticar al servidor.
-**Gates**: suite 17/17 · secret-scan exit 0 · shellcheck exit 0 · linter de closure exit 0 · 48 de 48 casos adversariales de Patrick (en v25, el caso 8 pasa de aceptar a rechazar) y los del planner · escalera del árbol actual sellada por el runner en `SDD/verification/feat-GEN-108-mcp-bisalta-db-v27.md`
+**Gates**: suite 17/17 · secret-scan exit 0 · shellcheck exit 0 · linter de closure exit 0 · 48 de 48 casos adversariales de Patrick (en v25, el caso 8 pasa de aceptar a rechazar) y los del planner · escalera del árbol actual sellada por el runner en `SDD/verification/feat-GEN-108-mcp-bisalta-db-v28.md`
 
 ---
 
@@ -39,7 +39,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 - **Diecisiete sentencias de SQL Server que no son lectura, rechazadas** (`AC53`). El caso 8 de Patrick usaba `OPENQUERY` y deja de ser límite conocido: se cambió sólo su veredicto esperado.
 - **Temporales huérfanos** borrados al arrancar (`AC56`).
 - **Un defecto que la review no vio** (`AC57`): `sqlcmd` escribe sus errores en stdout, y el plugin sólo leía stderr. Todo error de SQL Server llegaba sin mensaje.
-- **Antes de habilitar al equipo**, además: el tope de conexiones del rol (`D73`), los bloqueos y el techo de recursos en Dev SQL (`D75`), y qué es `COMPRAS_STG` (`D72`). **Saber qué persona corrió cada consulta** (`D74`) quedó hecho en v27: la sesión lleva un **seudónimo** de quien consulta, sacado de su identidad de AWS (`AC60`). No lleva el correo, porque el nombre de la sesión lo ve cualquier login de la réplica. **El seudónimo no es un secreto**: quien conozca los nombres del equipo puede calcularlo. Sólo se ve en vivo; no es auditoría.
+- **Lo que faltaba antes de habilitar al equipo quedó cerrado en v28**: `claude_lectura` tiene un tope de 12 conexiones (`D73`, medido). En SQL Server la consulta corre en `READ UNCOMMITTED` para no bloquear a quien escribe, porque ninguna base tiene `READ_COMMITTED_SNAPSHOT` (`AC61`, `D75`). **A cambio, puede leer filas sin confirmar.** Un techo de recursos no se puede poner en SQL Server 2019 Standard. `COMPRAS_STG` queda en el catálogo sin usarse (`D72`, aceptada). **Saber qué persona corrió cada consulta** (`D74`) quedó hecho en v27: la sesión lleva un **seudónimo** de quien consulta, sacado de su identidad de AWS (`AC60`). No lleva el correo, porque el nombre de la sesión lo ve cualquier login de la réplica. **El seudónimo no es un secreto**: quien conozca los nombres del equipo puede calcularlo. Sólo se ve en vivo; no es auditoría.
 
 🟡 **El endpoint de réplica depende de que el cluster tenga réplicas, y tiene una sola** — con los nombres de instancia cruzados, huella de un failover anterior. Desde v16 el plugin lo comprueba en cada consulta y **se niega** (`no_es_replica`, código 9) si llegó al writer: una falla cerrada, y un riesgo de disponibilidad, no de seguridad.
 
@@ -73,9 +73,10 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 | **v25** | Review de seguridad de gradiel12: `AC53` a `AC57`, 34 mutaciones que caen, cifrado verificado en vivo. Review §7.5: `APPROVED` en la ronda 3. **Probado a través del plugin instalado** el 25-sep (report de v25, §5) |
 | **v26** | Postgres autentica al servidor con el bundle de RDS (`AC58`). Las seis conexiones conectan con `verify-full`, y con una autoridad ajena falla. **Un gate de seguridad cambió qué mira** (`AC59`): el secret-scan ya no escanea el base64 de un certificado público dentro de un bloque cerrado. La primera versión de la regla tenía tres huecos que la review encontró y que ya están cerrados. Review §7.5: `APPROVED` en la ronda 3 |
 | **v27** | La sesión lleva el seudónimo de quien consulta, sacado de su identidad de AWS (`AC60`, `D74`). Medido en vivo en los dos motores. Ronda 1 `REJECTED`: la primera versión mandaba el correo, y la review midió que lo ve cualquier login de la réplica. Ian eligió el seudónimo. Review §7.5: `APPROVED` en la ronda 3. |
+| **v28** | SQL Server corre en `READ UNCOMMITTED` (`AC61`, `D75`): medido en vivo, el nivel de la sesión pasa de `2` a `1`. `D73` pagada con el tope de 12 medido, y `D72` aceptada. Review §7.5: pendiente |
 | **Aprovisionamiento** | Postgres ejecutado por Patrick el 22-sep y SQL Server el 23-sep, verificados desde el plugin. Parte de su evidencia vive en Slack (`D61`) |
 | **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep, **iniciales para probar la herramienta**, no definitivas |
-| **Deuda, retro y escalaciones del ciclo** | 51 ítems de deuda (32 abiertos), 34 entradas de retro hasta `RT56` y 12 escalaciones hasta `E20` |
+| **Deuda, retro y escalaciones del ciclo** | 51 ítems de deuda (29 abiertos), 34 entradas de retro hasta `RT56` y 12 escalaciones hasta `E20` |
 
 **Lo que este PR NO hace**: no crea ningún rol, no toca ninguna base, no carga ningún secreto. Es código y procedimientos. Lo que ya existe en AWS y en las bases lo hizo Patrick a mano.
 
@@ -92,7 +93,8 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 7c. ~~Probar v26 a través del plugin instalado~~ — hecho el 25-sep a las 14:04: las seis conexiones de Postgres conectan con `verify-full`, y SQL Server responde igual (report de v26, §5).
 7d. ~~Confirmar Feature Ready sobre v26~~ — **APROBADO por Ian Vargas el 25-sep-2026**, después de la prueba a través del plugin instalado. v26 cambia qué mira un gate de seguridad (`AC59`).
 7e. ~~Review §7.5 de v27, quién consulta~~ (`AC60`, decisión de Ian del 28-sep): viaja un **seudónimo**, no el correo. Ronda 1 `REJECTED`, y Ian eligió el seudónimo; ronda 2 `REJECTED`, por la evidencia del §1; **ronda 3 `APPROVED`**, con los MINOR a deuda. **El merge tiene que ser con squash**: el correo de la primera versión quedó en un commit de la branch (`d1fb0e8`).
-7f. **Confirmar Feature Ready sobre v27**, que cambia `AC29`, y probarlo a través del plugin instalado.
+7f. **Review §7.5 de v28**, `READ UNCOMMITTED` en SQL Server (`AC61`).
+7g. **Confirmar Feature Ready sobre v28**, que suma v27 (cambia `AC29`) y v28 (`AC61`, con lecturas sin confirmar como riesgo aceptado), y probarlo a través del plugin instalado.
 8. **Merge.** Requiere la review de un code owner (`@Bisalta/construplaza-admin`). No habilita nada al equipo por sí solo.
 
 Para **habilitarlo al equipo** hace falta además la aprobación de Esteban o Sebastián.

@@ -54,6 +54,13 @@ const NOMBRE_TEMP = new RegExp('^' + PREFIJO_TEMP + '[A-Za-z0-9]{6}$');
 // SQL Server no tiene un equivalente por login, y sin esto una sentencia
 // larga retiene la sesión hasta el corte de proceso.
 const TIMEOUT_CONSULTA_SQLSERVER_S = 60;
+// AC61 (v28): las consultas de SQL Server corren en READ UNCOMMITTED. Medido
+// el 28-sep: ninguna base de Dev SQL tiene READ_COMMITTED_SNAPSHOT, así que
+// con el aislamiento por omisión un SELECT toma bloqueos compartidos y frena
+// a quien escribe (D75). A cambio, puede leer filas sin confirmar. Lo arma
+// el plugin, después de la lista blanca; la consulta del usuario sigue sin
+// poder llevar SET ni punto y coma (AC53).
+const AISLAMIENTO_SQLSERVER = 'SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED; ';
 // Separador de campos para SQL Server: un carácter de control que no aparece
 // en datos de texto normales (unit separator, 0x1F).
 const SEPARADOR_SQLSERVER = String.fromCharCode(31);
@@ -287,7 +294,7 @@ function construirComandoSqlserver(entrada, usuario, contrasena, sql, identidad)
       // AC60 (v27): `-H` fija lo que el motor muestra como `HOST_NAME()`. Sin
       // él, sqlcmd manda el nombre de la máquina, que no identifica a nadie.
       '-H', nombreDeSesion(usuario, identidad),
-      '-b', '-s', SEPARADOR_SQLSERVER, '-W', '-Q', sql],
+      '-b', '-s', SEPARADOR_SQLSERVER, '-W', '-Q', AISLAMIENTO_SQLSERVER + sql],
     env: env
   };
 }

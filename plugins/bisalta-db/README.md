@@ -276,6 +276,14 @@ Dos precisiones sobre estos valores:
   seis bases de ese motor. Riesgo aceptado (contract v25): el aislamiento es por
   política IAM, según la regla de Patrick Ocampo (v12).
 
+## Aislamiento en SQL Server (v28, `AC61`)
+
+En SQL Server la consulta corre en `READ UNCOMMITTED`. Ninguna base de Dev SQL tiene `READ_COMMITTED_SNAPSHOT` (medido el 28-sep), y con el aislamiento por omisión un `SELECT` toma bloqueos compartidos que frenan a quien escribe.
+
+- **El costo**: la consulta puede devolver filas que otra transacción todavía no confirmó. Si necesitás un número exacto sobre datos que se están escribiendo, tenelo en cuenta.
+- **Lo pone el plugin**, delante de tu consulta. Vos no podés mandar `SET` (lo rechaza la lista blanca).
+- **Postgres no lo necesita**: una lectura no bloquea la escritura de filas, y el plugin lee de la réplica.
+
 ## Quién consulta (v27, `AC60`)
 
 Todos entran con el mismo rol de Postgres y el mismo login de SQL Server. Para que el motor distinga personas, el nombre de la sesión lleva además un **seudónimo de quien consulta**, sacado de su identidad de AWS: `<usuario del secreto>/u-<8 hex>`. Por ejemplo, `claude_lectura/u-349175ad` en Postgres (`application_name`) y `bisalta_lectura/u-349175ad` en SQL Server (`HOST_NAME()`).

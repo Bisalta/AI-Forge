@@ -227,7 +227,9 @@ const HERRAMIENTAS = [
       'En SQL Server se manda una sola sentencia, sin punto y coma, y se rechazan además TRUNCATE, DROP, ' +
       'CREATE, ALTER, EXEC, sp_/xp_ y las sentencias que no son lectura (WAITFOR, WHILE, GRANT, REVOKE, ' +
       'DENY, USE, DBCC, SET, DECLARE, BEGIN, BACKUP, RESTORE, KILL, SHUTDOWN, OPENROWSET, OPENQUERY, ' +
-      'OPENDATASOURCE), con un límite de 60 s por consulta. ' +
+      'OPENDATASOURCE), con un límite de 60 s por consulta. En SQL Server la consulta corre en ' +
+      'READ UNCOMMITTED para no bloquear a quien escribe: puede devolver filas que otra transacción ' +
+      'todavía no confirmó. ' +
       'En Postgres, si la conexión no llegó a una réplica de lectura, se niega con no_es_replica sin ' +
       'ejecutar el SQL. Tope de ' + LIMITE_FILAS + ' filas y ' + LIMITE_BYTES + ' bytes.',
     inputSchema: {

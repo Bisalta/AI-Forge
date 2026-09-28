@@ -256,6 +256,8 @@ let crudo='';process.stdin.on('data',function(c){crudo+=c;});process.stdin.on('e
   crudo.split('\n').forEach(function(l){ if(l.replace(/\s+/g,'')==='')return; let m; try{m=JSON.parse(l);}catch(e){return;}
     if(m.result&&m.result.tools) process.stdout.write(m.result.tools.map(function(t){return t.name;}).join(','));});});")"
 assert_eq "$nombres" "consultar,listar_conexiones" "AC34 tools/list devuelve exactamente consultar y listar_conexiones"
+assert_contains "$salida" "En SQL Server la consulta corre en READ UNCOMMITTED" "AC61 la descripción de consultar avisa el nivel de aislamiento de SQL Server"
+assert_contains "$salida" "que otra transacción todavía no confirmó" "AC61 la descripción de consultar avisa que puede leer filas sin confirmar"
 
 # Una notificación no lleva respuesta: contestarle rompe el handshake.
 respuestas="$(printf '%s\n' "$salida" | grep -c '"jsonrpc"')"
@@ -700,6 +702,15 @@ lineas_arg="$(grep '^ARG ' "$TMP_DIR/psql-invocado.log" | tr '\n' '|')"
 assert_contains "$lineas_arg" "ARG -t|ARG 60|" "AC54 sqlcmd lleva -t 60 (el mismo límite que el rol de Postgres)"
 assert_contains "$lineas_arg" "ARG -N|ARG true|" "AC55 sqlcmd exige el cifrado con -N true"
 assert_contains "$lineas_arg" "ARG -C|" "AC55 sqlcmd lleva -C (el certificado de la instancia no es de una autoridad conocida, D71)"
+
+# ---------------------------------------------------------------------------
+# AC61 (v28) — SQL Server corre en READ UNCOMMITTED
+# ---------------------------------------------------------------------------
+# El argumento de -Q completo: el nivel primero y la consulta intacta después.
+# Un assert de "contiene READ UNCOMMITTED" no vería el orden ni un nivel mal
+# escrito.
+assert_contains "$lineas_arg" "ARG -Q|ARG SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED; SELECT 1|" \
+  "AC61 sqlcmd recibe el nivel de aislamiento antes de la consulta, y la consulta intacta"
 
 # ---------------------------------------------------------------------------
 # AC57 (v25) — el error de sqlcmd sale por stdout
