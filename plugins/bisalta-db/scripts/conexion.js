@@ -25,6 +25,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const crypto = require('crypto');
 
 const TIMEOUT_SENTENCIA_MS = 120000;
 // Desde v19 (AC28) esto ya NO se manda al motor como `statement_timeout`: el
@@ -99,33 +100,50 @@ function redactar(texto, sensibles) {
 }
 
 // AC60 (v27): quién consulta, para que el motor lo muestre mientras la
-// consulta corre. Sale de la identidad de AWS con la que se leyó el secreto:
-// es la barrera real (IAM) y no se falsea sin las credenciales de otra
-// persona. NO es auditoría: el nombre sólo se ve en vivo (D49, D74).
+// consulta corre. Sale de la identidad de AWS con la que se leyó el secreto,
+// que es la barrera real (IAM), pero NO viaja en claro: viaja un SEUDÓNIMO,
+// `u-` y los primeros 8 caracteres hexadecimales del SHA-256 del nombre.
+// Decisión de Ian Vargas, 28-sep (opción B): el nombre de la sesión lo ve
+// cualquier login de la réplica, y un Claude que mirara `pg_stat_activity`
+// traería los correos del equipo a su contexto. El seudónimo se resuelve con
+// `--seudonimo` (el propio) y `--seudonimo-de <nombre>` (cualquiera). No es
+// secreto: quien conozca los nombres puede calcularlos. NO es auditoría: el
+// nombre sólo se ve en vivo (D49, D74).
 const IDENTIDAD_DESCONOCIDA = '?';
-// `application_name` de Postgres se trunca a 63 bytes (NAMEDATALEN - 1).
-const LARGO_NOMBRE_SESION = 63;
+// Un `sts` que no responde no puede sumarle a cada consulta el corte de
+// proceso entero (125 s): la identidad es diagnóstico, y 10 s alcanzan.
+const TIMEOUT_STS_MS = 10000;
 let identidadResuelta = null;
 
 /**
  * El nombre de una persona dentro de un ARN de AWS: el último tramo de un
  * usuario IAM (`…:user/<ruta>/<nombre>`) o el nombre de sesión de un rol
- * asumido (`…:assumed-role/<rol>/<sesion>`). Nunca el número de cuenta. Sólo
- * letras, dígitos y `@._+-`; lo demás pasa a `_`.
+ * asumido (`…:assumed-role/<rol>/<sesion>`). Nunca el número de cuenta. De
+ * cualquier otro ARN (`root`, `federated-user`) no sale un nombre: `?`.
  */
 function nombreDeArn(arn) {
   const m = /^arn:aws[a-z-]*:(iam|sts)::[0-9]+:(user|assumed-role)\/(.+)$/.exec(String(arn).trim());
   if (!m) return IDENTIDAD_DESCONOCIDA;
   const tramos = m[3].split('/');
-  const nombre = tramos[tramos.length - 1].replace(/[^A-Za-z0-9@._+-]/g, '_');
+  const nombre = tramos[tramos.length - 1];
   return nombre === '' ? IDENTIDAD_DESCONOCIDA : nombre;
 }
 
+/** AC60: el seudónimo de un nombre. `?` sigue siendo `?`. */
+function seudonimo(nombre) {
+  if (nombre === IDENTIDAD_DESCONOCIDA) return IDENTIDAD_DESCONOCIDA;
+  return 'u-' + crypto.createHash('sha256').update(String(nombre), 'utf8').digest('hex').slice(0, 8);
+}
+
 /**
- * AC60: la identidad de AWS de quien consulta. Se pide una sola vez por
- * proceso y se guarda; si `aws sts` falla, devuelve `?` y no la guarda, para
- * volver a intentar en la próxima consulta. Nunca frena la consulta: es un
- * dato para diagnosticar, no una barrera.
+ * AC60: el seudónimo de quien consulta. Se pide una sola vez por proceso y se
+ * guarda, también cuando `sts` respondió con un ARN del que no sale un nombre:
+ * eso da `?` y no cambia pidiéndolo de nuevo. Si `aws sts` FALLA, devuelve `?`
+ * y no lo guarda, para volver a intentar en la próxima consulta. Nunca frena
+ * la consulta: es un dato para diagnosticar, no una barrera; por eso su límite
+ * de tiempo es corto. El caché dura lo que dura el proceso: si cambian las
+ * credenciales de AWS (otro `aws sso login`, otro perfil), hay que reiniciar
+ * la sesión para que el seudónimo cambie.
  */
 function resolverIdentidad(region) {
   if (identidadResuelta !== null) return identidadResuelta;
@@ -134,16 +152,15 @@ function resolverIdentidad(region) {
     '--region', region,
     '--query', 'Arn',
     '--output', 'text'
-  ], { encoding: 'utf8', maxBuffer: MAX_BUFFER, timeout: TIMEOUT_PROCESO_MS });
+  ], { encoding: 'utf8', maxBuffer: MAX_BUFFER, timeout: TIMEOUT_STS_MS });
   if (r.error || r.status !== 0) return IDENTIDAD_DESCONOCIDA;
-  const nombre = nombreDeArn(r.stdout);
-  if (nombre !== IDENTIDAD_DESCONOCIDA) identidadResuelta = nombre;
-  return nombre;
+  identidadResuelta = seudonimo(nombreDeArn(r.stdout));
+  return identidadResuelta;
 }
 
-/** El nombre de la sesión en el motor: `<usuario del secreto>/<quién consulta>`. */
+/** El nombre de la sesión en el motor: `<usuario del secreto>/<seudónimo>`. */
 function nombreDeSesion(usuario, identidad) {
-  return (String(usuario) + '/' + String(identidad || IDENTIDAD_DESCONOCIDA)).slice(0, LARGO_NOMBRE_SESION);
+  return String(usuario) + '/' + String(identidad || IDENTIDAD_DESCONOCIDA);
 }
 
 /** Escapa `\` y `:`, los dos caracteres con significado en el archivo de libpq. */
@@ -204,7 +221,7 @@ function resolverCredencial(entrada) {
  * conninfo; la contraseña, sólo en el archivo que apunta la variable de
  * archivo de credenciales de libpq.
  * AC28 (sesión de solo lectura; el `statement_timeout` ya no viaja por acá,
- * lo fija el rol — AC49) y AC29 (`application_name` = usuario del secreto,
+ * lo fija el rol — AC49) y AC29 (`application_name` = `<usuario del secreto>/<seudónimo>`, AC60,
  * para que `pg_stat_activity` atribuya del lado del motor) se verifican
  * sobre lo que esta función
  * devuelve. Con un solo rol (`claude_lectura` — contract v13, "Cambios
@@ -238,7 +255,7 @@ function construirComandoPostgres(entrada, usuario, rutaPassfile, sql, identidad
       // tres formas se midieron una al lado de la otra; sólo PGAPPNAME y el
       // parámetro del conninfo sobreviven. No mover esto de vuelta a
       // PGOPTIONS: el comando se ve correcto y el efecto no lo es.
-      // AC29 y AC60 (v27): el usuario del secreto, más quién consulta.
+      // AC29 y AC60 (v27): el usuario del secreto, más el seudónimo de quien consulta.
       PGAPPNAME: nombreDeSesion(usuario, identidad),
       // AC55 (v25) y AC58 (v26): TLS obligatorio y con el servidor
       // autenticado. `verify-full` exige que el certificado lo firme una de
@@ -483,7 +500,10 @@ module.exports = {
   BUNDLE_RDS: BUNDLE_RDS,
   resolverCredencial: resolverCredencial,
   nombreDeArn: nombreDeArn,
+  seudonimo: seudonimo,
+  resolverIdentidad: resolverIdentidad,
   nombreDeSesion: nombreDeSesion,
+  TIMEOUT_STS_MS: TIMEOUT_STS_MS,
   ejecutarConsulta: ejecutarConsulta,
   construirComandoPostgres: construirComandoPostgres,
   construirComandoSqlserver: construirComandoSqlserver,

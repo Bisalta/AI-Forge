@@ -114,8 +114,9 @@ configurado a mano entran a los scripts. Las cuatro mutaciones declaradas de `AC
 el certificado del servidor; `sqlcmd -t 60`; diecisiete sentencias de SQL Server que no son lectura,
 rechazadas por nombre; y los temporales huérfanos, borrados al arrancar. En v26, Postgres pasa a
 `verify-full` con el bundle de certificados de RDS, que viaja con el plugin: autentica al servidor. En v27, la
-sesión lleva la identidad de AWS de quien consulta (`claude_lectura/<persona>`), para saber en vivo
-quién está cargando la base; no es auditoría. Al medir apareció un defecto
+sesión lleva un seudónimo de quien consulta, sacado de su identidad de AWS (`claude_lectura/u-…`),
+para saber en vivo quién está cargando la base; no lleva el correo, porque el nombre de la sesión lo
+ve cualquier login de la réplica, y no es auditoría. Al medir apareció un defecto
 que ninguna review había visto: `sqlcmd` escribe sus errores en stdout, el plugin sólo leía stderr, y
 todo error de SQL Server llegaba sin mensaje. El stub del test era una copia del de `psql` (`RT55`).
 

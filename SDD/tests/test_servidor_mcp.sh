@@ -80,6 +80,13 @@ cat > "$BIN_DIR/aws" <<'STUB'
 printf 'ARGS %s\n' "$*" >> "$BISALTA_STUB_DIR/aws-invocado.log"
 # AC60 (v27): la identidad de quien consulta.
 if [ "${1:-}" = "sts" ]; then
+  n=$(( $(cat "$BISALTA_STUB_DIR/sts-llamadas" 2>/dev/null || echo 0) + 1 ))
+  echo "$n" > "$BISALTA_STUB_DIR/sts-llamadas"
+  if [ "${BISALTA_STUB_STS_LENTO:-0}" = "1" ]; then sleep 30; fi
+  if [ "${BISALTA_STUB_STS_FALLA_PRIMERA:-0}" = "1" ] && [ "$n" = "1" ]; then
+    printf 'An error occurred (Throttling)\n' >&2
+    exit 255
+  fi
   if [ "${BISALTA_STUB_STS_FALLA:-0}" = "1" ]; then
     printf 'An error occurred (ExpiredToken)\n' >&2
     exit 255
@@ -229,7 +236,7 @@ trama_consultar() {
 }
 
 reiniciar_registros() {
-  rm -f "$TMP_DIR/aws-invocado.log" "$TMP_DIR/psql-invocado.log" "$BISALTA_DB_BITACORA"
+  rm -f "$TMP_DIR/aws-invocado.log" "$TMP_DIR/psql-invocado.log" "$BISALTA_DB_BITACORA" "$TMP_DIR/sts-llamadas"
 }
 
 # ---------------------------------------------------------------------------
@@ -778,25 +785,31 @@ rm -rf "$HUERFANO" "$RECIENTE" "$AJENO" "$CON_PREFIJO" "$ENLACE"
 # AC60 (v27) — la sesión lleva quién consulta, sacado de la identidad de AWS
 # ---------------------------------------------------------------------------
 IDENTIDAD_PRUEBA="persona.prueba@ejemplo.com"
+# El seudónimo se calcula acá con shasum, no con el código del plugin: si no,
+# el test compararía el plugin consigo mismo.
+seudonimo_de() { printf 'u-%s' "$(printf '%s' "$1" | shasum -a 256 | cut -c1-8)"; }
+SEUDONIMO_PRUEBA="$(seudonimo_de "$IDENTIDAD_PRUEBA")"
 
 # Postgres: `<usuario del secreto>/<identidad>`, sin el número de cuenta.
 reiniciar_registros
 servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
 appname="$(grep '^PGAPPNAME ' "$TMP_DIR/psql-invocado.log")"
-assert_eq "$appname" "PGAPPNAME $USUARIO_ESPERADO/$IDENTIDAD_PRUEBA" "AC60 PGAPPNAME lleva el usuario del secreto y quién consulta"
+assert_eq "$appname" "PGAPPNAME $USUARIO_ESPERADO/$SEUDONIMO_PRUEBA" "AC60 PGAPPNAME lleva el usuario del secreto y el seudónimo de quien consulta"
+assert_no_contains "$appname" "$IDENTIDAD_PRUEBA" "AC60 el correo de quien consulta no viaja en claro en Postgres"
 assert_no_contains "$appname" "123456789012" "AC60 el nombre de la sesión no lleva el número de cuenta"
 
 # SQL Server: lo mismo, con -H.
 reiniciar_registros
 servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
 lineas_arg="$(grep '^ARG ' "$TMP_DIR/psql-invocado.log" | tr '\n' '|')"
-assert_contains "$lineas_arg" "ARG -H|ARG $USUARIO_ESPERADO/$IDENTIDAD_PRUEBA|" "AC60 sqlcmd lleva -H con el usuario del secreto y quién consulta"
+assert_contains "$lineas_arg" "ARG -H|ARG $USUARIO_ESPERADO/$SEUDONIMO_PRUEBA|" "AC60 sqlcmd lleva -H con el usuario del secreto y el seudónimo"
+assert_no_contains "$lineas_arg" "$IDENTIDAD_PRUEBA" "AC60 el correo de quien consulta no viaja en claro en SQL Server"
 
 # Una sola llamada a sts por proceso, aunque haya dos consultas.
 reiniciar_registros
 servidor_jsonrpc "$(printf '%s\n%s' "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$(trama_consultar 2 'proveedores-qa' 'SELECT 1')")" "$PATH_CON_STUBS" >/dev/null
 assert_eq "$(grep -c '^ARGS sts ' "$TMP_DIR/aws-invocado.log")" "1" "AC60 la identidad se pide una sola vez por proceso"
-assert_eq "$(grep -c "^PGAPPNAME $USUARIO_ESPERADO/$IDENTIDAD_PRUEBA\$" "$TMP_DIR/psql-invocado.log")" "2" "AC60 (control) las dos consultas llevan la identidad"
+assert_eq "$(grep -c "^PGAPPNAME $USUARIO_ESPERADO/$SEUDONIMO_PRUEBA\$" "$TMP_DIR/psql-invocado.log")" "2" "AC60 (control) las dos consultas llevan el seudónimo"
 
 # Un SQL que la lista blanca rechaza no llega a AWS: ni el secreto ni sts.
 reiniciar_registros
@@ -813,13 +826,56 @@ assert_eq "$(grep '^PGAPPNAME ' "$TMP_DIR/psql-invocado.log")" "PGAPPNAME $USUAR
 BISALTA_STUB_STS_FALLA=0
 export BISALTA_STUB_STS_FALLA
 
-# Un ARN de rol asumido con caracteres raros: se usa la sesión, saneada.
-BISALTA_STUB_ARN='arn:aws:sts::123456789012:assumed-role/Admin/ana perez;x'
+# Un ARN de rol asumido: el seudónimo sale del nombre de sesión, no del rol.
+BISALTA_STUB_ARN='arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_Admin_x/ana.perez@ejemplo.com'
 export BISALTA_STUB_ARN
 reiniciar_registros
 servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
-assert_eq "$(grep '^PGAPPNAME ' "$TMP_DIR/psql-invocado.log")" "PGAPPNAME $USUARIO_ESPERADO/ana_perez_x" "AC60 de un rol asumido se usa la sesión, sin caracteres raros"
+assert_eq "$(grep '^PGAPPNAME ' "$TMP_DIR/psql-invocado.log")" "PGAPPNAME $USUARIO_ESPERADO/$(seudonimo_de 'ana.perez@ejemplo.com')" "AC60 de un rol asumido el seudónimo sale del nombre de sesión"
 unset BISALTA_STUB_ARN
+
+# Los argumentos de sts: la región de la entrada, y sólo el ARN como texto.
+reiniciar_registros
+servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
+REGION_ESPERADA="$(node -e "process.stdout.write(require('$PLUGIN_DIR/catalogo.json').find(x => x.nombre === 'proveedores-dev').region)")"
+assert_eq "$(grep '^ARGS sts ' "$TMP_DIR/aws-invocado.log")" "ARGS sts get-caller-identity --region $REGION_ESPERADA --query Arn --output text" "AC60 sts se llama con la región de la entrada y sólo pide el ARN"
+
+# Si sts falla, el ? NO se guarda: la consulta siguiente vuelve a pedirlo.
+BISALTA_STUB_STS_FALLA_PRIMERA=1
+export BISALTA_STUB_STS_FALLA_PRIMERA
+reiniciar_registros
+servidor_jsonrpc "$(printf '%s\n%s' "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$(trama_consultar 2 'proveedores-qa' 'SELECT 1')")" "$PATH_CON_STUBS" >/dev/null
+assert_eq "$(grep -c '^ARGS sts ' "$TMP_DIR/aws-invocado.log")" "2" "AC60 si sts falla, la consulta siguiente vuelve a pedir la identidad"
+assert_eq "$(grep '^PGAPPNAME ' "$TMP_DIR/psql-invocado.log" | tail -1)" "PGAPPNAME $USUARIO_ESPERADO/$SEUDONIMO_PRUEBA" "AC60 la segunda consulta ya lleva el seudónimo"
+BISALTA_STUB_STS_FALLA_PRIMERA=0
+export BISALTA_STUB_STS_FALLA_PRIMERA
+
+# Si sts responde pero el ARN no da un nombre (root), el ? SÍ se guarda.
+BISALTA_STUB_ARN='arn:aws:iam::123456789012:root'
+export BISALTA_STUB_ARN
+reiniciar_registros
+servidor_jsonrpc "$(printf '%s\n%s' "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$(trama_consultar 2 'proveedores-qa' 'SELECT 1')")" "$PATH_CON_STUBS" >/dev/null
+assert_eq "$(grep -c '^ARGS sts ' "$TMP_DIR/aws-invocado.log")" "1" "AC60 un ARN sin nombre (root) se guarda como ? y no se vuelve a pedir"
+unset BISALTA_STUB_ARN
+
+# Los dos comandos para resolver seudónimos.
+assert_eq "$(env PATH="$PATH_CON_STUBS" TMPDIR="$SYSTMP" "$NODE_BIN" "$SERVIDOR" --seudonimo-de "$IDENTIDAD_PRUEBA" 2>/dev/null)" "$SEUDONIMO_PRUEBA" "AC60 --seudonimo-de imprime el seudónimo de un nombre"
+propio="$(env PATH="$PATH_CON_STUBS" TMPDIR="$SYSTMP" "$NODE_BIN" "$SERVIDOR" --seudonimo 2>/dev/null)"
+assert_eq "$propio" "$SEUDONIMO_PRUEBA" "AC60 --seudonimo imprime el seudónimo propio, con la identidad de AWS"
+assert_no_contains "$propio" "$IDENTIDAD_PRUEBA" "AC60 --seudonimo no imprime el nombre"
+
+# Un sts que no responde no le suma a la consulta el corte de proceso (125 s):
+# su límite es corto. El stub tarda 30 s; la consulta tiene que volver antes de 20.
+BISALTA_STUB_STS_LENTO=1
+export BISALTA_STUB_STS_LENTO
+reiniciar_registros
+inicio=$(date +%s)
+cuerpo="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS")")"
+duracion=$(( $(date +%s) - inicio ))
+assert_eq "$([ "$duracion" -lt 20 ] && echo si || echo "no ($duracion s)")" "si" "AC60 un sts que no responde se corta rápido (menos de 20 s)"
+assert_no_contains "$cuerpo" '"error"' "AC60 (control) la consulta con sts lento igual responde"
+BISALTA_STUB_STS_LENTO=0
+export BISALTA_STUB_STS_LENTO
 
 test_summary
 exit $?

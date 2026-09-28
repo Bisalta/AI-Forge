@@ -278,11 +278,14 @@ Dos precisiones sobre estos valores:
 
 ## Quién consulta (v27, `AC60`)
 
-Todos entran con el mismo rol de Postgres y el mismo login de SQL Server. Para que el motor distinga personas, el nombre de la sesión lleva además **la identidad de AWS de quien consulta**: `<usuario del secreto>/<identidad>`. Por ejemplo, `claude_lectura/nombre.apellido@construplaza.com` en Postgres (`application_name`) y `bisalta_lectura/nombre.apellido@construplaza.com` en SQL Server (`HOST_NAME()`).
+Todos entran con el mismo rol de Postgres y el mismo login de SQL Server. Para que el motor distinga personas, el nombre de la sesión lleva además un **seudónimo de quien consulta**, sacado de su identidad de AWS: `<usuario del secreto>/u-<8 hex>`. Por ejemplo, `claude_lectura/u-349175ad` en Postgres (`application_name`) y `bisalta_lectura/u-349175ad` en SQL Server (`HOST_NAME()`).
 
-- Sale de `aws sts get-caller-identity`, con las mismas credenciales que leen el secreto. Se pide una vez por proceso, y si falla, la consulta sigue con `?`.
-- **No es auditoría.** Se ve sólo mientras la consulta corre: el cluster de Postgres no exporta logs (`D49`), y las sesiones de otros en SQL Server sólo las ve el administrador. Sirve para saber quién está cargando la base ahora.
-- Como todos comparten el rol, cada uno ya podía ver las consultas de los demás en `pg_stat_activity`. Ahora se ve también de quién es cada una.
+- **Por qué seudónimo y no el correo**: el nombre de la sesión lo ve **cualquier login conectado a la réplica** de Postgres, no sólo el equipo (medido el 28-sep). Además, un Claude que mire `pg_stat_activity` traería lo que vea a su contexto. Con el seudónimo, ningún correo queda en texto claro.
+- **Saber el propio**: `node scripts/servidor-mcp.js --seudonimo`. Usa la identidad de AWS y no imprime el nombre.
+- **Mapear una lista** (Patrick, al diagnosticar): `node scripts/servidor-mcp.js --seudonimo-de <usuario IAM>`, una vez por persona.
+- **No es un secreto**: quien conozca los nombres puede calcular los seudónimos.
+- **No es auditoría**: el nombre se ve sólo mientras la consulta corre. No se exportan logs (`D49`), `log_connections` está apagado y Performance Insights, desactivado.
+- Se pide una vez por proceso, y si falla, la consulta sigue con `?`. Si cambiás de credenciales de AWS, reiniciá la sesión.
 
 ## Cifrado en tránsito (v25, `AC55`)
 

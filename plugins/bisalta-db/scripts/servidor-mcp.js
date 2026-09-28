@@ -339,6 +339,27 @@ function correrUnaVez(argv) {
   process.exitCode = salida.codigo;
 }
 
+/**
+ * AC60 (v27): resolver un seudónimo. `--seudonimo` imprime el de quien corre
+ * el comando, con la identidad de AWS, y NO imprime el nombre: así se puede
+ * correr desde una sesión de Claude sin traer el correo al contexto.
+ * `--seudonimo-de <nombre>` imprime el de un nombre dado, para mapear una
+ * lista de usuarios IAM. La región sale de la primera entrada del catálogo.
+ */
+function correrSeudonimo(argv) {
+  const k = argv.indexOf('--seudonimo-de');
+  if (k !== -1) {
+    const nombre = argv[k + 1];
+    if (!nombre) { process.stderr.write('uso: --seudonimo-de <nombre>\n'); process.exitCode = 2; return; }
+    process.stdout.write(conexion.seudonimo(nombre) + '\n');
+    return;
+  }
+  let region;
+  try { region = catalogo.cargarCatalogo(rutaCatalogo())[0].region; } catch (e) { region = null; }
+  if (!region) { process.stderr.write('no pude leer la región del catálogo\n'); process.exitCode = 2; return; }
+  process.stdout.write(conexion.resolverIdentidad(region) + '\n');
+}
+
 module.exports = {
   manejarConsultar: manejarConsultar,
   manejarListar: manejarListar,
@@ -354,7 +375,9 @@ if (require.main === module) {
   // proceso muerto sin pasar por su `finally`.
   conexion.limpiarTemporalesHuerfanos();
   const argv = process.argv.slice(2);
-  if (argv.indexOf('--consultar') !== -1 || argv.indexOf('--listar-conexiones') !== -1) {
+  if (argv.indexOf('--seudonimo') !== -1 || argv.indexOf('--seudonimo-de') !== -1) {
+    correrSeudonimo(argv);
+  } else if (argv.indexOf('--consultar') !== -1 || argv.indexOf('--listar-conexiones') !== -1) {
     correrUnaVez(argv);
   } else {
     correrServidor();

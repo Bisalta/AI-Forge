@@ -2,15 +2,16 @@
 
 - **Versión**: v27
 
-### Cambios v26 → v27 (la sesión lleva quién consulta, 28-sep-2026)
+### Cambios v26 → v27 (la sesión lleva el seudónimo de quien consulta, 28-sep-2026)
 
-Ian Vargas decidió `D74` el 28-sep: la sesión lleva, además del usuario del secreto, **la identidad de AWS de quien consulta**. Todos los del equipo van a entrar con el mismo rol y el mismo login, y sin esto el motor no distingue personas. Se eligió la identidad de AWS y no el usuario de la máquina porque es la barrera real (IAM), y no se falsea sin las credenciales de otra persona.
+Ian Vargas decidió `D74` el 28-sep: la sesión lleva, además del usuario del secreto, **quién consulta**. Todos los del equipo van a entrar con el mismo rol y el mismo login, y sin esto el motor no distingue personas. La identidad sale de AWS, que es la barrera real (IAM) y no se falsea sin las credenciales de otra persona. Viaja como **seudónimo**, no en claro.
 
-- Entra **`AC60`**. Cambia la condición de aprobación de **`AC29`**: el nombre de la sesión deja de ser exactamente el usuario del secreto y pasa a ser `<usuario del secreto>/<identidad>`. Por eso el bump.
-- Medido el 28-sep, antes del cambio, sobre la sesión de Ian. Postgres mostraba `application_name = claude_lectura` y una IP de la red. SQL Server mostraba el nombre de la Mac, `MacBook-Pro-2.local`. Ninguno de los dos identificaba a una persona.
-- Medido el 28-sep, después del cambio, con el servidor del repo. Postgres muestra `application_name = claude_lectura/<identidad de Ian>`, y SQL Server, `HOST_NAME() = bisalta_lectura/<identidad de Ian>`. La identidad es su usuario IAM; no se escribe acá por la regla de no dejar datos identificables de empleados.
-- **No es auditoría.** El nombre se ve sólo mientras la consulta corre. Después no queda registro: el cluster de Postgres no exporta logs (`D49`), y en SQL Server ver las sesiones de otros exige un permiso que sólo tiene el administrador. Sirve para saber quién está cargando la base ahora.
-- **Efecto dentro del equipo**: como todos comparten el rol de Postgres, cada uno ya podía ver las consultas de los demás en `pg_stat_activity`. Ahora se ve también de quién es cada una.
+- **Por qué seudónimo** (opción B, elegida por Ian después de la ronda 1 de la review). La primera versión de v27 mandaba el correo en claro, y la review midió dos cosas. Primero, que en Postgres el nombre de la sesión lo ve **cualquier login conectado a la réplica**, no sólo el equipo: desde `claude_lectura` se ven 10 sesiones de otro rol y el `application_name` de 4 de ellas, aunque no sus consultas. Segundo, que un Claude que consultara `pg_stat_activity` traería los correos del equipo a su contexto, y eso choca con la regla de no escribir datos identificables de empleados. El seudónimo es `u-` más 8 caracteres hexadecimales del SHA-256 del nombre.
+- **Lo que no queda registrado**, medido el 28-sep en `sistemas-costruplaza-db`: `log_connections` está apagado, `log_statement = none`, `log_line_prefix` no incluye el nombre de la aplicación, no hay export a CloudWatch (`D49`) y Performance Insights está desactivado en las dos instancias. El nombre se ve sólo mientras la consulta corre. **No es auditoría.**
+- Entra **`AC60`**. Cambia la condición de aprobación de **`AC29`**: el nombre de la sesión deja de ser exactamente el usuario del secreto y pasa a ser `<usuario del secreto>/<seudónimo>`. Por eso el bump.
+- **Medido el 28-sep, antes del cambio**, sobre la sesión de Ian: Postgres mostraba `claude_lectura` y una IP de la red, y SQL Server, el nombre de la Mac. **Después del cambio**: `claude_lectura/u-…` en Postgres y `bisalta_lectura/u-…` en SQL Server.
+- **El seudónimo no es un secreto**: quien conozca los nombres del equipo puede calcularlos. Sirve para que ningún correo quede en texto claro, no para esconder a nadie.
+- **El correo de la primera versión quedó en el historial de la branch** (`d1fb0e8`, ya pusheado). Para que no llegue a `prod`, el PR #14 se mergea con **squash**. En GitHub el commit sigue visible dentro del PR.
 
 Evidencia en `SDD/verification/feat-GEN-108-mcp-bisalta-db-v27.md`.
 
@@ -636,7 +637,7 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 
 **AC28** — El comando que el servidor construye para una conexión `postgres` incluye `default_transaction_read_only=on` y **no** incluye `statement_timeout`: el límite de sentencia lo fija el rol (`AC49`). (v19: hasta v18 el comando mandaba `statement_timeout=120000`, que le ganaba al del rol.) **Mutación declarada**: volver a agregar `statement_timeout` a `PGOPTIONS` pone rojo el assert negativo.
 
-**AC29** (v27 cambia el valor) — El comando que el servidor construye lleva un `application_name` igual a `<username del secreto>/<identidad>` (`AC60`); hasta v26, igual al `username` del secreto. Sirve para que `pg_stat_activity` atribuya del lado del motor. **Desde v15 el valor viaja en la variable `PGAPPNAME`, y `PGOPTIONS` no lleva `application_name`**: medido contra el motor real, psql le gana al `-c application_name` de `PGOPTIONS` y la sesión quedaba nombrada `psql`. **Mutaciones declaradas (v15)**: (a) quitar `PGAPPNAME` del entorno del comando pone rojo el assert positivo; (b) devolver `application_name` a `PGOPTIONS` pone rojo el assert negativo — cada una enrojece exactamente uno de los dos. (Hasta v12 la razón era distinguir `claude_lectura` de `neo_lectura`; con el rol único de v13 **ya no distingue consumidores** —`D53`, aceptado— pero la atribución al rol sigue siendo útil y el AC no cambia de propiedad.) **Parte `manual-only` (v16) — efecto externo**: la propiedad vive en `pg_stat_activity`, y ningún stub la ve. A través del plugin **instalado**, en una sesión arrancada después de instalar, `SELECT current_setting('application_name')` en **cada** conexión Postgres del catálogo devuelve el `username` del secreto. Evidencia: la salida literal de cada consulta, pegada en el verification report.
+**AC29** (v27 cambia el valor) — El comando que el servidor construye lleva un `application_name` igual a `<username del secreto>/<seudónimo>` (`AC60`); hasta v26, igual al `username` del secreto. Sirve para que `pg_stat_activity` atribuya del lado del motor. **Desde v15 el valor viaja en la variable `PGAPPNAME`, y `PGOPTIONS` no lleva `application_name`**: medido contra el motor real, psql le gana al `-c application_name` de `PGOPTIONS` y la sesión quedaba nombrada `psql`. **Mutaciones declaradas (v15)**: (a) quitar `PGAPPNAME` del entorno del comando pone rojo el assert positivo; (b) devolver `application_name` a `PGOPTIONS` pone rojo el assert negativo — cada una enrojece exactamente uno de los dos. (Hasta v12 la razón era distinguir `claude_lectura` de `neo_lectura`; con el rol único de v13 **ya no distingue consumidores** —`D53`, aceptado— pero la atribución al rol sigue siendo útil y el AC no cambia de propiedad.) **Parte `manual-only` (v16) — efecto externo**: la propiedad vive en `pg_stat_activity`, y ningún stub la ve. A través del plugin **instalado**, en una sesión arrancada después de instalar, `SELECT current_setting('application_name')` en **cada** conexión Postgres del catálogo devuelve `<username del secreto>/<seudónimo>` (hasta v26, el `username` del secreto). Evidencia: la salida literal de cada consulta, pegada en el verification report.
 
 **AC30** — La bitácora escribe una línea JSON por invocación con conexión, dialecto, hash de la consulta, filas devueltas, si truncó, duración y exit code.
 
@@ -721,21 +722,30 @@ Casos del test — rechazados: en `postgres`, `WITH x AS (INSERT INTO t VALUES (
 **AC50** (detección, `manual-only`) — `postgres-parte-b.sql`, en cada base que recorre: primero concede `CREATE ON SCHEMA public` al dueño de la base **y** a todo rol no superusuario que sea dueño de una relación, una función o un tipo en `public`, y **después** revoca `CREATE ON SCHEMA public FROM PUBLIC`. El orden es la condición: revocar primero rompe las migraciones de quien ya crea ahí. Verificado como `claude_lectura` con `has_schema_privilege('public','CREATE')` = `f`, sin intentar una escritura.
 `manual-only: requiere el cluster.` **Evidencia mínima aceptada** (v21): el par antes/después de Patrick (22-sep) —que vive en Slack, `D61`— y la medición de seis de seis bases en `f` (23-sep), pegada en el report de v19 parte 1. El `REVOKE CONNECT` sobre la base `postgres` va al runbook como paso explícito, con su verificación.
 
-**AC60** (detección, v27) — La sesión lleva quién consulta. Se toma el ARN que devuelve `aws sts get-caller-identity`, con la misma región y las mismas credenciales con las que se leyó el secreto. De un usuario IAM se usa el último tramo, y de un rol asumido, el nombre de sesión. Nunca el número de cuenta. Sólo quedan letras, dígitos y `@._+-`; lo demás pasa a `_`. El nombre de la sesión es `<usuario del secreto>/<identidad>`, cortado a 63 caracteres: en Postgres va en `PGAPPNAME` y en SQL Server, en `-H`, que es lo que el motor devuelve como `HOST_NAME()`. Condiciones:
-- **una vez por proceso**: la identidad se pide una vez y se guarda;
-- **después del secreto**: nunca se llama a AWS por una conexión desconocida ni por un SQL que la lista blanca rechazó;
-- **no frena**: si `sts` falla, la consulta sigue con `?` como identidad, y ese `?` no se guarda, así que la próxima consulta vuelve a intentar.
+**AC60** (detección, v27) — La sesión lleva el **seudónimo** de quien consulta.
+- **De dónde sale**: del ARN que devuelve `aws sts get-caller-identity`, con la región de la entrada y las mismas credenciales con las que se leyó el secreto. De un usuario IAM se usa el último tramo, y de un rol asumido, el nombre de sesión. De cualquier otro ARN (`root`, `federated-user`) no sale un nombre, y queda `?`. Nunca el número de cuenta.
+- **Qué viaja**: `u-` más los primeros 8 caracteres hexadecimales del SHA-256 del nombre, **nunca el nombre en claro**. El nombre de la sesión es `<usuario del secreto>/<seudónimo>`. En Postgres va en `PGAPPNAME`, y en SQL Server en `-H`, que es lo que el motor devuelve como `HOST_NAME()`.
+- **Una vez por proceso**: el seudónimo se guarda, también cuando `sts` respondió pero no salió un nombre (`?`).
+- **Después del secreto**: nunca se llama a AWS por una conexión desconocida ni por un SQL que la lista blanca rechazó.
+- **No frena**: si `sts` falla, la consulta sigue con `?`. Ese `?` no se guarda, así que la próxima consulta vuelve a intentar. El límite de `sts` es de 10 s.
+- **Cómo se resuelve**: `servidor-mcp.js --seudonimo` imprime el seudónimo propio, sin imprimir el nombre, y `--seudonimo-de <nombre>` imprime el de un nombre dado.
+- El caché dura lo que el proceso: si cambian las credenciales de AWS, hay que reiniciar la sesión.
 
 **Mutaciones declaradas**:
-- (a) `PGAPPNAME` sin la identidad pone rojo el assert de Postgres;
-- (b) sin `-H` pone rojo el de SQL Server;
-- (c) sin guardar la identidad pone rojo el de una sola llamada;
-- (d) pedirla al cargar el módulo pone rojo el de un SQL rechazado y el de `AC31`;
-- (e) que un fallo de `sts` frene la consulta pone rojo el de "no se frena";
-- (f) sin sanear pone rojo el del rol asumido;
-- (g) usar el ARN entero pone rojo el de "sin número de cuenta".
+- (a) `PGAPPNAME` sin el seudónimo pone rojo el assert de Postgres;
+- (b) sin `-H`, el de SQL Server;
+- (c) sin guardar, el de una sola llamada;
+- (d) pedirlo al cargar el módulo, el de un SQL rechazado y el de `AC31`;
+- (e) que un fallo de `sts` frene la consulta, el de "no se frena";
+- (f) el nombre en claro en lugar del seudónimo, los dos de "el correo no viaja en claro";
+- (g) usar el ARN entero, el de Postgres;
+- (h) guardar el `?` de un `sts` fallido, el de "vuelve a pedir";
+- (i) no guardar el `?` de un ARN sin nombre, el del `root`;
+- (j) `sts` sin `--region`, el de los argumentos;
+- (k) el límite de `sts` en el corte de proceso, el de `sts` lento;
+- (l) que `--seudonimo` imprima el nombre, el de "no imprime el nombre".
 
-**Parte `manual-only`**, contra las bases reales: `application_name` en Postgres y `HOST_NAME()` en SQL Server muestran `<usuario>/<identidad>`.
+**Parte `manual-only`**, contra las bases reales: `application_name` en Postgres y `HOST_NAME()` en SQL Server muestran `<usuario>/u-<8 hex>`, sin correo.
 
 **AC51** (detección) — La normalización de la lista blanca es **un solo recorrido de izquierda a derecha** que conoce las reglas de comillado de cada dialecto, de modo que **el validador ve las mismas sentencias que ejecuta el motor**:
 - **en los dos dialectos**: literales entre comillas simples con `''` como escape; identificadores entre comillas dobles con `""` como escape (se copian tal cual); comentarios de línea (`--` hasta el fin de línea); comentarios de bloque **anidados**;
