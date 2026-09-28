@@ -107,7 +107,7 @@ function redactar(texto, sensibles) {
 // cualquier login de la réplica, y un Claude que mirara `pg_stat_activity`
 // traería los correos del equipo a su contexto. El seudónimo se resuelve con
 // `--seudonimo` (el propio) y `--seudonimo-de <nombre>` (cualquiera). No es
-// secreto: quien conozca los nombres puede calcularlos. NO es auditoría: el
+// un dato oculto (quien conozca los nombres puede calcularlo). NO es auditoría: el
 // nombre sólo se ve en vivo (D49, D74).
 const IDENTIDAD_DESCONOCIDA = '?';
 // Un `sts` que no responde no puede sumarle a cada consulta el corte de
