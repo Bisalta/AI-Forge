@@ -55,7 +55,8 @@ const NOMBRE_TEMP = new RegExp('^' + PREFIJO_TEMP + '[A-Za-z0-9]{6}$');
 // larga retiene la sesión hasta el corte de proceso.
 const TIMEOUT_CONSULTA_SQLSERVER_S = 60;
 // AC61 (v28): las consultas de SQL Server corren en READ UNCOMMITTED. Medido
-// el 28-sep: ninguna base de Dev SQL tiene READ_COMMITTED_SNAPSHOT, así que
+// el 28-sep: ninguna de las seis bases del catálogo tiene
+// READ_COMMITTED_SNAPSHOT, así que
 // con el aislamiento por omisión un SELECT toma bloqueos compartidos y frena
 // a quien escribe (D75). A cambio, puede leer filas sin confirmar. Lo arma
 // el plugin, después de la lista blanca; la consulta del usuario sigue sin

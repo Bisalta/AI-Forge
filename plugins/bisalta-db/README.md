@@ -278,7 +278,7 @@ Dos precisiones sobre estos valores:
 
 ## Aislamiento en SQL Server (v28, `AC61`)
 
-En SQL Server la consulta corre en `READ UNCOMMITTED`. Ninguna base de Dev SQL tiene `READ_COMMITTED_SNAPSHOT` (medido el 28-sep), y con el aislamiento por omisión un `SELECT` toma bloqueos compartidos que frenan a quien escribe.
+En SQL Server la consulta corre en `READ UNCOMMITTED`. Ninguna de las seis bases del catálogo tiene `READ_COMMITTED_SNAPSHOT` (medido el 28-sep), y con el aislamiento por omisión un `SELECT` toma bloqueos compartidos que frenan a quien escribe.
 
 - **El costo**: la consulta puede devolver filas que otra transacción todavía no confirmó. Si necesitás un número exacto sobre datos que se están escribiendo, tenelo en cuenta.
 - **Lo pone el plugin**, delante de tu consulta. Vos no podés mandar `SET` (lo rechaza la lista blanca).
