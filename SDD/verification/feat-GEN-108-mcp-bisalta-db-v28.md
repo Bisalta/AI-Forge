@@ -1,22 +1,22 @@
 # Gates run — generado por sdd-run-gates.sh v0.12.0
 
-- **Branch**: `feat-GEN-108-mcp-bisalta-db` · **Commit**: `20e04f3` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-09-28T22:41:05Z
-- Tree: `7d0ee47234e0b90bb1da69b1e94c46c46c1418a8` — LIMPIO
+- **Branch**: `feat-GEN-108-mcp-bisalta-db` · **Commit**: `1d83fb1` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-09-28T22:49:42Z
+- Tree: `72e0780bec92bd1e27c53e815afe99a0005032fe` — LIMPIO
 - Este archivo lo escribió el runner, no un modelo. Editarlo a mano invalida la evidencia.
 
 | # | Gate | Comando | Exit | Timestamp UTC | Resultado |
 |---|---|---|---|---|---|
-| 1 | format / style | — | — | 2026-09-28T22:38:09Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
-| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-09-28T22:38:09Z | verde |
-| 3 | type-check | — | — | 2026-09-28T22:38:11Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
-| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-09-28T22:38:11Z | verde |
-| 5 | integration | — | — | 2026-09-28T22:39:36Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
-| 6 | build | — | — | 2026-09-28T22:39:36Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
-| 7 | e2e | — | — | 2026-09-28T22:39:36Z | [SKIPPED] sin comando en el doc (N/A) |
-| 8 | cobertura del diff | — | — | 2026-09-28T22:39:36Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
-| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-09-28T22:39:36Z | verde |
-| 10 | smoke manual | — | — | 2026-09-28T22:39:39Z | [SKIPPED] sin comando en el doc (N/A) |
-| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-09-28T22:39:39Z | verde |
+| 1 | format / style | — | — | 2026-09-28T22:46:42Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
+| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-09-28T22:46:42Z | verde |
+| 3 | type-check | — | — | 2026-09-28T22:46:43Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
+| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-09-28T22:46:43Z | verde |
+| 5 | integration | — | — | 2026-09-28T22:48:11Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
+| 6 | build | — | — | 2026-09-28T22:48:11Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
+| 7 | e2e | — | — | 2026-09-28T22:48:11Z | [SKIPPED] sin comando en el doc (N/A) |
+| 8 | cobertura del diff | — | — | 2026-09-28T22:48:11Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
+| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-09-28T22:48:11Z | verde |
+| 10 | smoke manual | — | — | 2026-09-28T22:48:14Z | [SKIPPED] sin comando en el doc (N/A) |
+| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-09-28T22:48:14Z | verde |
 
 ## Output por gate (últimas 15 líneas)
 
@@ -49,7 +49,7 @@ PASS  test_usage_summary.sh
 ### Gate 9 — security (exit 0)
 
 ```
-secret-scan: sin hallazgos sobre 187 archivos versionados (1 excluido: self)
+secret-scan: sin hallazgos sobre 188 archivos versionados (1 excluido: self)
 ```
 
 ### Gate — — suite completa (exit 0)
