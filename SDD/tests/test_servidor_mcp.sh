@@ -258,6 +258,7 @@ let crudo='';process.stdin.on('data',function(c){crudo+=c;});process.stdin.on('e
 assert_eq "$nombres" "consultar,listar_conexiones" "AC34 tools/list devuelve exactamente consultar y listar_conexiones"
 assert_contains "$salida" "En SQL Server la consulta corre en READ UNCOMMITTED" "AC61 la descripción de consultar avisa el nivel de aislamiento de SQL Server"
 assert_contains "$salida" "que otra transacción todavía no confirmó" "AC61 la descripción de consultar avisa que puede leer filas sin confirmar"
+assert_contains "$salida" "leer dos veces o saltear filas ya confirmadas" "AC61 la descripción de consultar avisa que puede leer dos veces o saltear filas confirmadas"
 
 # Una notificación no lleva respuesta: contestarle rompe el handshake.
 respuestas="$(printf '%s\n' "$salida" | grep -c '"jsonrpc"')"

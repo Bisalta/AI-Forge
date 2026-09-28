@@ -6,7 +6,7 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ### 0.1.0 — 2026-09-18
 
-Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v27).
+Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v28).
 Consulta de solo lectura a las bases de dev/qa de Bisalta desde Claude Code, **sin que
 ninguna credencial entre en el contexto de la sesión**. La credencial no desaparece: pasa de un
 archivo que hoy hay que leerle al modelo —y que queda archivado en el transcript— a un secreto de
@@ -55,6 +55,11 @@ AWS que el proceso resuelve, usa y tira.
 - `aprovisionamiento/` trae el runbook, el inventario medido de los dos motores y los `.sql` de
   roles, logins y secretos (R1). Los corre una persona con privilegios de administración en cada
   motor; este repo no los ejecuta.
+- **En SQL Server la consulta corre en `READ UNCOMMITTED`** (v28, `AC61`). Ninguna de las seis
+  bases del catálogo tiene `READ_COMMITTED_SNAPSHOT`, y con el aislamiento por omisión un `SELECT`
+  del plugin frenaba a quien escribe. **El costo**: si alguien escribe mientras tanto, puede leer
+  filas sin confirmar, leer dos veces o saltear filas confirmadas, o cortar con el error 601. La
+  descripción de `consultar` lo avisa.
 
 **Lo que la medición corrigió, entre v2 y v8**: el ciclo cerró con ocho ratificaciones de contract,
 y las tres que más movieron el diseño no salieron de un review sino de que la persona que iba a

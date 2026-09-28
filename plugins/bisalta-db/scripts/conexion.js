@@ -58,7 +58,9 @@ const TIMEOUT_CONSULTA_SQLSERVER_S = 60;
 // el 28-sep: ninguna de las seis bases del catálogo tiene
 // READ_COMMITTED_SNAPSHOT, así que
 // con el aislamiento por omisión un SELECT toma bloqueos compartidos y frena
-// a quien escribe (D75). A cambio, puede leer filas sin confirmar. Lo arma
+// a quien escribe filas (D75); los cambios de estructura siguen esperando,
+// por el bloqueo de esquema. A cambio, puede leer filas sin confirmar, leer
+// dos veces o saltear filas confirmadas, o cortar con el error 601. Lo arma
 // el plugin, después de la lista blanca; la consulta del usuario sigue sin
 // poder llevar SET ni punto y coma (AC53).
 const AISLAMIENTO_SQLSERVER = 'SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED; ';

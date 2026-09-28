@@ -161,7 +161,8 @@ mano en DBeaver, donde una persona ve lo que va a pasar antes de que pase.
 | Literal, identificador o comentario de bloque sin cerrar (v20, `AC51`) | **rechazado**, con el tipo en el motivo | **rechazado**, con el tipo en el motivo |
 | `WAITFOR`, `WHILE`, `GRANT`, `REVOKE`, `DENY`, `USE`, `DBCC`, `SET`, `DECLARE`, `BEGIN`, `BACKUP`, `RESTORE`, `KILL`, `SHUTDOWN`, `OPENROWSET`, `OPENQUERY`, `OPENDATASOURCE` en cualquier posición (v25, `AC53`). Dentro de un nombre entre corchetes o comillas dobles (`[set]`, `"use"`) también: rechazo de más, a sabiendas | n/a | **rechazadas** (`sentencia_no_permitida`) |
 
-En `sqlserver` se manda **una sola sentencia y sin punto y coma**: no existe
+En `sqlserver` la consulta lleva **una sola sentencia y sin punto y coma** (desde
+v28 el plugin le antepone el nivel de aislamiento, `AC61`): no existe
 equivalente de sesión de solo lectura que contenga un batch de T-SQL. La lista
 blanca es ahí la primera capa, la que rechaza temprano y con un mensaje claro;
 **la barrera es el rol** (ver la tabla de abajo).
@@ -280,7 +281,8 @@ Dos precisiones sobre estos valores:
 
 En SQL Server la consulta corre en `READ UNCOMMITTED`. Ninguna de las seis bases del catálogo tiene `READ_COMMITTED_SNAPSHOT` (medido el 28-sep), y con el aislamiento por omisión un `SELECT` toma bloqueos compartidos que frenan a quien escribe.
 
-- **El costo**: la consulta puede devolver filas que otra transacción todavía no confirmó. Si necesitás un número exacto sobre datos que se están escribiendo, tenelo en cuenta.
+- **El costo**, si alguien escribe mientras consultás: la consulta puede devolver filas que otra transacción todavía no confirmó, **leer dos veces o saltear filas ya confirmadas** (SQL Server puede recorrer la tabla en el orden físico de las páginas, y una página que se parte mueve filas), o cortar con el error 601. Un `COUNT` o un total pueden dar mal. Si necesitás un número exacto sobre datos que se están escribiendo, no lo saques de acá.
+- **Lo que sigue frenando**: los cambios de estructura (`TRUNCATE`, `ALTER`, una reconstrucción de índices) esperan a que termine la consulta, hasta 60 s, por el bloqueo de esquema que toma toda lectura.
 - **Lo pone el plugin**, delante de tu consulta. Vos no podés mandar `SET` (lo rechaza la lista blanca).
 - **Postgres no lo necesita**: una lectura no bloquea la escritura de filas, y el plugin lee de la réplica.
 

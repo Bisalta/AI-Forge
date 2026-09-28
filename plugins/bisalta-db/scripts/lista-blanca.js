@@ -232,7 +232,8 @@ function validarSql(sql, dialecto) {
 
   // SQL Server: cualquier `;` que quede tras quitar comentarios y literales.
   // Un batch de T-SQL con varias sentencias no tiene equivalente de sesión de
-  // solo lectura que lo contenga, así que acá se manda una sola sentencia.
+  // solo lectura que lo contenga, así que la consulta lleva una sola sentencia.
+  // (Desde v28 el plugin le antepone el nivel de aislamiento, AC61.)
   if (dialecto === 'sqlserver' && normalizado.indexOf(';') !== -1) {
     return rechazo('punto_y_coma_no_permitido', normalizado.replace(/[\r\n]+/g, ' ').replace(/^\s+/, ''));
   }
