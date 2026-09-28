@@ -276,6 +276,14 @@ Dos precisiones sobre estos valores:
   seis bases de ese motor. Riesgo aceptado (contract v25): el aislamiento es por
   política IAM, según la regla de Patrick Ocampo (v12).
 
+## Quién consulta (v27, `AC60`)
+
+Todos entran con el mismo rol de Postgres y el mismo login de SQL Server. Para que el motor distinga personas, el nombre de la sesión lleva además **la identidad de AWS de quien consulta**: `<usuario del secreto>/<identidad>`. Por ejemplo, `claude_lectura/ian.vargas@construplaza.com` en Postgres (`application_name`) y `bisalta_lectura/ian.vargas@construplaza.com` en SQL Server (`HOST_NAME()`).
+
+- Sale de `aws sts get-caller-identity`, con las mismas credenciales que leen el secreto. Se pide una vez por proceso, y si falla, la consulta sigue con `?`.
+- **No es auditoría.** Se ve sólo mientras la consulta corre: el cluster de Postgres no exporta logs (`D49`), y las sesiones de otros en SQL Server sólo las ve el administrador. Sirve para saber quién está cargando la base ahora.
+- Como todos comparten el rol, cada uno ya podía ver las consultas de los demás en `pg_stat_activity`. Ahora se ve también de quién es cada una.
+
 ## Cifrado en tránsito (v25, `AC55`)
 
 - **Postgres** (v26, `AC58`): `PGSSLMODE=verify-full` y `PGSSLROOTCERT` apuntando a

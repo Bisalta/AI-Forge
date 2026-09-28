@@ -78,6 +78,15 @@ export BISALTA_DB_BITACORA="$TMP_DIR/bitacora.jsonl"
 cat > "$BIN_DIR/aws" <<'STUB'
 #!/usr/bin/env bash
 printf 'ARGS %s\n' "$*" >> "$BISALTA_STUB_DIR/aws-invocado.log"
+# AC60 (v27): la identidad de quien consulta.
+if [ "${1:-}" = "sts" ]; then
+  if [ "${BISALTA_STUB_STS_FALLA:-0}" = "1" ]; then
+    printf 'An error occurred (ExpiredToken)\n' >&2
+    exit 255
+  fi
+  printf '%s\n' "${BISALTA_STUB_ARN:-arn:aws:iam::123456789012:user/persona.prueba@ejemplo.com}"
+  exit 0
+fi
 if [ "${BISALTA_STUB_AWS_FALLA:-0}" = "1" ]; then
   printf 'An error occurred (AccessDeniedException): %s\n' "$BISALTA_STUB_MARCA" >&2
   exit 255
@@ -764,6 +773,53 @@ assert_eq "$([ -e "$AJENO" ] && echo queda || echo borrado)" "queda" "AC56 no bo
 assert_eq "$([ -e "$CON_PREFIJO" ] && echo queda || echo borrado)" "queda" "AC56 no borra un directorio viejo con el prefijo que no tiene el nombre de mkdtemp"
 assert_eq "$([ -L "$ENLACE" ] && echo queda || echo borrado)" "queda" "AC56 no sigue un symlink con el nombre del plugin (lstat)"
 rm -rf "$HUERFANO" "$RECIENTE" "$AJENO" "$CON_PREFIJO" "$ENLACE"
+
+# ---------------------------------------------------------------------------
+# AC60 (v27) — la sesión lleva quién consulta, sacado de la identidad de AWS
+# ---------------------------------------------------------------------------
+IDENTIDAD_PRUEBA="persona.prueba@ejemplo.com"
+
+# Postgres: `<usuario del secreto>/<identidad>`, sin el número de cuenta.
+reiniciar_registros
+servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
+appname="$(grep '^PGAPPNAME ' "$TMP_DIR/psql-invocado.log")"
+assert_eq "$appname" "PGAPPNAME $USUARIO_ESPERADO/$IDENTIDAD_PRUEBA" "AC60 PGAPPNAME lleva el usuario del secreto y quién consulta"
+assert_no_contains "$appname" "123456789012" "AC60 el nombre de la sesión no lleva el número de cuenta"
+
+# SQL Server: lo mismo, con -H.
+reiniciar_registros
+servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
+lineas_arg="$(grep '^ARG ' "$TMP_DIR/psql-invocado.log" | tr '\n' '|')"
+assert_contains "$lineas_arg" "ARG -H|ARG $USUARIO_ESPERADO/$IDENTIDAD_PRUEBA|" "AC60 sqlcmd lleva -H con el usuario del secreto y quién consulta"
+
+# Una sola llamada a sts por proceso, aunque haya dos consultas.
+reiniciar_registros
+servidor_jsonrpc "$(printf '%s\n%s' "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$(trama_consultar 2 'proveedores-qa' 'SELECT 1')")" "$PATH_CON_STUBS" >/dev/null
+assert_eq "$(grep -c '^ARGS sts ' "$TMP_DIR/aws-invocado.log")" "1" "AC60 la identidad se pide una sola vez por proceso"
+assert_eq "$(grep -c "^PGAPPNAME $USUARIO_ESPERADO/$IDENTIDAD_PRUEBA\$" "$TMP_DIR/psql-invocado.log")" "2" "AC60 (control) las dos consultas llevan la identidad"
+
+# Un SQL que la lista blanca rechaza no llega a AWS: ni el secreto ni sts.
+reiniciar_registros
+servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'DELETE FROM t')" "$PATH_CON_STUBS" >/dev/null
+assert_eq "$([ -s "$TMP_DIR/aws-invocado.log" ] && echo si || echo no)" "no" "AC60 un SQL rechazado no invoca aws"
+
+# Si sts falla, la consulta sigue, con `?` como identidad.
+BISALTA_STUB_STS_FALLA=1
+export BISALTA_STUB_STS_FALLA
+reiniciar_registros
+cuerpo="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS")")"
+assert_no_contains "$cuerpo" '"error"' "AC60 si sts falla, la consulta no se frena"
+assert_eq "$(grep '^PGAPPNAME ' "$TMP_DIR/psql-invocado.log")" "PGAPPNAME $USUARIO_ESPERADO/?" "AC60 si sts falla, la identidad es ?"
+BISALTA_STUB_STS_FALLA=0
+export BISALTA_STUB_STS_FALLA
+
+# Un ARN de rol asumido con caracteres raros: se usa la sesión, saneada.
+BISALTA_STUB_ARN='arn:aws:sts::123456789012:assumed-role/Admin/ana perez;x'
+export BISALTA_STUB_ARN
+reiniciar_registros
+servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
+assert_eq "$(grep '^PGAPPNAME ' "$TMP_DIR/psql-invocado.log")" "PGAPPNAME $USUARIO_ESPERADO/ana_perez_x" "AC60 de un rol asumido se usa la sesión, sin caracteres raros"
+unset BISALTA_STUB_ARN
 
 test_summary
 exit $?

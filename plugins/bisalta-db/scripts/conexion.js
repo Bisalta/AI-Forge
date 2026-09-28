@@ -98,6 +98,54 @@ function redactar(texto, sensibles) {
   return salida;
 }
 
+// AC60 (v27): quién consulta, para que el motor lo muestre mientras la
+// consulta corre. Sale de la identidad de AWS con la que se leyó el secreto:
+// es la barrera real (IAM) y no se falsea sin las credenciales de otra
+// persona. NO es auditoría: el nombre sólo se ve en vivo (D49, D74).
+const IDENTIDAD_DESCONOCIDA = '?';
+// `application_name` de Postgres se trunca a 63 bytes (NAMEDATALEN - 1).
+const LARGO_NOMBRE_SESION = 63;
+let identidadResuelta = null;
+
+/**
+ * El nombre de una persona dentro de un ARN de AWS: el último tramo de un
+ * usuario IAM (`…:user/<ruta>/<nombre>`) o el nombre de sesión de un rol
+ * asumido (`…:assumed-role/<rol>/<sesion>`). Nunca el número de cuenta. Sólo
+ * letras, dígitos y `@._+-`; lo demás pasa a `_`.
+ */
+function nombreDeArn(arn) {
+  const m = /^arn:aws[a-z-]*:(iam|sts)::[0-9]+:(user|assumed-role)\/(.+)$/.exec(String(arn).trim());
+  if (!m) return IDENTIDAD_DESCONOCIDA;
+  const tramos = m[3].split('/');
+  const nombre = tramos[tramos.length - 1].replace(/[^A-Za-z0-9@._+-]/g, '_');
+  return nombre === '' ? IDENTIDAD_DESCONOCIDA : nombre;
+}
+
+/**
+ * AC60: la identidad de AWS de quien consulta. Se pide una sola vez por
+ * proceso y se guarda; si `aws sts` falla, devuelve `?` y no la guarda, para
+ * volver a intentar en la próxima consulta. Nunca frena la consulta: es un
+ * dato para diagnosticar, no una barrera.
+ */
+function resolverIdentidad(region) {
+  if (identidadResuelta !== null) return identidadResuelta;
+  const r = spawnSync('aws', [
+    'sts', 'get-caller-identity',
+    '--region', region,
+    '--query', 'Arn',
+    '--output', 'text'
+  ], { encoding: 'utf8', maxBuffer: MAX_BUFFER, timeout: TIMEOUT_PROCESO_MS });
+  if (r.error || r.status !== 0) return IDENTIDAD_DESCONOCIDA;
+  const nombre = nombreDeArn(r.stdout);
+  if (nombre !== IDENTIDAD_DESCONOCIDA) identidadResuelta = nombre;
+  return nombre;
+}
+
+/** El nombre de la sesión en el motor: `<usuario del secreto>/<quién consulta>`. */
+function nombreDeSesion(usuario, identidad) {
+  return (String(usuario) + '/' + String(identidad || IDENTIDAD_DESCONOCIDA)).slice(0, LARGO_NOMBRE_SESION);
+}
+
 /** Escapa `\` y `:`, los dos caracteres con significado en el archivo de libpq. */
 function escaparCampoPassfile(valor) {
   return String(valor).replace(/\\/g, '\\\\').replace(/:/g, '\\:');
@@ -169,7 +217,7 @@ function resolverCredencial(entrada) {
  * réplica y después el SQL del consumidor. Sin `--quiet`, psql imprime `DO`
  * como primera línea del CSV (medido).
  */
-function construirComandoPostgres(entrada, usuario, rutaPassfile, sql) {
+function construirComandoPostgres(entrada, usuario, rutaPassfile, sql, identidad) {
   const conninfo = 'postgresql://' + encodeURIComponent(usuario) + '@' +
     entrada.host + ':' + entrada.puerto + '/' + encodeURIComponent(entrada.base);
   return {
@@ -190,7 +238,8 @@ function construirComandoPostgres(entrada, usuario, rutaPassfile, sql) {
       // tres formas se midieron una al lado de la otra; sólo PGAPPNAME y el
       // parámetro del conninfo sobreviven. No mover esto de vuelta a
       // PGOPTIONS: el comando se ve correcto y el efecto no lo es.
-      PGAPPNAME: usuario,
+      // AC29 y AC60 (v27): el usuario del secreto, más quién consulta.
+      PGAPPNAME: nombreDeSesion(usuario, identidad),
       // AC55 (v25) y AC58 (v26): TLS obligatorio y con el servidor
       // autenticado. `verify-full` exige que el certificado lo firme una de
       // las autoridades del bundle de RDS que viaja con el plugin, y que el
@@ -206,7 +255,7 @@ function construirComandoPostgres(entrada, usuario, rutaPassfile, sql) {
 }
 
 /** Comando de SQL Server. La contraseña va por entorno, nunca por argv. */
-function construirComandoSqlserver(entrada, usuario, contrasena, sql) {
+function construirComandoSqlserver(entrada, usuario, contrasena, sql, identidad) {
   const env = {};
   env[VARIABLE_CREDENCIAL_SQLSERVER] = contrasena;
   return {
@@ -218,6 +267,9 @@ function construirComandoSqlserver(entrada, usuario, contrasena, sql) {
     // pero no autentica al servidor (D71). AC54: `-t`, el límite de consulta.
     args: ['-S', entrada.host + ',' + entrada.puerto, '-d', entrada.base, '-U', usuario,
       '-N', 'true', '-C', '-t', String(TIMEOUT_CONSULTA_SQLSERVER_S),
+      // AC60 (v27): `-H` fija lo que el motor muestra como `HOST_NAME()`. Sin
+      // él, sqlcmd manda el nombre de la máquina, que no identifica a nadie.
+      '-H', nombreDeSesion(usuario, identidad),
       '-b', '-s', SEPARADOR_SQLSERVER, '-W', '-Q', sql],
     env: env
   };
@@ -298,6 +350,9 @@ function parsearSalidaSqlserver(texto) {
 function ejecutarConsulta(entrada, sql) {
   const credencial = resolverCredencial(entrada);
   const sensibles = [credencial.contrasena];
+  // AC60: después del secreto, así nunca se llama a AWS por una conexión
+  // desconocida ni por un SQL que la lista blanca rechazó.
+  const identidad = resolverIdentidad(entrada.region);
 
   let directorioTemporal = null;
   try {
@@ -314,9 +369,9 @@ function ejecutarConsulta(entrada, sql) {
       ].join(':') + '\n';
       fs.writeFileSync(rutaPassfile, linea, { mode: 0o600 });
       fs.chmodSync(rutaPassfile, 0o600);
-      plan = construirComandoPostgres(entrada, credencial.usuario, rutaPassfile, sql);
+      plan = construirComandoPostgres(entrada, credencial.usuario, rutaPassfile, sql, identidad);
     } else {
-      plan = construirComandoSqlserver(entrada, credencial.usuario, credencial.contrasena, sql);
+      plan = construirComandoSqlserver(entrada, credencial.usuario, credencial.contrasena, sql, identidad);
     }
 
     const entorno = Object.assign({}, process.env, plan.env);
@@ -427,6 +482,8 @@ module.exports = {
   TIMEOUT_CONSULTA_SQLSERVER_S: TIMEOUT_CONSULTA_SQLSERVER_S,
   BUNDLE_RDS: BUNDLE_RDS,
   resolverCredencial: resolverCredencial,
+  nombreDeArn: nombreDeArn,
+  nombreDeSesion: nombreDeSesion,
   ejecutarConsulta: ejecutarConsulta,
   construirComandoPostgres: construirComandoPostgres,
   construirComandoSqlserver: construirComandoSqlserver,
