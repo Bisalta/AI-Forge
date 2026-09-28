@@ -72,3 +72,284 @@ PASS  test_usage_summary.sh
 17 passed, 0 failed (17 total)
 ```
 
+
+---
+
+# Addendum del planner — v27 (NO lo escribió el runner)
+
+La escalera de arriba se corrió sobre `d1fb3d0`. Las mutaciones y la verificación en vivo se corrieron sobre `e8bd469`, el commit que agregó la escalera: el código y los tests son los de `d1fb3d0`. Esta versión del report reemplaza a la de `3092cae`, que mandaba el correo en claro y queda en el historial.
+
+**Una corrida roja antes de ésta.** La escalera de `5d45bac` salió con el gate 9 en rojo: un comentario decía "secreto:" seguido de texto, que coincide con el patrón del secret-scan. **No se commiteó**, porque el commit está condicionado a `"red":0` (`RT56`). Se reescribió el comentario en `d1fb3d0`.
+
+## 1. Las mediciones que decidieron el seudónimo (28-sep, a través del plugin instalado)
+
+Se hicieron antes de cambiar el código, con las herramientas del plugin instalado (v26) y con `aws rds` desde la máquina de Ian. Sólo cuentan sesiones: no leen el nombre ni la consulta de nadie. Salida literal:
+
+```
+consulta (proveedores-dev):
+SELECT count(*) FILTER (WHERE usename IS DISTINCT FROM current_user) AS sesiones_de_otros_roles,
+       count(*) FILTER (WHERE usename IS DISTINCT FROM current_user AND coalesce(application_name,'') <> '') AS con_application_name_visible,
+       count(*) FILTER (WHERE usename IS DISTINCT FROM current_user AND query = '<insufficient privilege>') AS con_consulta_oculta,
+       count(DISTINCT usename) FILTER (WHERE usename IS DISTINCT FROM current_user) AS roles_distintos
+FROM pg_stat_activity
+→ sesiones_de_otros_roles=10 · con_application_name_visible=4 · con_consulta_oculta=10 · roles_distintos=1
+
+consulta (proveedores-dev):
+SELECT current_setting('log_connections'), current_setting('log_line_prefix'),
+       current_setting('log_statement'), current_setting('log_min_duration_statement')
+→ log_connections=off · log_line_prefix=%t:%r:%u@%d:[%p]: · log_statement=none · log_min_duration=-1
+
+aws rds describe-db-instances (cluster sistemas-costruplaza-db):
+→ sistemas-costruplaza-db-instance-1: PerformanceInsightsEnabled=false
+→ sistemas-costruplaza-db-instance-1-reader: PerformanceInsightsEnabled=false
+aws rds describe-db-clusters:
+→ EnabledCloudwatchLogsExports=null
+```
+
+- **Cualquier login conectado a la réplica ve el nombre de la sesión**, aunque no la consulta. Desde `claude_lectura` se leen los `application_name` de otro rol, y es simétrico. Por eso viaja un seudónimo y no el correo.
+- **No queda registro del nombre**: no hay log de conexiones, el prefijo de log no incluye la aplicación (`%a`), no hay export a CloudWatch y Performance Insights está desactivado.
+
+## 2. Mutaciones de `AC29` y `AC60` — salida literal
+
+```
+árbol e8bd469
+
+### AC60 (a) PGAPPNAME sin el seudónimo
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=5
+      FAIL  AC60 PGAPPNAME lleva el usuario del secreto y el seudónimo de quien consulta
+      FAIL  AC60 (control) las dos consultas llevan el seudónimo
+      FAIL  AC60 si sts falla, la identidad es ?
+      FAIL  AC60 de un rol asumido el seudónimo sale del nombre de sesión
+      FAIL  AC60 la segunda consulta ya lleva el seudónimo
+- verde (restaurado): exit=0 fail=0
+
+### AC60 (b) sqlcmd sin -H
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=1
+      FAIL  AC60 sqlcmd lleva -H con el usuario del secreto y el seudónimo — no encontré [ARG -H|ARG claude_lectura/u-349175ad|] en la salida
+- verde (restaurado): exit=0 fail=0
+
+### AC60 (c) sin guardar el seudónimo
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=2
+      FAIL  AC60 la identidad se pide una sola vez por proceso
+      FAIL  AC60 un ARN sin nombre (root) se guarda como ? y no se vuelve a pedir
+- verde (restaurado): exit=0 fail=0
+
+### AC60 (d) el seudónimo se pide al cargar el módulo
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=4
+      FAIL  AC31 con una conexión desconocida no se invoca el binario aws
+      FAIL  una escritura se rechaza ANTES de resolver el secreto y de conectar
+      FAIL  AC60 un SQL rechazado no invoca aws
+      FAIL  AC60 un sts que no responde se corta rápido (menos de 20 s)
+- verde (restaurado): exit=0 fail=0
+
+### AC60 (e) un fallo de sts frena la consulta
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=3
+      FAIL  AC60 si sts falla, la consulta no se frena — encontré ["error"] y no debería estar
+      FAIL  AC60 si sts falla, la identidad es ?
+      FAIL  AC60 (control) la consulta con sts lento igual responde — encontré ["error"] y no debería estar
+- verde (restaurado): exit=0 fail=0
+
+### AC60 (f) el nombre en claro en lugar del seudónimo
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=9
+      FAIL  AC60 PGAPPNAME lleva el usuario del secreto y el seudónimo de quien consulta
+      FAIL  AC60 el correo de quien consulta no viaja en claro en Postgres — encontré [persona.prueba@ejemplo.com] y no debería estar
+      FAIL  AC60 sqlcmd lleva -H con el usuario del secreto y el seudónimo — no encontré [ARG -H|ARG claude_lectura/u-349175ad|] en la salida
+      FAIL  AC60 el correo de quien consulta no viaja en claro en SQL Server — encontré [persona.prueba@ejemplo.com] y no debería estar
+      FAIL  AC60 (control) las dos consultas llevan el seudónimo
+      FAIL  AC60 de un rol asumido el seudónimo sale del nombre de sesión
+      FAIL  AC60 la segunda consulta ya lleva el seudónimo
+      FAIL  AC60 --seudonimo imprime el seudónimo propio, con la identidad de AWS
+      FAIL  AC60 --seudonimo no imprime el nombre — encontré [persona.prueba@ejemplo.com] y no debería estar
+- verde (restaurado): exit=0 fail=0
+
+### AC60 (g) usa el ARN entero
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=6
+      FAIL  AC60 PGAPPNAME lleva el usuario del secreto y el seudónimo de quien consulta
+      FAIL  AC60 sqlcmd lleva -H con el usuario del secreto y el seudónimo — no encontré [ARG -H|ARG claude_lectura/u-349175ad|] en la salida
+      FAIL  AC60 (control) las dos consultas llevan el seudónimo
+      FAIL  AC60 de un rol asumido el seudónimo sale del nombre de sesión
+      FAIL  AC60 la segunda consulta ya lleva el seudónimo
+      FAIL  AC60 --seudonimo imprime el seudónimo propio, con la identidad de AWS
+- verde (restaurado): exit=0 fail=0
+
+### AC60 (h) guarda el ? de un sts fallido
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=2
+      FAIL  AC60 si sts falla, la consulta siguiente vuelve a pedir la identidad
+      FAIL  AC60 la segunda consulta ya lleva el seudónimo
+- verde (restaurado): exit=0 fail=0
+
+### AC60 (i) no guarda el ? de un ARN sin nombre
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=1
+      FAIL  AC60 un ARN sin nombre (root) se guarda como ? y no se vuelve a pedir
+- verde (restaurado): exit=0 fail=0
+
+### AC60 (j) sts sin --region
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=1
+      FAIL  AC60 sts se llama con la región de la entrada y sólo pide el ARN
+- verde (restaurado): exit=0 fail=0
+
+### AC60 (k) el límite de sts es el corte de proceso
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=1
+      FAIL  AC60 un sts que no responde se corta rápido (menos de 20 s)
+- verde (restaurado): exit=0 fail=0
+
+### AC60 (l) --seudonimo imprime el ARN
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=2
+      FAIL  AC60 --seudonimo imprime el seudónimo propio, con la identidad de AWS
+      FAIL  AC60 --seudonimo no imprime el nombre — encontré [persona.prueba@ejemplo.com] y no debería estar
+- verde (restaurado): exit=0 fail=0
+
+### AC29 (a) sin PGAPPNAME
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=6
+      FAIL  AC29 el comando lleva el usuario del secreto en PGAPPNAME — no encontré [PGAPPNAME claude_lectura] en la salida
+      FAIL  AC60 PGAPPNAME lleva el usuario del secreto y el seudónimo de quien consulta
+      FAIL  AC60 (control) las dos consultas llevan el seudónimo
+      FAIL  AC60 si sts falla, la identidad es ?
+      FAIL  AC60 de un rol asumido el seudónimo sale del nombre de sesión
+      FAIL  AC60 la segunda consulta ya lleva el seudónimo
+- verde (restaurado): exit=0 fail=0
+
+### AC29 (b) application_name de vuelta en PGOPTIONS
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=1
+      FAIL  AC29 PGOPTIONS no lleva application_name (psql le gana al -c) — encontré [application_name] y no debería estar
+- verde (restaurado): exit=0 fail=0
+
+Árbol al terminar: limpio
+```
+
+- Caen las 14, y las 28 corridas verdes salen `exit=0 fail=0`.
+
+### El script
+
+```bash
+#!/usr/bin/env bash
+# Mutaciones declaradas de AC29 y AC60 (contract v27). Cada una cambia una
+# línea con reemplazo exacto (tiene que aparecer una sola vez), verifica que
+# se aplicó, corre el test del AC, restaura con git checkout y verifica que
+# se restauró. Imprime exit code, cantidad de asserts que caen y sus nombres.
+set -u
+cd "$(git rev-parse --show-toplevel)"
+LB=plugins/bisalta-db/scripts/lista-blanca.js
+CX=plugins/bisalta-db/scripts/conexion.js
+SV=plugins/bisalta-db/scripts/servidor-mcp.js
+TL=SDD/tests/test_lista_blanca.sh
+TS=SDD/tests/test_servidor_mcp.sh
+SS=SDD/tests/secret-scan.sh
+TSS=SDD/tests/test_secret_scan.sh
+correr() { local o ec; o="$(bash "$1" 2>&1)"; ec=$?; printf 'exit=%s fail=%s\n' "$ec" "$(grep -c '^  FAIL' <<<"$o")"; grep '^  FAIL' <<<"$o" | sed 's/ — esperado.*//; s/ (exit [0-9]*)//; s/^/    /'; }
+mutar() { local nombre="$1" archivo="$2" test="$3" viejo="$4" nuevo="$5"
+  echo "### $nombre"
+  printf -- '- verde (árbol real): '; correr "$test"
+  python3 - "$archivo" "$viejo" "$nuevo" <<'PY'
+import sys
+p,v,n=sys.argv[1:4]; s=open(p).read(); assert s.count(v)==1,(v,s.count(v)); open(p,'w').write(s.replace(v,n))
+PY
+  if git diff --quiet -- "$archivo"; then echo "- ABORTA: la mutación no se aplicó"; return 1; fi
+  printf -- '- mutado:             '; correr "$test"
+  git checkout -q -- "$archivo"
+  if ! git diff --quiet -- "$archivo"; then echo "- ABORTA: no se restauró"; return 1; fi
+  printf -- '- verde (restaurado): '; correr "$test"
+  echo; }
+# RT56: sobre un árbol commiteado. Cada restauración es un `git checkout`,
+# que devolvería la versión commiteada y se llevaría lo que no lo está.
+[ -z "$(git status --porcelain)" ] || { echo "ABORTA: árbol sucio al empezar"; exit 1; }
+echo "árbol $(git rev-parse --short HEAD)"; echo
+mutar "AC60 (a) PGAPPNAME sin el seudónimo" "$CX" "$TS" \
+  'PGAPPNAME: nombreDeSesion(usuario, identidad),' 'PGAPPNAME: usuario,'
+mutar "AC60 (b) sqlcmd sin -H" "$CX" "$TS" \
+  "      '-H', nombreDeSesion(usuario, identidad),
+" ''
+mutar "AC60 (c) sin guardar el seudónimo" "$CX" "$TS" \
+  '  identidadResuelta = seudonimo(nombreDeArn(r.stdout));
+  return identidadResuelta;' '  return seudonimo(nombreDeArn(r.stdout));'
+mutar "AC60 (d) el seudónimo se pide al cargar el módulo" "$CX" "$TS" \
+  'module.exports = {' "resolverIdentidad('us-east-1');
+module.exports = {"
+mutar "AC60 (e) un fallo de sts frena la consulta" "$CX" "$TS" \
+  '  if (r.error || r.status !== 0) return IDENTIDAD_DESCONOCIDA;
+  identidadResuelta' "  if (r.error || r.status !== 0) throw fallo(5, 'secreto_inaccesible', 'sts');
+  identidadResuelta"
+mutar "AC60 (f) el nombre en claro en lugar del seudónimo" "$CX" "$TS" \
+  'identidadResuelta = seudonimo(nombreDeArn(r.stdout));' 'identidadResuelta = nombreDeArn(r.stdout);'
+mutar "AC60 (g) usa el ARN entero" "$CX" "$TS" \
+  'seudonimo(nombreDeArn(r.stdout))' 'seudonimo(String(r.stdout).trim())'
+mutar "AC60 (h) guarda el ? de un sts fallido" "$CX" "$TS" \
+  '  if (r.error || r.status !== 0) return IDENTIDAD_DESCONOCIDA;
+  identidadResuelta' '  if (r.error || r.status !== 0) { identidadResuelta = IDENTIDAD_DESCONOCIDA; return IDENTIDAD_DESCONOCIDA; }
+  identidadResuelta'
+mutar "AC60 (i) no guarda el ? de un ARN sin nombre" "$CX" "$TS" \
+  '  identidadResuelta = seudonimo(nombreDeArn(r.stdout));
+  return identidadResuelta;' '  const s0 = seudonimo(nombreDeArn(r.stdout));
+  if (s0 !== IDENTIDAD_DESCONOCIDA) identidadResuelta = s0;
+  return s0;'
+mutar "AC60 (j) sts sin --region" "$CX" "$TS" \
+  "    '--region', region,
+    '--query', 'Arn'," "    '--query', 'Arn',"
+mutar "AC60 (k) el límite de sts es el corte de proceso" "$CX" "$TS" \
+  'timeout: TIMEOUT_STS_MS });' 'timeout: TIMEOUT_PROCESO_MS });'
+mutar "AC60 (l) --seudonimo imprime el ARN" "$SV" "$TS" \
+  "process.stdout.write(conexion.resolverIdentidad(region) + '\\n');" "process.stdout.write(require('child_process').execFileSync('aws', ['sts', 'get-caller-identity'], { encoding: 'utf8' }));"
+mutar "AC29 (a) sin PGAPPNAME" "$CX" "$TS" \
+  '      PGAPPNAME: nombreDeSesion(usuario, identidad),
+' ''
+mutar "AC29 (b) application_name de vuelta en PGOPTIONS" "$CX" "$TS" \
+  "PGOPTIONS: '-c default_transaction_read_only=on'," "PGOPTIONS: '-c default_transaction_read_only=on -c application_name=otra',"
+echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio || echo SUCIO )"
+```
+
+## 3. Verificación en vivo, con el servidor del repo — salida literal
+
+```
+árbol e8bd469
+### Postgres: application_name de la propia sesión (tiene que ser <usuario>/u-<8 hex>, sin correo)
+{ "conexion": "proveedores-dev", "dialecto": "postgres", "filas": [ { "application_name": "claude_lectura/u-34a4b783", "usename": "claude_lectura" } ], "filas_devueltas": 1, "truncado": false, "motivo_truncado": null }
+### SQL Server: HOST_NAME() de la propia sesión (ídem)
+{ "conexion": "compras", "dialecto": "sqlserver", "filas": [ { "estacion": "bisalta_lectura/u-34a4b783", "login": "bisalta_lectura" } ], "filas_devueltas": 1, "truncado": false, "motivo_truncado": null }
+### El seudónimo propio, con --seudonimo (no imprime el nombre)
+u-34a4b783
+Árbol al terminar: limpio
+```
+
+- En los dos motores, la sesión muestra `<usuario del secreto>/u-<8 hex>`, sin correo. `--seudonimo` imprime el seudónimo y no el nombre.
+- El seudónimo que aparece es el de Ian. Es público por diseño: se calcula a partir de su usuario IAM.
+
+### El script
+
+```bash
+#!/usr/bin/env bash
+# Verificación en vivo de v27 (AC60, seudónimo), con el servidor del repo, contra las
+# bases reales. Sólo lectura de la propia sesión; ninguna credencial pasa por
+# esta salida.
+set -u
+cd "$(git rev-parse --show-toplevel)"
+call() { printf '%s\n%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"medicion","version":"0"}}}' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"consultar\",\"arguments\":{\"conexion\":\"$1\",\"sql\":\"$2\"}}}" | node plugins/bisalta-db/scripts/servidor-mcp.js 2>/dev/null | tail -1 | node -e 'let d="";process.stdin.on("data",x=>d+=x).on("end",()=>{console.log(JSON.parse(d).result.content[0].text.replace(/\s+/g," "))})'; }
+echo "árbol $(git rev-parse --short HEAD)"
+echo "### Postgres: application_name de la propia sesión (tiene que ser <usuario>/u-<8 hex>, sin correo)"
+call proveedores-dev "SELECT application_name, usename FROM pg_stat_activity WHERE pid = pg_backend_pid()"
+echo "### SQL Server: HOST_NAME() de la propia sesión (ídem)"
+call compras "SELECT HOST_NAME() AS estacion, SUSER_NAME() AS login"
+echo "### El seudónimo propio, con --seudonimo (no imprime el nombre)"
+node plugins/bisalta-db/scripts/servidor-mcp.js --seudonimo
+echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio || echo SUCIO )"
+```
+
+## 4. Binding AC ↔ test (`SDD/tests/test_servidor_mcp.sh`)
+
+| AC | Asserts |
+|---|---|
+| `AC60` | `AC60 …`, 20 asserts. Cubren el seudónimo en Postgres y en SQL Server, que el correo no viaje en claro en ninguno de los dos, que no aparezca el número de cuenta, una sola llamada por proceso y su control, que un SQL rechazado no invoque `aws`, que un `sts` que falla no frene y deje `?`, el rol asumido, los argumentos de `sts`, que un `sts` fallido se reintente y su segunda consulta, que el `?` del `root` se guarde, los dos comandos de seudónimo (tres asserts) y el `sts` lento con su control. Más la parte `manual-only` del §3 |
+| `AC29` | Los asserts de v15 siguen: `PGAPPNAME` empieza con el usuario del secreto, y `PGOPTIONS` no lleva `application_name` |
