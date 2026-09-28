@@ -8,7 +8,7 @@ Ian Vargas decidió `D74` el 28-sep: la sesión lleva, además del usuario del s
 
 - Entra **`AC60`**. Cambia la condición de aprobación de **`AC29`**: el nombre de la sesión deja de ser exactamente el usuario del secreto y pasa a ser `<usuario del secreto>/<identidad>`. Por eso el bump.
 - Medido el 28-sep, antes del cambio, sobre la sesión de Ian. Postgres mostraba `application_name = claude_lectura` y una IP de la red. SQL Server mostraba el nombre de la Mac, `MacBook-Pro-2.local`. Ninguno de los dos identificaba a una persona.
-- Medido el 28-sep, después del cambio, con el servidor del repo. Postgres muestra `application_name = claude_lectura/ian.vargas@construplaza.com`, y SQL Server, `HOST_NAME() = bisalta_lectura/ian.vargas@construplaza.com`.
+- Medido el 28-sep, después del cambio, con el servidor del repo. Postgres muestra `application_name = claude_lectura/<identidad de Ian>`, y SQL Server, `HOST_NAME() = bisalta_lectura/<identidad de Ian>`. La identidad es su usuario IAM; no se escribe acá por la regla de no dejar datos identificables de empleados.
 - **No es auditoría.** El nombre se ve sólo mientras la consulta corre. Después no queda registro: el cluster de Postgres no exporta logs (`D49`), y en SQL Server ver las sesiones de otros exige un permiso que sólo tiene el administrador. Sirve para saber quién está cargando la base ahora.
 - **Efecto dentro del equipo**: como todos comparten el rol de Postgres, cada uno ya podía ver las consultas de los demás en `pg_stat_activity`. Ahora se ve también de quién es cada una.
 
