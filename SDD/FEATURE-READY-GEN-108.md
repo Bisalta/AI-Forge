@@ -34,7 +34,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 🟡 **Una parte de la lista blanca no la puede tocar un agente.** El filtro de seguridad cortó tres veces el trabajo de ajustarla contra formas de pasarla, aunque los casos fueran de Patrick. Por eso v20 lo escribió él (`RT54`). Lo que no cortó, de v23 a v25, fueron los casos de consultas legítimas y las reglas de rechazo explícitas por nombre (`RT55`).
 
 🟠 **Review de seguridad de gradiel12 (PR #14, 24-sep).** No bloquea el merge; pide sus puntos 1 y 2 antes de habilitar al equipo. v25 aplica lo que no dependía de nadie más, y todo tiene su mutación verificada:
-- **TLS obligatorio** en los dos motores (`AC55`). **Desde v26, Postgres autentica al servidor** con el bundle de RDS (`AC58`, `D70` pagada). **SQL Server cifra pero no autentica al servidor**, y eso queda como **riesgo aceptado** (`D71`, 25-sep): a Dev SQL sólo se llega por la VPN, según confirmaste vos, y Patrick lo aceptó. **En duda desde el 28-sep**: el security group de la instancia admite, además de las redes de la VPN, tres IP públicas puntuales y rangos internos que no se identificaron. Decidís vos y Patrick si se mantiene.
+- **TLS obligatorio** en los dos motores (`AC55`). **Desde v26, Postgres autentica al servidor** con el bundle de RDS (`AC58`, `D70` pagada). **SQL Server cifra pero no autentica al servidor**, y eso queda como **riesgo aceptado** (`D71`, 25-sep): a Dev SQL sólo se llega por la VPN, según confirmaste vos, y Patrick lo aceptó.
 - **`sqlcmd -t 60`** (`AC54`): SQL Server no tenía límite de consulta.
 - **Diecisiete sentencias de SQL Server que no son lectura, rechazadas** (`AC53`). El caso 8 de Patrick usaba `OPENQUERY` y deja de ser límite conocido: se cambió sólo su veredicto esperado.
 - **Temporales huérfanos** borrados al arrancar (`AC56`).
@@ -75,7 +75,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 | **v27** | La sesión lleva el seudónimo de quien consulta, sacado de su identidad de AWS (`AC60`, `D74`). Medido en vivo en los dos motores. Ronda 1 `REJECTED`: la primera versión mandaba el correo, y la review midió que lo ve cualquier login de la réplica. Ian eligió el seudónimo. Review §7.5: `APPROVED` en la ronda 3. |
 | **Aprovisionamiento** | Postgres ejecutado por Patrick el 22-sep y SQL Server el 23-sep, verificados desde el plugin. Parte de su evidencia vive en Slack (`D61`) |
 | **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep, **iniciales para probar la herramienta**, no definitivas |
-| **Deuda, retro y escalaciones del ciclo** | 51 ítems de deuda (34 abiertos), 34 entradas de retro hasta `RT56` y 12 escalaciones hasta `E20` |
+| **Deuda, retro y escalaciones del ciclo** | 51 ítems de deuda (32 abiertos), 34 entradas de retro hasta `RT56` y 12 escalaciones hasta `E20` |
 
 **Lo que este PR NO hace**: no crea ningún rol, no toca ninguna base, no carga ningún secreto. Es código y procedimientos. Lo que ya existe en AWS y en las bases lo hizo Patrick a mano.
 
@@ -91,9 +91,8 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 7b. ~~v26, el bundle de RDS~~ (pedido en la misma aprobación): review §7.5 en tres rondas. Ronda 1 `REJECTED`, porque la primera regla del secret-scan tenía dos huecos. Ronda 2 `APPROVED` con un tercer hueco, corregido. **Ronda 3 `APPROVED`**, con dos MINOR de prosa a deuda (`D79`, `D80`).
 7c. ~~Probar v26 a través del plugin instalado~~ — hecho el 25-sep a las 14:04: las seis conexiones de Postgres conectan con `verify-full`, y SQL Server responde igual (report de v26, §5).
 7d. ~~Confirmar Feature Ready sobre v26~~ — **APROBADO por Ian Vargas el 25-sep-2026**, después de la prueba a través del plugin instalado. v26 cambia qué mira un gate de seguridad (`AC59`).
-7e. ~~Review §7.5 de v27, quién consulta~~ (`AC60`, decisión de Ian del 28-sep): viaja un **seudónimo**, no el correo. Ronda 1 `REJECTED`, y Ian eligió el seudónimo; ronda 2 `REJECTED`, por la evidencia del §1; **ronda 3 `APPROVED`**, con los MINOR a deuda (`D81`, `D82`). **El merge tiene que ser con squash**: el correo de la primera versión quedó en un commit de la branch (`d1fb0e8`).
+7e. ~~Review §7.5 de v27, quién consulta~~ (`AC60`, decisión de Ian del 28-sep): viaja un **seudónimo**, no el correo. Ronda 1 `REJECTED`, y Ian eligió el seudónimo; ronda 2 `REJECTED`, por la evidencia del §1; **ronda 3 `APPROVED`**, con los MINOR a deuda. **El merge tiene que ser con squash**: el correo de la primera versión quedó en un commit de la branch (`d1fb0e8`).
 7f. **Confirmar Feature Ready sobre v27**, que cambia `AC29`, y probarlo a través del plugin instalado.
-7g. **Decidir D71 con Patrick**: el security group de Dev SQL admite tres orígenes públicos `/32` y rangos internos, además de la VPN (`D81`, `D82`). Es antes de habilitar al equipo, no antes del merge.
 8. **Merge.** Requiere la review de un code owner (`@Bisalta/construplaza-admin`). No habilita nada al equipo por sí solo.
 
 Para **habilitarlo al equipo** hace falta además la aprobación de Esteban o Sebastián.

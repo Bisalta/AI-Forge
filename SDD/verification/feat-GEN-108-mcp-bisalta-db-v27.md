@@ -125,7 +125,7 @@ puertos=tcp 3389-3389  origenes_privados=1 origenes_publicos=1 otros_sg=0
 
 - **Cualquier login conectado a la réplica ve el nombre de la sesión**, aunque no la consulta (medición 1). Es simétrico. Por eso viaja un seudónimo y no el correo.
 - **No queda registro del nombre** (mediciones 2 a 4): no hay log de conexiones, el prefijo de log no incluye la aplicación (`%a`), no hay export a CloudWatch y Performance Insights está desactivado.
-- **D71** (medición 5): la instancia no tiene IP pública, pero su security group admite, además de rangos privados, **orígenes públicos puntuales** por todo TCP, por todos los puertos y por el 3389. Por eso la condición "sólo por la VPN" no está verificada (contract, "Cambios v26 → v27").
+- **D71** (medición 5): la instancia no tiene IP pública, pero su security group admite, además de rangos privados, **orígenes públicos puntuales** por todo TCP, por todos los puertos y por el 3389. Por eso la condición "sólo por la VPN" no está verificada (contract, "Cambios v26 → v27"). *(28-sep, después de la review: Ian mantuvo D71. El security group define quién puede conectarse a la instancia, no quién puede interceptar la conexión del plugin.)*
 
 ### El script
 
