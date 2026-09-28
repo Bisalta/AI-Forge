@@ -73,10 +73,10 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 | **v25** | Review de seguridad de gradiel12: `AC53` a `AC57`, 34 mutaciones que caen, cifrado verificado en vivo. Review §7.5: `APPROVED` en la ronda 3. **Probado a través del plugin instalado** el 25-sep (report de v25, §5) |
 | **v26** | Postgres autentica al servidor con el bundle de RDS (`AC58`). Las seis conexiones conectan con `verify-full`, y con una autoridad ajena falla. **Un gate de seguridad cambió qué mira** (`AC59`): el secret-scan ya no escanea el base64 de un certificado público dentro de un bloque cerrado. La primera versión de la regla tenía tres huecos que la review encontró y que ya están cerrados. Review §7.5: `APPROVED` en la ronda 3 |
 | **v27** | La sesión lleva el seudónimo de quien consulta, sacado de su identidad de AWS (`AC60`, `D74`). Medido en vivo en los dos motores. Ronda 1 `REJECTED`: la primera versión mandaba el correo, y la review midió que lo ve cualquier login de la réplica. Ian eligió el seudónimo. Review §7.5: `APPROVED` en la ronda 3. |
-| **v28** | SQL Server corre en `READ UNCOMMITTED` (`AC61`, `D75`): medido en vivo, el nivel de la sesión pasa de `2` a `1`. `D73` pagada con el tope de 12 medido, y `D72` aceptada. Ronda 1 `ESCALATE`: el riesgo aceptado nombraba sólo las filas sin confirmar, y Ian aceptó el riesgo completo (`E21`). Review §7.5: ronda 2 pendiente |
+| **v28** | SQL Server corre en `READ UNCOMMITTED` (`AC61`, `D75`): medido en vivo, el nivel de la sesión pasa de `2` a `1`. `D73` pagada con el tope de 12 medido, y `D72` aceptada. Ronda 1 `ESCALATE`: el riesgo aceptado nombraba sólo las filas sin confirmar, y Ian aceptó el riesgo completo (`E21`). Review §7.5: ronda 2 `APPROVED`, con los MINOR del brief corregidos; **ronda 3 `APPROVED`**, con `D83` a deuda |
 | **Aprovisionamiento** | Postgres ejecutado por Patrick el 22-sep y SQL Server el 23-sep, verificados desde el plugin. Parte de su evidencia vive en Slack (`D61`) |
 | **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep, **iniciales para probar la herramienta**, no definitivas |
-| **Deuda, retro y escalaciones del ciclo** | 51 ítems de deuda (29 abiertos), 35 entradas de retro hasta `RT57` y 13 escalaciones hasta `E21` |
+| **Deuda, retro y escalaciones del ciclo** | 53 ítems de deuda (30 abiertos), 35 entradas de retro hasta `RT57` y 13 escalaciones hasta `E21` |
 
 **Lo que este PR NO hace**: no crea ningún rol, no toca ninguna base, no carga ningún secreto. Es código y procedimientos. Lo que ya existe en AWS y en las bases lo hizo Patrick a mano.
 
@@ -93,7 +93,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 7c. ~~Probar v26 a través del plugin instalado~~ — hecho el 25-sep a las 14:04: las seis conexiones de Postgres conectan con `verify-full`, y SQL Server responde igual (report de v26, §5).
 7d. ~~Confirmar Feature Ready sobre v26~~ — **APROBADO por Ian Vargas el 25-sep-2026**, después de la prueba a través del plugin instalado. v26 cambia qué mira un gate de seguridad (`AC59`).
 7e. ~~Review §7.5 de v27, quién consulta~~ (`AC60`, decisión de Ian del 28-sep): viaja un **seudónimo**, no el correo. Ronda 1 `REJECTED`, y Ian eligió el seudónimo; ronda 2 `REJECTED`, por la evidencia del §1; **ronda 3 `APPROVED`**, con los MINOR a deuda. **El merge tiene que ser con squash**: el correo de la primera versión quedó en un commit de la branch (`d1fb0e8`).
-7f. **Review §7.5 de v28**, `READ UNCOMMITTED` en SQL Server (`AC61`).
+7f. ~~Review §7.5 de v28~~, `READ UNCOMMITTED` en SQL Server (`AC61`). Ronda 1 `ESCALATE`, porque el riesgo estaba descrito de menos y Ian lo aceptó completo (`E21`); ronda 2 `APPROVED`; **ronda 3 `APPROVED`**.
 7g. **Confirmar Feature Ready sobre v28**, que suma v27 (cambia `AC29`) y v28 (`AC61`: riesgo aceptado completo de lecturas sin confirmar, filas leídas dos veces o salteadas y `Msg 601`, `E21`; ver arriba), y probarlo a través del plugin instalado.
 8. **Merge.** Requiere la review de un code owner (`@Bisalta/construplaza-admin`). No habilita nada al equipo por sí solo.
 
