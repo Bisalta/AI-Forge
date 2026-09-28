@@ -72,10 +72,10 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 | **v24** | Cinco casos del planner para la mutación (c), que ahora cae (`D64`). Las cuatro mutaciones de `AC51` caen sobre el árbol actual. Review §7.5: `APPROVED` en la ronda 3 |
 | **v25** | Review de seguridad de gradiel12: `AC53` a `AC57`, 34 mutaciones que caen, cifrado verificado en vivo. Review §7.5: `APPROVED` en la ronda 3. **Probado a través del plugin instalado** el 25-sep (report de v25, §5) |
 | **v26** | Postgres autentica al servidor con el bundle de RDS (`AC58`). Las seis conexiones conectan con `verify-full`, y con una autoridad ajena falla. **Un gate de seguridad cambió qué mira** (`AC59`): el secret-scan ya no escanea el base64 de un certificado público dentro de un bloque cerrado. La primera versión de la regla tenía tres huecos que la review encontró y que ya están cerrados. Review §7.5: `APPROVED` en la ronda 3 |
-| **v27** | La sesión lleva el seudónimo de quien consulta, sacado de su identidad de AWS (`AC60`, `D74`). Medido en vivo en los dos motores. Ronda 1 `REJECTED`: la primera versión mandaba el correo, y la review midió que lo ve cualquier login de la réplica. Ian eligió el seudónimo. **En review** (§7.5) |
+| **v27** | La sesión lleva el seudónimo de quien consulta, sacado de su identidad de AWS (`AC60`, `D74`). Medido en vivo en los dos motores. Ronda 1 `REJECTED`: la primera versión mandaba el correo, y la review midió que lo ve cualquier login de la réplica. Ian eligió el seudónimo. Review §7.5: `APPROVED` en la ronda 3. |
 | **Aprovisionamiento** | Postgres ejecutado por Patrick el 22-sep y SQL Server el 23-sep, verificados desde el plugin. Parte de su evidencia vive en Slack (`D61`) |
 | **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep, **iniciales para probar la herramienta**, no definitivas |
-| **Deuda, retro y escalaciones del ciclo** | 49 ítems de deuda (32 abiertos), 34 entradas de retro hasta `RT56` y 12 escalaciones hasta `E20` |
+| **Deuda, retro y escalaciones del ciclo** | 51 ítems de deuda (34 abiertos), 34 entradas de retro hasta `RT56` y 12 escalaciones hasta `E20` |
 
 **Lo que este PR NO hace**: no crea ningún rol, no toca ninguna base, no carga ningún secreto. Es código y procedimientos. Lo que ya existe en AWS y en las bases lo hizo Patrick a mano.
 
@@ -91,7 +91,9 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 7b. ~~v26, el bundle de RDS~~ (pedido en la misma aprobación): review §7.5 en tres rondas. Ronda 1 `REJECTED`, porque la primera regla del secret-scan tenía dos huecos. Ronda 2 `APPROVED` con un tercer hueco, corregido. **Ronda 3 `APPROVED`**, con dos MINOR de prosa a deuda (`D79`, `D80`).
 7c. ~~Probar v26 a través del plugin instalado~~ — hecho el 25-sep a las 14:04: las seis conexiones de Postgres conectan con `verify-full`, y SQL Server responde igual (report de v26, §5).
 7d. ~~Confirmar Feature Ready sobre v26~~ — **APROBADO por Ian Vargas el 25-sep-2026**, después de la prueba a través del plugin instalado. v26 cambia qué mira un gate de seguridad (`AC59`).
-7e. **v27, quién consulta** (`AC60`, decisión de Ian del 28-sep): viaja un **seudónimo**, no el correo. Ronda 1 de la review `REJECTED`, y Ian eligió el seudónimo; va la ronda 2. Después, tu confirmación de Feature Ready sobre v27, porque cambia `AC29`. **El merge tiene que ser con squash**: el correo de la primera versión quedó en un commit de la branch (`d1fb0e8`).
+7e. ~~Review §7.5 de v27, quién consulta~~ (`AC60`, decisión de Ian del 28-sep): viaja un **seudónimo**, no el correo. Ronda 1 `REJECTED`, y Ian eligió el seudónimo; ronda 2 `REJECTED`, por la evidencia del §1; **ronda 3 `APPROVED`**, con los MINOR a deuda (`D81`, `D82`). **El merge tiene que ser con squash**: el correo de la primera versión quedó en un commit de la branch (`d1fb0e8`).
+7f. **Confirmar Feature Ready sobre v27**, que cambia `AC29`, y probarlo a través del plugin instalado.
+7g. **Decidir D71 con Patrick**: el security group de Dev SQL admite tres orígenes públicos `/32` y rangos internos, además de la VPN (`D81`, `D82`). Es antes de habilitar al equipo, no antes del merge.
 8. **Merge.** Requiere la review de un code owner (`@Bisalta/construplaza-admin`). No habilita nada al equipo por sí solo.
 
 Para **habilitarlo al equipo** hace falta además la aprobación de Esteban o Sebastián.
