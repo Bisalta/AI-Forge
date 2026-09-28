@@ -767,12 +767,13 @@ Casos del test — rechazados: en `postgres`, `WITH x AS (INSERT INTO t VALUES (
 
 **Parte `manual-only`**, contra las bases reales: `application_name` en Postgres y `HOST_NAME()` en SQL Server muestran `<usuario>/u-<8 hex>`, sin correo.
 
-**AC61** (detección, v28) — En SQL Server, la consulta corre en `READ UNCOMMITTED`. El argumento de `-Q` es exactamente `SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED; ` seguido de la consulta, sin cambios. La descripción de `consultar` dice que en SQL Server la consulta corre en `READ UNCOMMITTED`, que puede devolver filas que otra transacción todavía no confirmó, y que puede leer dos veces o saltear filas ya confirmadas. Casos en `SDD/tests/test_servidor_mcp.sh`: el assert del argumento de `-Q` y los tres de la descripción. **Mutaciones declaradas**:
+**AC61** (detección, v28) — En SQL Server, la consulta corre en `READ UNCOMMITTED`. El argumento de `-Q` es exactamente `SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED; ` seguido de la consulta, sin cambios. La descripción de `consultar` dice que en SQL Server la consulta corre en `READ UNCOMMITTED`, que puede devolver filas que otra transacción todavía no confirmó, que puede leer dos veces o saltear filas ya confirmadas, y que puede cortar con el error 601. Casos en `SDD/tests/test_servidor_mcp.sh`: el assert del argumento de `-Q` y los cuatro de la descripción. **Mutaciones declaradas**:
 - (a) sin el prefijo, el assert del argumento;
 - (b) el prefijo después de la consulta, el mismo;
 - (c) `READ COMMITTED` en lugar de `READ UNCOMMITTED`, el mismo;
-- (d) sin el aviso en la descripción, los tres de la descripción;
-- (e) sin la frase de las filas repetidas o salteadas, el de esa frase.
+- (d) sin el aviso en la descripción, los cuatro de la descripción;
+- (e) sin la frase de las filas repetidas o salteadas, el de esa frase y el del 601, que va en la misma frase;
+- (f) sin el corte con el error 601, el del 601.
 **Parte `manual-only`**, contra la instancia real: `transaction_isolation_level` de la propia sesión (`sys.dm_exec_sessions`) da `1`, y una consulta con `WITH` responde.
 
 **AC51** (detección) — La normalización de la lista blanca es **un solo recorrido de izquierda a derecha** que conoce las reglas de comillado de cada dialecto, de modo que **el validador ve las mismas sentencias que ejecuta el motor**:

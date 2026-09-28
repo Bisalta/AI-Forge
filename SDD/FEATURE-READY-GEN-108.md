@@ -57,7 +57,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 
 1. **`plugins/bisalta-db/scripts/lista-blanca.js`** — la normalización de v20 es la de Patrick, con sus límites escritos en el comentario de la función.
 2. **`SDD/tests/fixtures/`** — los dos archivos de casos de Patrick, que el test recorre sin copiar sus consultas.
-3. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-v27.md`** — la escalera sellada sobre el árbol actual, las mutaciones de `AC29` y `AC60` y la verificación en vivo del seudónimo. **`…-v26.md`** trae las 45 mutaciones de `AC53` a `AC59` y la verificación en vivo de `verify-full`, con su control negativo. **`…-v25.md`** trae las mediciones que decidieron el diseño de v25 y la prueba a través del plugin instalado. **`…-v24.md`** trae las cuatro mutaciones de `AC51`. **`…-v23-D67.md`** trae los controles de aislamiento de la (a), y **`…-v23.md`**, los 48 casos agrupados y el binding. El de v22 trae la verificación en vivo con el plugin instalado.
+3. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-v28.md`** — la escalera sellada sobre el árbol actual, las mutaciones de `AC61`, el antes y el después del aislamiento, y `D73` y `D75` medidos. **`…-v27.md`** trae las mutaciones de `AC29` y `AC60` y la verificación en vivo del seudónimo. **`…-v26.md`** trae las 45 mutaciones de `AC53` a `AC59` y la verificación en vivo de `verify-full`, con su control negativo. **`…-v25.md`** trae las mediciones que decidieron el diseño de v25 y la prueba a través del plugin instalado. **`…-v24.md`** trae las cuatro mutaciones de `AC51`. **`…-v23-D67.md`** trae los controles de aislamiento de la (a), y **`…-v23.md`**, los 48 casos agrupados y el binding. El de v22 trae la verificación en vivo con el plugin instalado.
 4. **`SDD/verification/feat-GEN-108-mcp-bisalta-db-v19-parte-1.md`** — el timeout, el `ALTER ROLE` y el esquema `public`, verificados contra el motor.
 5. **`plugins/bisalta-db/aprovisionamiento/APROBACIONES.md`** — quién autorizó qué, y la diferencia entre lo que la aprobación enumera y lo que el acceso alcanza.
 
@@ -76,7 +76,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 | **v28** | SQL Server corre en `READ UNCOMMITTED` (`AC61`, `D75`): medido en vivo, el nivel de la sesión pasa de `2` a `1`. `D73` pagada con el tope de 12 medido, y `D72` aceptada. Ronda 1 `ESCALATE`: el riesgo aceptado nombraba sólo las filas sin confirmar, y Ian aceptó el riesgo completo (`E21`). Review §7.5: ronda 2 pendiente |
 | **Aprovisionamiento** | Postgres ejecutado por Patrick el 22-sep y SQL Server el 23-sep, verificados desde el plugin. Parte de su evidencia vive en Slack (`D61`) |
 | **Alcance de Dev SQL** | Arranca en **cero**. Seis bases pedidas el 21-sep, **iniciales para probar la herramienta**, no definitivas |
-| **Deuda, retro y escalaciones del ciclo** | 51 ítems de deuda (29 abiertos), 34 entradas de retro hasta `RT56` y 12 escalaciones hasta `E20` |
+| **Deuda, retro y escalaciones del ciclo** | 51 ítems de deuda (29 abiertos), 35 entradas de retro hasta `RT57` y 13 escalaciones hasta `E21` |
 
 **Lo que este PR NO hace**: no crea ningún rol, no toca ninguna base, no carga ningún secreto. Es código y procedimientos. Lo que ya existe en AWS y en las bases lo hizo Patrick a mano.
 
@@ -94,7 +94,7 @@ Un plugin que le da a Claude Code consulta de solo lectura contra las bases de B
 7d. ~~Confirmar Feature Ready sobre v26~~ — **APROBADO por Ian Vargas el 25-sep-2026**, después de la prueba a través del plugin instalado. v26 cambia qué mira un gate de seguridad (`AC59`).
 7e. ~~Review §7.5 de v27, quién consulta~~ (`AC60`, decisión de Ian del 28-sep): viaja un **seudónimo**, no el correo. Ronda 1 `REJECTED`, y Ian eligió el seudónimo; ronda 2 `REJECTED`, por la evidencia del §1; **ronda 3 `APPROVED`**, con los MINOR a deuda. **El merge tiene que ser con squash**: el correo de la primera versión quedó en un commit de la branch (`d1fb0e8`).
 7f. **Review §7.5 de v28**, `READ UNCOMMITTED` en SQL Server (`AC61`).
-7g. **Confirmar Feature Ready sobre v28**, que suma v27 (cambia `AC29`) y v28 (`AC61`, con lecturas sin confirmar como riesgo aceptado), y probarlo a través del plugin instalado.
+7g. **Confirmar Feature Ready sobre v28**, que suma v27 (cambia `AC29`) y v28 (`AC61`: riesgo aceptado completo de lecturas sin confirmar, filas leídas dos veces o salteadas y `Msg 601`, `E21`; ver arriba), y probarlo a través del plugin instalado.
 8. **Merge.** Requiere la review de un code owner (`@Bisalta/construplaza-admin`). No habilita nada al equipo por sí solo.
 
 Para **habilitarlo al equipo** hace falta además la aprobación de Esteban o Sebastián.
