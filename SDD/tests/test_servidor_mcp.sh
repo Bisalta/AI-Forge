@@ -863,6 +863,12 @@ assert_eq "$(env PATH="$PATH_CON_STUBS" TMPDIR="$SYSTMP" "$NODE_BIN" "$SERVIDOR"
 propio="$(env PATH="$PATH_CON_STUBS" TMPDIR="$SYSTMP" "$NODE_BIN" "$SERVIDOR" --seudonimo 2>/dev/null)"
 assert_eq "$propio" "$SEUDONIMO_PRUEBA" "AC60 --seudonimo imprime el seudónimo propio, con la identidad de AWS"
 assert_no_contains "$propio" "$IDENTIDAD_PRUEBA" "AC60 --seudonimo no imprime el nombre"
+# Sin seudónimo (sts falla), --seudonimo sale distinto de 0.
+env PATH="$PATH_CON_STUBS" TMPDIR="$SYSTMP" BISALTA_STUB_STS_FALLA=1 "$NODE_BIN" "$SERVIDOR" --seudonimo >/dev/null 2>&1
+assert_exit 1 "$?" "AC60 --seudonimo sale 1 cuando no hay seudónimo"
+# El modo se elige por el primer argumento: --seudonimo como valor de --sql no lo activa.
+salida_cli="$(env PATH="$PATH_CON_STUBS" TMPDIR="$SYSTMP" "$NODE_BIN" "$SERVIDOR" --consultar 'no-existe' --sql '--seudonimo' 2>/dev/null)"
+assert_contains "$salida_cli" '"error": "conexion_desconocida"' "AC60 --seudonimo como valor de --sql no activa el modo seudónimo"
 
 # Un sts que no responde no le suma a la consulta el corte de proceso (125 s):
 # su límite es corto. El stub tarda 30 s; la consulta tiene que volver antes de 20.

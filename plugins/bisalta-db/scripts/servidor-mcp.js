@@ -357,7 +357,14 @@ function correrSeudonimo(argv) {
   let region;
   try { region = catalogo.cargarCatalogo(rutaCatalogo())[0].region; } catch (e) { region = null; }
   if (!region) { process.stderr.write('no pude leer la región del catálogo\n'); process.exitCode = 2; return; }
-  process.stdout.write(conexion.resolverIdentidad(region) + '\n');
+  const propio = conexion.resolverIdentidad(region);
+  process.stdout.write(propio + '\n');
+  // `?` es "no hay seudónimo": `sts` falló o el ARN no tiene nombre. Sale
+  // distinto de 0 para que no se confunda con un seudónimo.
+  if (propio === '?') {
+    process.stderr.write('no hay seudónimo: aws sts falló, o la identidad no tiene un nombre (root, federated-user)\n');
+    process.exitCode = 1;
+  }
 }
 
 module.exports = {
@@ -375,7 +382,9 @@ if (require.main === module) {
   // proceso muerto sin pasar por su `finally`.
   conexion.limpiarTemporalesHuerfanos();
   const argv = process.argv.slice(2);
-  if (argv.indexOf('--seudonimo') !== -1 || argv.indexOf('--seudonimo-de') !== -1) {
+  // AC60: por el PRIMER argumento, para que un `--sql --seudonimo` de la CLI
+  // no caiga en el modo seudónimo.
+  if (argv[0] === '--seudonimo' || argv[0] === '--seudonimo-de') {
     correrSeudonimo(argv);
   } else if (argv.indexOf('--consultar') !== -1 || argv.indexOf('--listar-conexiones') !== -1) {
     correrUnaVez(argv);

@@ -116,7 +116,8 @@ rechazadas por nombre; y los temporales huérfanos, borrados al arrancar. En v26
 `verify-full` con el bundle de certificados de RDS, que viaja con el plugin: autentica al servidor. En v27, la
 sesión lleva un seudónimo de quien consulta, sacado de su identidad de AWS (`claude_lectura/u-…`),
 para saber en vivo quién está cargando la base; no lleva el correo, porque el nombre de la sesión lo
-ve cualquier login de la réplica, y no es auditoría. Al medir apareció un defecto
+ve cualquier login de la réplica. El seudónimo no es un secreto (quien conozca los nombres puede
+calcularlo), y no es auditoría. Al medir apareció un defecto
 que ninguna review había visto: `sqlcmd` escribe sus errores en stdout, el plugin sólo leía stderr, y
 todo error de SQL Server llegaba sin mensaje. El stub del test era una copia del de `psql` (`RT55`).
 

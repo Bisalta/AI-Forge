@@ -13,6 +13,8 @@ Ian Vargas decidió `D74` el 28-sep: la sesión lleva, además del usuario del s
 - **El seudónimo no es un secreto**: quien conozca los nombres del equipo puede calcularlos. Sirve para que ningún correo quede en texto claro, no para esconder a nadie.
 - **El correo de la primera versión quedó en el historial de la branch** (`d1fb0e8`, ya pusheado). Para que no llegue a `prod`, el PR #14 se mergea con **squash**. En GitHub el commit sigue visible dentro del PR.
 
+- **Registro de `D71`**, que se había escrito sobre la sección de v25 → v26. El 25-sep, SQL Server quedó como **riesgo aceptado**: cifra sin autenticar al servidor. La condición es que a Dev SQL sólo se llegue por la VPN, según confirmó Ian Vargas, y Patrick Ocampo lo aceptó. **Medido el 28-sep (review de v27, ronda 2)**: la instancia no tiene IP pública, pero su security group admite, además de rangos que coinciden con la VPN, **tres IP públicas `/32`** y **rangos internos que no se identificaron**, por el 1433 o por todos los puertos. La condición "sólo por la VPN" **no está verificada**. Deciden Ian y Patrick si la aceptación se mantiene, se acota o se reabre. Las direcciones no se copian al repo.
+
 Evidencia en `SDD/verification/feat-GEN-108-mcp-bisalta-db-v27.md`.
 
 ### Cambios v25 → v26 (Postgres autentica al servidor, 25-sep-2026)
@@ -728,7 +730,7 @@ Casos del test — rechazados: en `postgres`, `WITH x AS (INSERT INTO t VALUES (
 - **Una vez por proceso**: el seudónimo se guarda, también cuando `sts` respondió pero no salió un nombre (`?`).
 - **Después del secreto**: nunca se llama a AWS por una conexión desconocida ni por un SQL que la lista blanca rechazó.
 - **No frena**: si `sts` falla, la consulta sigue con `?`. Ese `?` no se guarda, así que la próxima consulta vuelve a intentar. El límite de `sts` es de 10 s.
-- **Cómo se resuelve**: `servidor-mcp.js --seudonimo` imprime el seudónimo propio, sin imprimir el nombre, y `--seudonimo-de <nombre>` imprime el de un nombre dado.
+- **Cómo se resuelve**: `servidor-mcp.js --seudonimo` imprime el seudónimo propio, sin imprimir el nombre, y sale 1 si no hay (`?`). `--seudonimo-de <nombre>` imprime el de un nombre dado, exactamente como termina el ARN, distinguiendo mayúsculas. El modo se elige por el primer argumento.
 - El caché dura lo que el proceso: si cambian las credenciales de AWS, hay que reiniciar la sesión.
 
 **Mutaciones declaradas**:
@@ -743,7 +745,9 @@ Casos del test — rechazados: en `postgres`, `WITH x AS (INSERT INTO t VALUES (
 - (i) no guardar el `?` de un ARN sin nombre, el del `root`;
 - (j) `sts` sin `--region`, el de los argumentos;
 - (k) el límite de `sts` en el corte de proceso, el de `sts` lento;
-- (l) que `--seudonimo` imprima el nombre, el de "no imprime el nombre".
+- (l) que `--seudonimo` imprima el nombre, el de "no imprime el nombre";
+- (m) que `--seudonimo` salga 0 sin seudónimo, el de "sale 1";
+- (n) elegir el modo con `indexOf` en vez del primer argumento, el de "como valor de --sql".
 
 **Parte `manual-only`**, contra las bases reales: `application_name` en Postgres y `HOST_NAME()` en SQL Server muestran `<usuario>/u-<8 hex>`, sin correo.
 

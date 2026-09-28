@@ -282,7 +282,8 @@ Todos entran con el mismo rol de Postgres y el mismo login de SQL Server. Para q
 
 - **Por qué seudónimo y no el correo**: el nombre de la sesión lo ve **cualquier login conectado a la réplica** de Postgres, no sólo el equipo (medido el 28-sep). Además, un Claude que mire `pg_stat_activity` traería lo que vea a su contexto. Con el seudónimo, ningún correo queda en texto claro.
 - **Saber el propio**: `node scripts/servidor-mcp.js --seudonimo`. Usa la identidad de AWS y no imprime el nombre.
-- **Mapear una lista** (Patrick, al diagnosticar): `node scripts/servidor-mcp.js --seudonimo-de <usuario IAM>`, una vez por persona.
+- **Mapear una lista** (Patrick, al diagnosticar): `node scripts/servidor-mcp.js --seudonimo-de <nombre>`, una vez por persona. El nombre es **exactamente como termina el ARN**: el usuario IAM o, si entra por SSO, el nombre de sesión del rol asumido. Distingue mayúsculas.
+- `--seudonimo` sale con código 1 si no hay seudónimo: `sts` falló, o la identidad no tiene un nombre (`root`, `federated-user`).
 - **No es un secreto**: quien conozca los nombres puede calcular los seudónimos.
 - **No es auditoría**: el nombre se ve sólo mientras la consulta corre. No se exportan logs (`D49`), `log_connections` está apagado y Performance Insights, desactivado.
 - Se pide una vez por proceso, y si falla, la consulta sigue con `?`. Si cambiás de credenciales de AWS, reiniciá la sesión.
