@@ -95,7 +95,52 @@ while IFS= read -r f; do
   # matcheado (nunca la línea completa) -> a la salida sólo le llega el
   # número de línea (campo 1); el valor detectado (campo 2+) se descarta acá
   # mismo y nunca se imprime — threat model contract v2 punto 3.
-  line_numbers="$(grep -iInEo "$PATTERN" "$REPO_ROOT/$f" 2>/dev/null | cut -d: -f1)"
+  #
+  # Binarios (GEN-108 v26, AC59): se saltean ACÁ, antes del awk. Antes lo
+  # hacía `grep -I` sobre el archivo; ahora grep lee por stdin lo que sale del
+  # awk, y el awk de macOS corta cada línea en el primer NUL, así que grep ya
+  # no reconocería el binario. Mismo comportamiento que antes de AC59.
+  grep -Iq . "$REPO_ROOT/$f" 2>/dev/null || continue
+  #
+  # Certificados públicos (GEN-108 v26, AC59): dentro de un bloque
+  # `-----BEGIN CERTIFICATE-----` … `-----END CERTIFICATE-----`, las líneas
+  # que son base64 puro se vacían antes del grep. Son datos de un certificado
+  # público, y el base64 al azar puede formar `AKIA` + 16 caracteres: pasó en
+  # el bundle de autoridades de RDS. Tres condiciones, y las tres importan
+  # (review de v26, ronda 1):
+  #   - el bloque tiene que CERRAR: sus líneas se guardan y se vacían recién
+  #     al llegar el END. Si el archivo termina sin END, se escanean tal cual
+  #     (un PEM truncado no puede apagar el scan del resto del archivo);
+  #   - "base64 puro" es base64 de verdad: letras, dígitos, `+` y `/`, con el
+  #     relleno `=` sólo al final (dos como mucho) y a lo sumo 76 caracteres.
+  #     `password=valor` no lo es;
+  #   - CR y espacios al final se toleran al RECONOCER las líneas, pero se
+  #     imprime la línea original.
+  # Es por CONTENIDO, no por path. Una línea que no sea base64 dentro del
+  # bloque se sigue escaneando, y fuera de un bloque cerrado no cambia nada.
+  # Se vacían, no se borran, para que los números de línea sigan siendo los
+  # del archivo.
+  line_numbers="$(awk '
+    function limpia(t) { sub(/\r$/, "", t); sub(/[ \t]+$/, "", t); return t }
+    function es_base64(t) { t = limpia(t); return length(t) >= 1 && length(t) <= 76 && t ~ /^[A-Za-z0-9+\/]+=?=?$/ }
+    {
+      l = limpia($0)
+      if (!en_cert && l == "-----BEGIN CERTIFICATE-----") { en_cert = 1; n = 1; buf[1] = $0; next }
+      # Un BEGIN con el bloque ya abierto: el anterior no cerró, así que sus
+      # líneas se escanean tal cual, y el bloque se reabre acá (review de v26,
+      # ronda 2). Si no, un PEM truncado seguido de uno completo formaría un
+      # solo bloque, y lo que quedara en el medio no se escanearía.
+      if (en_cert && l == "-----BEGIN CERTIFICATE-----") { for (k = 1; k <= n; k++) print buf[k]; n = 1; buf[1] = $0; next }
+      if (en_cert && l == "-----END CERTIFICATE-----") {
+        print buf[1]
+        for (k = 2; k <= n; k++) { if (es_base64(buf[k])) print ""; else print buf[k] }
+        print; en_cert = 0; next
+      }
+      if (en_cert) { buf[++n] = $0; next }
+      print
+    }
+    END { if (en_cert) for (k = 1; k <= n; k++) print buf[k] }
+  ' "$REPO_ROOT/$f" 2>/dev/null | grep -iInEo "$PATTERN" 2>/dev/null | cut -d: -f1)"
   if [ -n "$line_numbers" ]; then
     printf '%s\n' "$line_numbers" | while IFS= read -r ln; do
       printf '%s:%s: posible secreto (standards/security.md §3) — valor no impreso\n' "$f" "$ln"

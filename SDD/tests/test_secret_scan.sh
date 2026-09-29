@@ -156,5 +156,117 @@ remove_fixture "SDD/contracts/2026-09-01-nueva-feature.md"
 run_scan >/dev/null 2>&1; ec6_after=$?
 assert_exit 0 "$ec6_after" "forma6 secreto bajo SDD-contracts - verde tras remover"
 
+# --- formas 7 a 9 (GEN-108 v26, AC59): certificados públicos ---------------
+# El literal con forma de clave de AWS se arma en dos piezas, por el mismo
+# motivo que plant_kv: escrito entero, este archivo fuente se detectaría a sí
+# mismo.
+CLAVE_AWS="$(printf '%s%s' 'AK' 'IAQWERTYUIOPASDFGH')"
+INICIO_CERT='-----BEGIN CERTIFICATE-----'
+FIN_CERT='-----END CERTIFICATE-----'
+
+# forma 7: el patrón dentro de una línea base64 de un certificado -> verde.
+{
+  printf '%s\n' "$INICIO_CERT"
+  printf 'MIIEBjCCAu6gAwIBAgIJ%sQWERTYzAN\n' "$CLAVE_AWS"
+  printf '%s\n' "$FIN_CERT"
+} > "$TMP_DIR/form7.pem"
+( cd "$TMP_DIR" && git add -A )
+run_scan >/dev/null 2>&1; ec7=$?
+assert_exit 0 "$ec7" "forma7 base64 de un certificado con forma de clave AWS - verde (es un certificado público)"
+remove_fixture "form7.pem"
+
+# forma 8: la misma línea FUERA de un bloque de certificado -> rojo.
+printf 'MIIEBjCCAu6gAwIBAgIJ%sQWERTYzAN\n' "$CLAVE_AWS" > "$TMP_DIR/form8.txt"
+( cd "$TMP_DIR" && git add -A )
+out8="$(run_scan 2>&1)"; ec8=$?
+assert_exit 1 "$ec8" "forma8 la misma línea fuera de un certificado - rojo"
+assert_contains "$out8" "form8.txt" "forma8 la misma línea fuera de un certificado - rojo"
+remove_fixture "form8.txt"
+
+# forma 9: dentro del bloque, una línea que NO es base64 se sigue escaneando.
+{
+  printf '%s\n' "$INICIO_CERT"
+  printf 'aws_key = %s\n' "$CLAVE_AWS"
+  printf '%s\n' "$FIN_CERT"
+} > "$TMP_DIR/form9.pem"
+( cd "$TMP_DIR" && git add -A )
+out9="$(run_scan 2>&1)"; ec9=$?
+assert_exit 1 "$ec9" "forma9 una línea que no es base64 dentro de un certificado - rojo"
+assert_contains "$out9" "form9.pem:2:" "forma9 el número de línea es el del archivo"
+remove_fixture "form9.pem"
+
+# --- formas 10 a 13 (review de v26, ronda 1): los huecos de la primera regla -
+# Los literales con forma de secreto se arman en piezas, como arriba.
+CLAVE_PASS="$(printf '%s%s' 'pass' 'word=Sup3rS3cret99')"
+CLAVE_SEC="$(printf '%s%s' 'SEC' 'RET=abcd1234efgh')"
+
+# forma 10: BEGIN sin END. Lo que viene después se escanea -> rojo, con su
+# línea. Con la primera versión de AC59, el resto del archivo quedaba sin
+# escanear.
+{
+  printf '%s\n' "$INICIO_CERT"
+  printf 'MIIEBjCCAu6gAwIBAgIJ\n'
+  printf '%s\n' "$CLAVE_SEC"
+  printf '%s\n' "$CLAVE_AWS"
+} > "$TMP_DIR/form10.md"
+( cd "$TMP_DIR" && git add -A )
+out10="$(run_scan 2>&1)"; ec10=$?
+assert_exit 1 "$ec10" "forma10 un BEGIN sin END no apaga el scan del resto del archivo - rojo"
+assert_contains "$out10" "form10.md:3:" "forma10 detecta la clave=valor después del BEGIN sin END"
+assert_contains "$out10" "form10.md:4:" "forma10 detecta la clave AWS sola en su línea después del BEGIN sin END"
+remove_fixture "form10.md"
+
+# forma 11: clave=valor alfanumérico dentro de un bloque CERRADO -> rojo. No
+# es base64: el `=` va en el medio.
+{
+  printf '%s\n' "$INICIO_CERT"
+  printf '%s\n' "$CLAVE_PASS"
+  printf '%s\n' "$FIN_CERT"
+} > "$TMP_DIR/form11.pem"
+( cd "$TMP_DIR" && git add -A )
+out11="$(run_scan 2>&1)"; ec11=$?
+assert_exit 1 "$ec11" "forma11 clave=valor dentro de un certificado cerrado - rojo (no es base64)"
+assert_contains "$out11" "form11.pem:2:" "forma11 el número de línea es el del archivo"
+remove_fixture "form11.pem"
+
+# forma 12: un binario se sigue salteando, como antes de AC59.
+printf 'bin\000ario\n%s\n' "$CLAVE_AWS" > "$TMP_DIR/form12.bin"
+( cd "$TMP_DIR" && git add -A )
+run_scan >/dev/null 2>&1; ec12=$?
+assert_exit 0 "$ec12" "forma12 un binario no se escanea, igual que antes de AC59"
+remove_fixture "form12.bin"
+
+# forma 13: un certificado con CRLF se reconoce igual -> verde.
+{
+  printf '%s\r\n' "$INICIO_CERT"
+  printf 'MIIEBjCCAu6gAwIBAgIJ%sQWERTYzAN\r\n' "$CLAVE_AWS"
+  printf '%s\r\n' "$FIN_CERT"
+} > "$TMP_DIR/form13.pem"
+( cd "$TMP_DIR" && git add -A )
+run_scan >/dev/null 2>&1; ec13=$?
+assert_exit 0 "$ec13" "forma13 un certificado con CRLF se reconoce - verde"
+remove_fixture "form13.pem"
+
+# forma 14: un PEM truncado, una clave AWS sola en su línea y después un
+# certificado completo -> rojo en la línea de la clave. El BEGIN del segundo
+# no puede estirar el primero hasta su END.
+{
+  printf '%s\n' "$INICIO_CERT"
+  printf 'MIIEBjCCAu6gAwIBAgIJ\n'
+  printf 'texto de un ejemplo truncado\n'
+  printf '%s\n' "$CLAVE_AWS"
+  printf '%s\n' "$INICIO_CERT"
+  printf 'MIIEBjCCAu6gAwIBAgIJ\n'
+  printf '%s\n' "$FIN_CERT"
+} > "$TMP_DIR/form14.md"
+( cd "$TMP_DIR" && git add -A )
+out14="$(run_scan 2>&1)"; ec14=$?
+assert_exit 1 "$ec14" "forma14 un PEM truncado seguido de uno completo no forma un solo bloque - rojo"
+assert_contains "$out14" "form14.md:4:" "forma14 detecta la clave AWS entre los dos bloques"
+remove_fixture "form14.md"
+
+run_scan >/dev/null 2>&1; ec_final=$?
+assert_exit 0 "$ec_final" "secret-scan.sh sale limpio tras remover las formas 7 a 14"
+
 test_summary
 exit $?

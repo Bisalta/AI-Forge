@@ -27,6 +27,11 @@
       "name": "usage-monitor",
       "source": "./plugins/usage-monitor",
       "description": "Resumen de atribucion de consumo de Claude Code desde un log local de OTel console — costo y tokens por modelo, skill y agente, sin exponer session.id, email ni ningun identificador del log crudo."
+    },
+    {
+      "name": "bisalta-db",
+      "source": "./plugins/bisalta-db",
+      "description": "Consulta de solo lectura a las bases de dev/qa de Bisalta desde Claude Code, sin credencial en el contexto de la sesion. Servidor MCP propio sobre stdio, cero dependencias npm: lista blanca por dialecto anclada al principio de cada sentencia, catalogo donde produccion es irrepresentable, credencial resuelta desde AWS Secrets Manager por invocacion."
     }
   ]
 }
