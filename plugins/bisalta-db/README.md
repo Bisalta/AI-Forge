@@ -332,6 +332,8 @@ Todos entran con el mismo rol de Postgres y el mismo login de SQL Server. Para q
 }
 ```
 
+En SQL Server la respuesta lleva además, antes de `filas`, `aislamiento` (el nivel con que corrió, hoy `READ UNCOMMITTED`) y `aviso` (qué puede estar mal en esas filas). Si vas a informar un número que sale de ahí, informá también el aviso (v29, `AC62`).
+
 Tope de **1000 filas** y **1048576 bytes** (1 MiB) de `filas` serializado. Al
 truncar, `filas` trae las que caben, `truncado` es `true` y `motivo_truncado`
 nombra cuál de los dos topes se alcanzó primero. **Truncar no es un error**:

@@ -193,12 +193,21 @@ function manejarConsultar(args) {
   const topes = aplicarTopes(resultado.filas);
   const cuerpo = {
     conexion: entrada.nombre,
-    dialecto: entrada.dialecto,
+    dialecto: entrada.dialecto
+  };
+  // AC62 (v29, D86): en SQL Server el nivel y su aviso van en la respuesta,
+  // antes de las filas, para que quien las lea no informe una cifra sin
+  // confirmar con el mismo tono que una confirmada.
+  if (entrada.dialecto === 'sqlserver') {
+    cuerpo.aislamiento = conexion.NIVEL_AISLAMIENTO_SQLSERVER;
+    cuerpo.aviso = conexion.AVISO_AISLAMIENTO_SQLSERVER;
+  }
+  Object.assign(cuerpo, {
     filas: topes.filas,
     filas_devueltas: topes.filas.length,
     truncado: topes.truncado,
     motivo_truncado: topes.motivo_truncado
-  };
+  });
   return terminar(0, cuerpo, topes.filas.length, topes.truncado);
 }
 
@@ -230,7 +239,8 @@ const HERRAMIENTAS = [
       'OPENDATASOURCE), con un límite de 60 s por consulta. En SQL Server la consulta corre en ' +
       'READ UNCOMMITTED para no bloquear a quien escribe: puede devolver filas que otra transacción ' +
       'todavía no confirmó y, si alguien escribe mientras tanto, leer dos veces o saltear filas ya ' +
-      'confirmadas (un COUNT o un total pueden dar mal) o cortar con el error 601. ' +
+      'confirmadas (un COUNT o un total pueden dar mal) o cortar con el error 601. Cada respuesta de SQL Server ' +
+      'lo repite en los campos aislamiento y aviso. ' +
       'En Postgres, si la conexión no llegó a una réplica de lectura, se niega con no_es_replica sin ' +
       'ejecutar el SQL. Tope de ' + LIMITE_FILAS + ' filas y ' + LIMITE_BYTES + ' bytes.',
     inputSchema: {

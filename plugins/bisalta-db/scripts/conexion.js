@@ -63,7 +63,15 @@ const TIMEOUT_CONSULTA_SQLSERVER_S = 60;
 // dos veces o saltear filas confirmadas, o cortar con el error 601. Lo arma
 // el plugin, después de la lista blanca; la consulta del usuario sigue sin
 // poder llevar SET ni punto y coma (AC53).
-const AISLAMIENTO_SQLSERVER = 'SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED; ';
+const NIVEL_AISLAMIENTO_SQLSERVER = 'READ UNCOMMITTED';
+const AISLAMIENTO_SQLSERVER = 'SET TRANSACTION ISOLATION LEVEL ' + NIVEL_AISLAMIENTO_SQLSERVER + '; ';
+// AC62 (v29, D86): el aviso viaja en cada respuesta de SQL Server, no sólo en
+// la descripción de la herramienta, que el modelo lee una vez. El nivel sale
+// de la misma constante que arma el prefijo, así que no puede informarse uno
+// y mandarse otro.
+const AVISO_AISLAMIENTO_SQLSERVER = 'Corrió en ' + NIVEL_AISLAMIENTO_SQLSERVER + ': puede incluir filas que ' +
+  'otra transacción todavía no confirmó y, si alguien escribía mientras tanto, filas leídas dos veces o ' +
+  'salteadas. Un COUNT o un total pueden estar mal.';
 // Separador de campos para SQL Server: un carácter de control que no aparece
 // en datos de texto normales (unit separator, 0x1F).
 const SEPARADOR_SQLSERVER = String.fromCharCode(31);
@@ -507,6 +515,8 @@ module.exports = {
   limpiarTemporalesHuerfanos: limpiarTemporalesHuerfanos,
   EDAD_HUERFANO_MS: EDAD_HUERFANO_MS,
   TIMEOUT_CONSULTA_SQLSERVER_S: TIMEOUT_CONSULTA_SQLSERVER_S,
+  NIVEL_AISLAMIENTO_SQLSERVER: NIVEL_AISLAMIENTO_SQLSERVER,
+  AVISO_AISLAMIENTO_SQLSERVER: AVISO_AISLAMIENTO_SQLSERVER,
   BUNDLE_RDS: BUNDLE_RDS,
   resolverCredencial: resolverCredencial,
   nombreDeArn: nombreDeArn,

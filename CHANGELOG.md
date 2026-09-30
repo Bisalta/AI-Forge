@@ -4,6 +4,13 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ## bisalta-db
 
+### 0.2.0 — 2026-09-30
+
+Contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v29 (`AC62`, `D86`).
+
+- **En SQL Server, la respuesta de `consultar` lleva el aislamiento y su aviso**: `aislamiento` y `aviso`, antes de `filas`. El aviso de `READ UNCOMMITTED` estaba sólo en la descripción de la herramienta, que el modelo lee una vez, así que informaba cifras sin confirmar con el mismo tono que las confirmadas. Lo propuso Patrick Ocampo en su review del PR #14. En Postgres la respuesta no cambia.
+- **Primer bump de versión del plugin.** La 0.1.0 publicada en `prod` ya traía todo hasta v28: el seudónimo, `READ UNCOMMITTED` y TLS. Sin este bump, `/plugin update` no le ofrece el cambio a quien ya lo tiene instalado.
+
 ### 0.1.0 — 2026-09-18
 
 Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v28).

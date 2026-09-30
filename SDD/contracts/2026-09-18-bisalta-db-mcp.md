@@ -1,6 +1,15 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v28
+- **Versión**: v29
+
+### Cambios v28 → v29 (el aviso del aislamiento viaja en la respuesta, 30-sep-2026)
+
+Entra **`AC62`** y cambia la forma de la respuesta de `consultar` en SQL Server, por eso el bump. Es `D86`, la segunda mejora que propuso Patrick Ocampo en su review del PR #14: el aviso de `READ UNCOMMITTED` estaba sólo en la descripción de la herramienta, que el modelo lee una vez, y después informaba cifras sin confirmar con el mismo tono que las confirmadas.
+
+- **Qué cambia**: en SQL Server, la respuesta de `consultar` lleva `aislamiento` (el nivel con que corrió) y `aviso` (qué puede estar mal en las filas), antes de `filas`. En Postgres la respuesta no cambia.
+- **El nivel sale de una sola constante** (`NIVEL_AISLAMIENTO_SQLSERVER`), la misma que arma el prefijo de `AC61`. No se puede informar un nivel y mandar otro, y un test compara los dos.
+- **`D85` no entra**: `ALLOW_SNAPSHOT_ISOLATION` la enciende Patrick base por base, y antes hay que medir la carga en `tempdb`, que el login del plugin no puede ver (no tiene `VIEW SERVER STATE`). Cuando una base la tenga, el cambio de código es chico: el nivel de esa conexión pasa a `SNAPSHOT`, y `AC62` ya lo informa.
+- Las mutaciones (c) a (f) de `AC61` se reescriben sobre el código nuevo, sin cambiar qué asserts tumban.
 
 ### Cambios v27 → v28 (SQL Server deja de bloquear a quien escribe, 28-sep-2026)
 
@@ -511,6 +520,8 @@ Arreglo de objetos. El validador **rechaza cualquier campo no listado acá** y c
 {
   "conexion": "<nombre>",
   "dialecto": "<postgres|sqlserver>",
+  "aislamiento": "READ UNCOMMITTED",        // sólo en sqlserver (v29, AC62)
+  "aviso": "Corrió en READ UNCOMMITTED: …", // sólo en sqlserver (v29, AC62)
   "filas": [ { ... } ],
   "filas_devueltas": <entero>,
   "truncado": <booleano>,
@@ -521,6 +532,7 @@ Arreglo de objetos. El validador **rechaza cualquier campo no listado acá** y c
 - Tope de filas: **1000**. Tope de bytes de `filas` serializado: **1048576** (1 MiB).
 - Al truncar, `filas` trae las primeras filas que caben, `truncado` es `true` y `motivo_truncado` nombra cuál de los dos topes se alcanzó primero. **Truncar no es un error**: la respuesta es exitosa.
 - `motivo_truncado` es `null` exactamente cuando `truncado` es `false`.
+- `aislamiento` y `aviso` van **sólo en `sqlserver`**, en ese orden y antes de `filas` (v29, `AC62`). En `postgres` no aparecen.
 
 ### Respuesta de `listar_conexiones`
 
@@ -775,6 +787,14 @@ Casos del test — rechazados: en `postgres`, `WITH x AS (INSERT INTO t VALUES (
 - (e) sin la frase de las filas repetidas o salteadas, el de esa frase y el del 601, que va en la misma frase;
 - (f) sin el corte con el error 601, el del 601.
 **Parte `manual-only`**, contra la instancia real: `transaction_isolation_level` de la propia sesión (`sys.dm_exec_sessions`) da `1`, y una consulta con `WITH` responde.
+
+**AC62** (detección, v29) — En SQL Server, la respuesta de `consultar` lleva `aislamiento` y `aviso`, en ese orden, después de `dialecto` y antes de `filas`. `aislamiento` es el mismo nivel que viaja en el prefijo de `-Q` (`AC61`), y sale de la misma constante. `aviso` empieza con `Corrió en <nivel>` y nombra las filas sin confirmar y las filas leídas dos veces o salteadas. En Postgres no aparece ninguno de los dos. Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC62`: el nivel, el nivel igual al enviado, el aviso, sus filas salteadas, el orden de las claves, y en Postgres la ausencia de los dos campos, con su control. **Mutaciones declaradas**:
+- (a) sin los dos campos, los de nivel, aviso y orden;
+- (b) el nivel informado distinto del constante (`'READ COMMITTED'` a mano), los dos de nivel;
+- (c) los dos campos también en Postgres, los dos de ausencia;
+- (d) el aviso después de las filas, el del orden;
+- (e) el nivel del prefijo escrito a mano y no desde la constante, con otro valor: el de nivel igual al enviado y el de `AC61`.
+**Parte `manual-only`**, contra la instancia real a través del plugin: una consulta de SQL Server trae los dos campos, y una de Postgres no.
 
 **AC51** (detección) — La normalización de la lista blanca es **un solo recorrido de izquierda a derecha** que conoce las reglas de comillado de cada dialecto, de modo que **el validador ve las mismas sentencias que ejecuta el motor**:
 - **en los dos dialectos**: literales entre comillas simples con `''` como escape; identificadores entre comillas dobles con `""` como escape (se copian tal cual); comentarios de línea (`--` hasta el fin de línea); comentarios de bloque **anidados**;

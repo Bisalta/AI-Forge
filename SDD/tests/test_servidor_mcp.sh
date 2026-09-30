@@ -715,6 +715,28 @@ assert_contains "$lineas_arg" "ARG -Q|ARG SET TRANSACTION ISOLATION LEVEL READ U
   "AC61 sqlcmd recibe el nivel de aislamiento antes de la consulta, y la consulta intacta"
 
 # ---------------------------------------------------------------------------
+# AC62 (v29, D86) — el aislamiento y su aviso viajan en la respuesta
+# ---------------------------------------------------------------------------
+# `cuerpo` sigue siendo el de la consulta sqlserver de arriba. El nivel que se
+# informa tiene que ser el que se mandó en -Q: se comparan los dos, no cada
+# uno contra un literal, para que una constante cambiada en un solo lado dé
+# rojo.
+campo_aislamiento="$("$NODE_BIN" -e "process.stdout.write(String(JSON.parse(process.argv[1]).aislamiento))" "$cuerpo")"
+nivel_enviado="$(printf '%s' "$lineas_arg" | sed -n 's/.*ARG SET TRANSACTION ISOLATION LEVEL \([A-Z ]*\); .*/\1/p')"
+assert_eq "$campo_aislamiento" "READ UNCOMMITTED" "AC62 la respuesta de sqlserver informa el nivel de aislamiento"
+assert_eq "$campo_aislamiento" "$nivel_enviado" "AC62 el nivel informado es el mismo que se mandó a sqlcmd"
+assert_contains "$cuerpo" '"aviso":"Corrió en READ UNCOMMITTED' "AC62 la respuesta de sqlserver trae el aviso"
+assert_contains "$cuerpo" 'filas leídas dos veces o salteadas' "AC62 el aviso nombra las filas leídas dos veces o salteadas"
+orden="$("$NODE_BIN" -e "process.stdout.write(Object.keys(JSON.parse(process.argv[1])).join(','))" "$cuerpo")"
+assert_eq "$orden" "conexion,dialecto,aislamiento,aviso,filas,filas_devueltas,truncado,motivo_truncado" \
+  "AC62 el aviso va antes de las filas"
+reiniciar_registros
+cuerpo_pg="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS")")"
+assert_contains "$cuerpo_pg" '"dialecto":"postgres"' "AC62 (control) la consulta postgres responde"
+assert_no_contains "$cuerpo_pg" '"aislamiento"' "AC62 la respuesta de postgres no lleva aislamiento"
+assert_no_contains "$cuerpo_pg" '"aviso"' "AC62 la respuesta de postgres no lleva aviso"
+
+# ---------------------------------------------------------------------------
 # AC57 (v25) — el error de sqlcmd sale por stdout
 # ---------------------------------------------------------------------------
 for modo in falla-stdout filas-y-error larga-sin-msg timeout-stdout datos-con-timeout; do
