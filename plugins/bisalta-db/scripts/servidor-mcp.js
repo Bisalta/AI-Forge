@@ -37,7 +37,7 @@ const listaBlanca = require('./lista-blanca.js');
 const conexion = require('./conexion.js');
 
 const NOMBRE_SERVIDOR = 'bisalta-db';
-const VERSION_SERVIDOR = '0.1.0';
+const VERSION_SERVIDOR = '0.2.0';
 const VERSION_PROTOCOLO = '2024-11-05';
 
 // Topes duros de la respuesta (contract v3, "Respuesta de `consultar`"). Son

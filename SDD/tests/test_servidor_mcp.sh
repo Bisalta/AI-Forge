@@ -726,6 +726,7 @@ nivel_enviado="$(printf '%s' "$lineas_arg" | sed -n 's/.*ARG SET TRANSACTION ISO
 assert_eq "$campo_aislamiento" "READ UNCOMMITTED" "AC62 la respuesta de sqlserver informa el nivel de aislamiento"
 assert_eq "$campo_aislamiento" "$nivel_enviado" "AC62 el nivel informado es el mismo que se mandó a sqlcmd"
 assert_contains "$cuerpo" '"aviso":"Corrió en READ UNCOMMITTED' "AC62 la respuesta de sqlserver trae el aviso"
+assert_contains "$cuerpo" 'otra transacción todavía no confirmó' "AC62 el aviso nombra las filas sin confirmar"
 assert_contains "$cuerpo" 'filas leídas dos veces o salteadas' "AC62 el aviso nombra las filas leídas dos veces o salteadas"
 orden="$("$NODE_BIN" -e "process.stdout.write(Object.keys(JSON.parse(process.argv[1])).join(','))" "$cuerpo")"
 assert_eq "$orden" "conexion,dialecto,aislamiento,aviso,filas,filas_devueltas,truncado,motivo_truncado" \
