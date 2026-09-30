@@ -1,22 +1,22 @@
 # Gates run — generado por sdd-run-gates.sh v0.12.0
 
-- **Branch**: `feat-GEN-108-aviso-aislamiento` · **Commit**: `4c51a3b` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-09-30T22:51:59Z
-- Tree: `86f0a1ca378d7fa48b922788d6637f9315aff70d` — LIMPIO
+- **Branch**: `feat-GEN-108-aviso-aislamiento` · **Commit**: `af85495` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-09-30T23:13:49Z
+- Tree: `13cba9681c15cf15f4779516a5ffa4d022fe0af9` — LIMPIO
 - Este archivo lo escribió el runner, no un modelo. Editarlo a mano invalida la evidencia.
 
 | # | Gate | Comando | Exit | Timestamp UTC | Resultado |
 |---|---|---|---|---|---|
-| 1 | format / style | — | — | 2026-09-30T22:49:04Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
-| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-09-30T22:49:04Z | verde |
-| 3 | type-check | — | — | 2026-09-30T22:49:05Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
-| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-09-30T22:49:05Z | verde |
-| 5 | integration | — | — | 2026-09-30T22:50:29Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
-| 6 | build | — | — | 2026-09-30T22:50:29Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
-| 7 | e2e | — | — | 2026-09-30T22:50:29Z | [SKIPPED] sin comando en el doc (N/A) |
-| 8 | cobertura del diff | — | — | 2026-09-30T22:50:29Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
-| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-09-30T22:50:29Z | verde |
-| 10 | smoke manual | — | — | 2026-09-30T22:50:32Z | [SKIPPED] sin comando en el doc (N/A) |
-| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-09-30T22:50:32Z | verde |
+| 1 | format / style | — | — | 2026-09-30T23:10:51Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
+| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-09-30T23:10:51Z | verde |
+| 3 | type-check | — | — | 2026-09-30T23:10:53Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
+| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-09-30T23:10:53Z | verde |
+| 5 | integration | — | — | 2026-09-30T23:12:20Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
+| 6 | build | — | — | 2026-09-30T23:12:20Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
+| 7 | e2e | — | — | 2026-09-30T23:12:20Z | [SKIPPED] sin comando en el doc (N/A) |
+| 8 | cobertura del diff | — | — | 2026-09-30T23:12:20Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
+| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-09-30T23:12:20Z | verde |
+| 10 | smoke manual | — | — | 2026-09-30T23:12:23Z | [SKIPPED] sin comando en el doc (N/A) |
+| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-09-30T23:12:23Z | verde |
 
 ## Output por gate (últimas 15 líneas)
 
@@ -77,12 +77,12 @@ PASS  test_usage_summary.sh
 
 # Addendum del planner — v29 (NO lo escribió el runner)
 
-Salida literal de los scripts, pegados al final de cada sección. Las mutaciones y la medición en vivo corrieron sobre el árbol del código sellado arriba (`4c51a3b`), con el árbol limpio al empezar y al terminar; cada salida dice sobre qué commit corrió.
+Salida literal de los scripts, pegados al final de cada sección. Las mutaciones y la medición en vivo corrieron sobre el árbol del código sellado arriba (`af85495`), con el árbol limpio al empezar y al terminar; cada salida dice sobre qué commit corrió.
 
 ## 1. En vivo, servidor del repo
 
 ```
-árbol 4c51a3b
+árbol af85495
 ### AC62: SQL Server trae aislamiento y aviso antes de las filas, y el nivel coincide con el de la sesión
 { "conexion": "compras", "dialecto": "sqlserver", "aislamiento": "READ UNCOMMITTED", "aviso": "Corrió en READ UNCOMMITTED: puede incluir filas que otra transacción todavía no confirmó y, si alguien escribía mientras tanto, filas leídas dos veces o salteadas. Un COUNT o un total pueden estar mal.", "filas": [ { "nivel": "1" } ], "filas_devueltas": 1, "truncado": false, "motivo_truncado": null }
 ### AC62: Postgres no trae ninguno de los dos
@@ -112,7 +112,7 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
 ## 2. Mutaciones de `AC61` (reescritas) y `AC62` — salida literal
 
 ```
-árbol 4c51a3b
+árbol af85495
 
 ### AC61 (a) sin el prefijo
 - verde (árbol real): exit=0 fail=0
@@ -200,6 +200,12 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
 - verde (árbol real): exit=0 fail=0
 - mutado:             exit=1 fail=1
       FAIL  AC62 el aviso nombra las filas sin confirmar — no encontré [otra transacción todavía no confirmó] en la salida
+- verde (restaurado): exit=0 fail=0
+
+### v29 serverInfo.version desalineada de plugin.json
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=1
+      FAIL  AC34 serverInfo.version es la de plugin.json — no encontré ["serverInfo":{"name":"bisalta-db","version":"0.2.0"}] en la salida
 - verde (restaurado): exit=0 fail=0
 
 Árbol al terminar: limpio
@@ -291,6 +297,8 @@ mutar "AC62 (e) el prefijo escrito a mano, con otro nivel" "$CX" "$TS" \
 mutar "AC62 (f) el aviso sin la cláusula de las filas sin confirmar" "$CX" "$TS" \
   ": puede incluir filas que ' +
   'otra transacción todavía no confirmó y, si alguien escribía mientras tanto, filas leídas dos veces o ' +" ": si alguien escribía mientras tanto, puede incluir filas leídas dos veces o ' +"
+mutar "v29 serverInfo.version desalineada de plugin.json" "$SV" "$TS" \
+  "const VERSION_SERVIDOR = '0.2.0';" "const VERSION_SERVIDOR = '0.1.0';"
 echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio || echo SUCIO )"
 ```
 
