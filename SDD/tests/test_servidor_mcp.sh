@@ -250,6 +250,10 @@ salida="$(servidor_jsonrpc "$tramas" "$PATH_CON_STUBS")"
 
 assert_contains "$salida" '"protocolVersion":"2024-11-05"' "AC34 initialize responde el protocolVersion declarado"
 assert_contains "$salida" '"name":"bisalta-db"' "AC34 initialize se identifica como bisalta-db"
+# v29: la versión que informa el servidor es la de plugin.json. Se desalineó una
+# vez (0.1.0 contra 0.2.0) y ningún test lo veía.
+version_plugin="$("$NODE_BIN" -e "process.stdout.write(require('$PLUGIN_DIR/.claude-plugin/plugin.json').version)")"
+assert_contains "$salida" "\"serverInfo\":{\"name\":\"bisalta-db\",\"version\":\"$version_plugin\"}" "AC34 serverInfo.version es la de plugin.json"
 
 nombres="$(printf '%s\n' "$salida" | "$NODE_BIN" -e "
 let crudo='';process.stdin.on('data',function(c){crudo+=c;});process.stdin.on('end',function(){

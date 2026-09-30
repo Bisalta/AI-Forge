@@ -11,7 +11,7 @@ Entra **`AC62`** y cambia la forma de la respuesta de `consultar` en SQL Server,
 - **`D85` no entra**: `ALLOW_SNAPSHOT_ISOLATION` la enciende Patrick base por base, y antes hay que medir la carga en `tempdb`, que el login del plugin no puede ver (no tiene `VIEW SERVER STATE`). Tampoco basta con encenderla: hoy el nivel es uno solo para todo SQL Server (una constante, no un dato de la conexión), y el aviso está escrito para `READ UNCOMMITTED`. Pasar una base a `SNAPSHOT` pide una decisión de contract: el nivel por entrada del catálogo, que hoy rechaza cualquier campo no declarado, y un aviso por nivel.
 - Las mutaciones (c) a (f) de `AC61` se reescriben sobre el código nuevo. Siguen tumbando los asserts declarados, y (a) a (c) además tumban asserts de `AC62`.
 - La descripción de `consultar` suma una frase: "Cada respuesta de SQL Server lo repite en los campos aislamiento y aviso."
-- `serverInfo.version` del servidor pasa a `0.2.0`, igual que `plugin.json`.
+- `serverInfo.version` del servidor pasa a `0.2.0`, igual que `plugin.json`. Un assert `AC34` lo compara con `plugin.json` (ronda 2 de la review: se había desalineado y ningún test lo veía). **Mutación declarada**: volver la constante a `0.1.0` pone rojo ese assert.
 - La ronda 1 de la review salió `REJECTED` (`E22`): el aviso no tenía assert para las filas sin confirmar. Entran ese assert y la mutación (f).
 
 ### Cambios v27 → v28 (SQL Server deja de bloquear a quien escribe, 28-sep-2026)
