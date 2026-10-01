@@ -738,6 +738,7 @@ nivel_enviado="$(printf '%s' "$lineas_arg_62" | sed -n 's/.*ARG SET TRANSACTION 
 assert_eq "$campo_aislamiento" "READ UNCOMMITTED" "AC62 la respuesta de sqlserver informa el nivel de aislamiento"
 assert_eq "$campo_aislamiento" "$nivel_enviado" "AC62 el nivel informado es el mismo que se mandó a sqlcmd"
 assert_contains "$cuerpo_62" '"aviso":"Corrió en READ UNCOMMITTED' "AC62 la respuesta de sqlserver trae el aviso"
+assert_contains "$cuerpo_62" "\"aviso\":\"Corrió en $campo_aislamiento:" "AC62 el aviso nombra el mismo nivel que el campo aislamiento"
 assert_contains "$cuerpo_62" 'otra transacción todavía no confirmó' "AC62 el aviso nombra las filas sin confirmar"
 assert_contains "$cuerpo_62" 'filas leídas dos veces o salteadas' "AC62 el aviso nombra las filas leídas dos veces o salteadas"
 orden="$("$NODE_BIN" -e "process.stdout.write(Object.keys(JSON.parse(process.argv[1])).join(','))" "$cuerpo_62")"
@@ -753,6 +754,16 @@ nivel_sin_aviso="$("$NODE_BIN" -e "
 const c = require('$DIR_SCRIPTS/conexion.js');
 try { c.avisoParaNivel('SNAPSHOT'); process.stdout.write('devolvio'); } catch (e) { process.stdout.write('rechaza'); }")"
 assert_eq "$nivel_sin_aviso" "rechaza" "AC62 un nivel sin aviso escrito se rechaza"
+# v30: el aviso del módulo pasa por avisoParaNivel al cargar. Una copia de
+# conexion.js con un nivel sin aviso escrito no carga; la copia sin tocar, sí.
+mkdir -p "$TMP_DIR/copia-conexion"
+cp "$DIR_SCRIPTS/conexion.js" "$TMP_DIR/copia-conexion/sin-tocar.js"
+sed "s/^const NIVEL_AISLAMIENTO_SQLSERVER = 'READ UNCOMMITTED';/const NIVEL_AISLAMIENTO_SQLSERVER = 'SNAPSHOT';/" \
+  "$DIR_SCRIPTS/conexion.js" > "$TMP_DIR/copia-conexion/snapshot.js"
+carga_de() { "$NODE_BIN" -e "try { require('$TMP_DIR/copia-conexion/' + process.argv[1]); process.stdout.write('carga'); } catch (e) { process.stdout.write('no-carga'); }" "$1"; }
+assert_eq "$(grep -c "'SNAPSHOT'" "$TMP_DIR/copia-conexion/snapshot.js")" "1" "AC62 (control) la copia lleva el nivel sustituido"
+assert_eq "$(carga_de sin-tocar.js)" "carga" "AC62 (control) la copia sin tocar de conexion.js carga"
+assert_eq "$(carga_de snapshot.js)" "no-carga" "AC62 con un nivel sin aviso escrito, conexion.js no carga"
 
 # ---------------------------------------------------------------------------
 # AC57 (v25) — el error de sqlcmd sale por stdout
@@ -790,6 +801,22 @@ for modo in falla-stdout filas-y-error larga-sin-msg timeout-stdout datos-con-ti
 done
 BISALTA_STUB_PSQL_MODO=normal
 export BISALTA_STUB_PSQL_MODO
+
+# ---------------------------------------------------------------------------
+# AC63 (v30) — los errores de SQL Server que no corrieron la consulta no llevan
+# aislamiento: el 5 (el secreto no resolvió) y el 8 (falta sqlcmd)
+# ---------------------------------------------------------------------------
+BISALTA_STUB_AWS_FALLA=1
+export BISALTA_STUB_AWS_FALLA
+reiniciar_registros
+cuerpo_5="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+BISALTA_STUB_AWS_FALLA=0
+export BISALTA_STUB_AWS_FALLA
+assert_contains "$cuerpo_5" '"codigo":5' "AC63 (control) un secreto de sqlserver que no resuelve da el código 5"
+assert_no_contains "$cuerpo_5" '"aislamiento"' "AC63 el código 5 de sqlserver no lleva aislamiento"
+cuerpo_8="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_SIN_PSQL")")"
+assert_contains "$cuerpo_8" '"codigo":8' "AC63 (control) sin sqlcmd en el PATH la consulta da el código 8"
+assert_no_contains "$cuerpo_8" '"aislamiento"' "AC63 el código 8 de sqlserver no lleva aislamiento"
 
 # ---------------------------------------------------------------------------
 # AC55 (v25) — cifrado en Postgres

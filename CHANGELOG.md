@@ -9,7 +9,7 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 Contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v30 (`AC62`, `AC63`, `D86`).
 
 - **En SQL Server, la respuesta de `consultar` lleva el aislamiento y su aviso**: `aislamiento` y `aviso`, antes de `filas`. El aviso de `READ UNCOMMITTED` estaba sólo en la descripción de la herramienta, que el modelo lee una vez, así que informaba cifras sin confirmar con el mismo tono que las confirmadas. Lo propuso Patrick Ocampo en su review del PR #14. En Postgres la respuesta no cambia.
-- **Los errores de consulta de SQL Server llevan `aislamiento`** (`AC63`). El caso que importa es el error 601, que sólo existe por `READ UNCOMMITTED`: antes llegaba como una falla de conexión cualquiera.
+- **Los errores de consulta de SQL Server llevan `aislamiento`** (`AC63`). Son los posteriores a resolver el secreto, así que también los lleva un login o una red que fallan: el campo dice con qué nivel corrió, y el `mensaje` dice si fue un 601, el error que sólo existe por `READ UNCOMMITTED`.
 - **El aviso es propio de cada nivel.** Si el nivel cambia y no tiene un aviso escrito, el servidor no arranca, en vez de mostrar un aviso falso.
 - **Primer bump de versión del plugin.** La 0.1.0 publicada en `prod` ya traía todo hasta v28: el seudónimo, `READ UNCOMMITTED` y TLS. Sin este bump, `/plugin update` no le ofrece el cambio a quien ya lo tiene instalado.
 

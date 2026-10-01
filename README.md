@@ -44,6 +44,7 @@ ai-forge/
 ├── plugins/
 │   ├── sdd-flow/                      SDD multi-agente (ver su README)
 │   ├── project-foundation/            seis docs fundacionales (ver su README)
+│   ├── bisalta-db/                    consulta de solo lectura a las bases de dev/qa (ver su README)
 │   └── usage-monitor/                 resumen de consumo desde log local OTel (ver su README)
 ├── CHANGELOG.md
 └── README.md
