@@ -11,7 +11,7 @@ Ian Vargas pidió una review profunda del PR #16 antes de pedírsela a Patrick, 
 - **`AC34`** (paga `D87`): su texto nombra la condición de versión que ya verificaba su assert. El assert ahora parsea la respuesta, en vez de buscar un literal con las claves en un orden fijo.
 - El test de `AC62` hace su propia consulta, en vez de usar las variables de un bloque anterior.
 - El CHANGELOG fecha la 0.2.0 el 1-oct, el día de la aprobación, y el README raíz suma `bisalta-db` a la tabla de plugins y a la estructura.
-- **Ronda 1 de la review: `REJECTED`** (`E23`), por dos cláusulas sin assert. Entran los casos de los códigos 5 y 8 de `AC63`, la carga de `conexion.js` con un nivel sin aviso, el aviso que nombra el nivel derivado del campo, y las mutaciones `AC63` (c) y `AC62` (h). Ronda 2: `APPROVED`.
+- **Ronda 1 de la review: `REJECTED`** (`E23`), por dos cláusulas sin assert. Entran los casos de los códigos 5 y 8 de `AC63`, la carga de `conexion.js` con un nivel sin aviso, el aviso que nombra el nivel derivado del campo, y las mutaciones `AC63` (c) y `AC62` (h). Rondas 2 y 3: `APPROVED`.
 - **Quedan como deuda** (`D88`, `D89`): el aviso completo se repite en cada respuesta, y la bitácora no registra el nivel.
 
 ### Cambios v28 → v29 (el aviso del aislamiento viaja en la respuesta, 30-sep-2026)
