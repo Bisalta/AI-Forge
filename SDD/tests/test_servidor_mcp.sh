@@ -844,7 +844,7 @@ for caso in falta no-uuid inyeccion; do
   case $caso in
     falta) BISALTA_STUB_EXTRA='' ;;
     no-uuid) BISALTA_STUB_EXTRA=', "tenant_construplaza": "construplaza"' ;;
-    inyeccion) BISALTA_STUB_EXTRA=", \"tenant_construplaza\": \"$TENANT_PRUEBA'; SELECT 1; --\"" ;;
+    inyeccion) BISALTA_STUB_EXTRA="$(printf ', "tenant_construplaza": "%s%s"' "$TENANT_PRUEBA" "'; SELECT 1; --")" ;;
   esac
   export BISALTA_STUB_EXTRA
   reiniciar_registros
