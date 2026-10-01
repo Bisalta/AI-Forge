@@ -308,3 +308,15 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
 $ bash plugins/sdd-flow/scripts/sdd-lint-contract.sh SDD/contracts/2026-09-18-bisalta-db-mcp.md
 exit 0
 ```
+
+## 4. A través del plugin instalado (1-oct, antes de la aprobación)
+
+Ian apuntó el marketplace `ai-forge` al directorio local, con `feat-GEN-108-aviso-aislamiento` en `e4db4e3`, reinstaló y reinició Claude Code. El servidor MCP del plugin corre desde `~/.claude/plugins/cache/ai-forge/bisalta-db/0.2.0/` desde las 07:59, y su `initialize` responde `"serverInfo":{"name":"bisalta-db","version":"0.2.0"}`. Abajo, las respuestas de la herramienta `consultar` del plugin instalado, tal cual, con el JSON en una línea:
+
+```
+compras:         { "conexion": "compras", "dialecto": "sqlserver", "aislamiento": "READ UNCOMMITTED", "aviso": "Corrió en READ UNCOMMITTED: puede incluir filas que otra transacción todavía no confirmó y, si alguien escribía mientras tanto, filas leídas dos veces o salteadas. Un COUNT o un total pueden estar mal.", "filas": [ { "nivel": "1", "estacion": "bisalta_lectura/u-34a4b783" } ], "filas_devueltas": 1, "truncado": false, "motivo_truncado": null }
+bi (con WITH):   { "conexion": "bi", "dialecto": "sqlserver", "aislamiento": "READ UNCOMMITTED", "aviso": "Corrió en READ UNCOMMITTED: puede incluir filas que otra transacción todavía no confirmó y, si alguien escribía mientras tanto, filas leídas dos veces o salteadas. Un COUNT o un total pueden estar mal.", "filas": [ { "base": "BI", "nivel": "1" } ], "filas_devueltas": 1, "truncado": false, "motivo_truncado": null }
+proveedores-dev: { "conexion": "proveedores-dev", "dialecto": "postgres", "filas": [ { "application_name": "claude_lectura/u-34a4b783" } ], "filas_devueltas": 1, "truncado": false, "motivo_truncado": null }
+```
+
+Las consultas: `SELECT transaction_isolation_level AS nivel, HOST_NAME() AS estacion FROM sys.dm_exec_sessions WHERE session_id = @@SPID` en `compras`; la misma lectura del nivel dentro de un `WITH` en `bi`; y `SELECT application_name FROM pg_stat_activity WHERE pid = pg_backend_pid()` en `proveedores-dev`.
