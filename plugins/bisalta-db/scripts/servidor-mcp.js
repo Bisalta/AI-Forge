@@ -187,6 +187,13 @@ function manejarConsultar(args) {
     } else {
       extra.mensaje = e.message;
     }
+    // v30: un error de la consulta en SQL Server (6 o 7) corrió con el nivel
+    // del prefijo, y uno de ellos, el Msg 601, sólo existe por ese nivel. Sin
+    // el campo, se lee como una caída de la red. El 5 (secreto) no llegó a
+    // correr nada y no lo lleva.
+    if (entrada.dialecto === 'sqlserver' && (codigo === 6 || codigo === 7)) {
+      extra.aislamiento = conexion.NIVEL_AISLAMIENTO_SQLSERVER;
+    }
     return terminar(codigo, cuerpoDeError(codigo, nombreError, extra), 0, false);
   }
 
@@ -239,8 +246,8 @@ const HERRAMIENTAS = [
       'OPENDATASOURCE), con un límite de 60 s por consulta. En SQL Server la consulta corre en ' +
       'READ UNCOMMITTED para no bloquear a quien escribe: puede devolver filas que otra transacción ' +
       'todavía no confirmó y, si alguien escribe mientras tanto, leer dos veces o saltear filas ya ' +
-      'confirmadas (un COUNT o un total pueden dar mal) o cortar con el error 601. Cada respuesta de SQL Server ' +
-      'lo repite en los campos aislamiento y aviso. ' +
+      'confirmadas (un COUNT o un total pueden dar mal) o cortar con el error 601. Las respuestas exitosas de ' +
+      'SQL Server lo repiten en los campos aislamiento y aviso, y sus errores de consulta, en aislamiento. ' +
       'En Postgres, si la conexión no llegó a una réplica de lectura, se niega con no_es_replica sin ' +
       'ejecutar el SQL. Tope de ' + LIMITE_FILAS + ' filas y ' + LIMITE_BYTES + ' bytes.',
     inputSchema: {

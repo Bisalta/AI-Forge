@@ -33,6 +33,7 @@ Notas:
 |---|---|---|
 | [**sdd-flow**](./plugins/sdd-flow) | 0.10.0 | Spec-Driven Development multi-agente: refinement con arquetipo/NFR/concerns, planner Opus 4.8 con threat model y ACs numerados, orquestación con estado y caps, subagentes con quality gates verificables y gate de seguridad, coordinación file-based `AGENT_{uuid}`. |
 | [**project-foundation**](./plugins/project-foundation) | 0.1.0 | Crea o back-fillea los seis documentos fundacionales de un proyecto (PRD, TRD, UI/UX Brief, App Flow, Backend Schema, Implementation Plan) desde cero o derivando de un codebase existente. Interopera con `sdd-flow` si ambos están instalados. |
+| [**bisalta-db**](./plugins/bisalta-db) | 0.2.0 | Consulta de solo lectura a las bases de dev/qa de Bisalta sin que ninguna credencial entre en el contexto: servidor MCP propio, lista blanca por dialecto, producción irrepresentable en el catálogo y la credencial resuelta desde AWS Secrets Manager. Habilitarlo para una persona pide la política IAM que asigna Patrick. |
 | [**usage-monitor**](./plugins/usage-monitor) | 0.1.0 | Resumen de atribución de consumo de Claude Code (costo/tokens por modelo, skill, agente) desde tu log local de OpenTelemetry — nunca comparte el log crudo ni identificadores de sesión/usuario. |
 
 ## Estructura

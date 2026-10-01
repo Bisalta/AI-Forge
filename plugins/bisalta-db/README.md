@@ -332,7 +332,7 @@ Todos entran con el mismo rol de Postgres y el mismo login de SQL Server. Para q
 }
 ```
 
-En SQL Server la respuesta lleva además, antes de `filas`, `aislamiento` (el nivel con que corrió, hoy `READ UNCOMMITTED`) y `aviso` (qué puede estar mal en esas filas). Si vas a informar un número que sale de ahí, informá también el aviso (v29, `AC62`).
+En SQL Server la respuesta lleva además, antes de `filas`, `aislamiento` (el nivel con que corrió, hoy `READ UNCOMMITTED`) y `aviso` (qué puede estar mal en esas filas). Si vas a informar un número que sale de ahí, informá también el aviso (v29, `AC62`). Los errores de la consulta (códigos 6 y 7) también traen `aislamiento`: un error 601 se debe a ese nivel, no a la red (v30, `AC63`).
 
 Tope de **1000 filas** y **1048576 bytes** (1 MiB) de `filas` serializado. Al
 truncar, `filas` trae las que caben, `truncado` es `true` y `motivo_truncado`

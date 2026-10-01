@@ -253,7 +253,12 @@ assert_contains "$salida" '"name":"bisalta-db"' "AC34 initialize se identifica c
 # v29: la versión que informa el servidor es la de plugin.json. Se desalineó una
 # vez (0.1.0 contra 0.2.0) y ningún test lo veía.
 version_plugin="$("$NODE_BIN" -e "process.stdout.write(require('$PLUGIN_DIR/.claude-plugin/plugin.json').version)")"
-assert_contains "$salida" "\"serverInfo\":{\"name\":\"bisalta-db\",\"version\":\"$version_plugin\"}" "AC34 serverInfo.version es la de plugin.json"
+version_servidor="$(printf '%s\n' "$salida" | "$NODE_BIN" -e "
+let crudo='';process.stdin.on('data',function(c){crudo+=c;});process.stdin.on('end',function(){
+  crudo.split('\\n').forEach(function(l){ let m; try{m=JSON.parse(l);}catch(e){return;}
+    if(m.result&&m.result.serverInfo) process.stdout.write(String(m.result.serverInfo.version));});});")"
+assert_eq "$([ -n "$version_plugin" ] && echo si || echo no)" "si" "AC34 (control) plugin.json declara una versión"
+assert_eq "$version_servidor" "$version_plugin" "AC34 serverInfo.version es la de plugin.json"
 
 nombres="$(printf '%s\n' "$salida" | "$NODE_BIN" -e "
 let crudo='';process.stdin.on('data',function(c){crudo+=c;});process.stdin.on('end',function(){
@@ -461,6 +466,7 @@ export BISALTA_STUB_PSQL_MODO
 salida="$(servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS")"
 cuerpo="$(cuerpos "$salida")"
 assert_contains "$cuerpo" '"codigo":6' "AC25 una conexión que falla devuelve el código 6"
+assert_no_contains "$cuerpo" '"aislamiento"' "AC63 un error de postgres no lleva aislamiento"
 assert_contains "$cuerpo" 'no route to host' "AC25 el error de conexión trae el mensaje del cliente"
 case "$salida" in
   *"$VALOR_CREDENCIAL"*) filtra=si ;;
@@ -721,18 +727,20 @@ assert_contains "$lineas_arg" "ARG -Q|ARG SET TRANSACTION ISOLATION LEVEL READ U
 # ---------------------------------------------------------------------------
 # AC62 (v29, D86) — el aislamiento y su aviso viajan en la respuesta
 # ---------------------------------------------------------------------------
-# `cuerpo` sigue siendo el de la consulta sqlserver de arriba. El nivel que se
-# informa tiene que ser el que se mandó en -Q: se comparan los dos, no cada
-# uno contra un literal, para que una constante cambiada en un solo lado dé
-# rojo.
-campo_aislamiento="$("$NODE_BIN" -e "process.stdout.write(String(JSON.parse(process.argv[1]).aislamiento))" "$cuerpo")"
-nivel_enviado="$(printf '%s' "$lineas_arg" | sed -n 's/.*ARG SET TRANSACTION ISOLATION LEVEL \([A-Z ]*\); .*/\1/p')"
+# v30: AC62 hace su propia consulta y lee su propio registro, en vez de usar
+# las variables de un bloque anterior. El nivel que se informa tiene que ser
+# el que se mandó en -Q: se comparan los dos, no cada uno contra un literal.
+reiniciar_registros
+cuerpo_62="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+lineas_arg_62="$(grep '^ARG ' "$TMP_DIR/psql-invocado.log" | tr '\n' '|')"
+campo_aislamiento="$("$NODE_BIN" -e "process.stdout.write(String(JSON.parse(process.argv[1]).aislamiento))" "$cuerpo_62")"
+nivel_enviado="$(printf '%s' "$lineas_arg_62" | sed -n 's/.*ARG SET TRANSACTION ISOLATION LEVEL \([A-Z ]*\); .*/\1/p')"
 assert_eq "$campo_aislamiento" "READ UNCOMMITTED" "AC62 la respuesta de sqlserver informa el nivel de aislamiento"
 assert_eq "$campo_aislamiento" "$nivel_enviado" "AC62 el nivel informado es el mismo que se mandó a sqlcmd"
-assert_contains "$cuerpo" '"aviso":"Corrió en READ UNCOMMITTED' "AC62 la respuesta de sqlserver trae el aviso"
-assert_contains "$cuerpo" 'otra transacción todavía no confirmó' "AC62 el aviso nombra las filas sin confirmar"
-assert_contains "$cuerpo" 'filas leídas dos veces o salteadas' "AC62 el aviso nombra las filas leídas dos veces o salteadas"
-orden="$("$NODE_BIN" -e "process.stdout.write(Object.keys(JSON.parse(process.argv[1])).join(','))" "$cuerpo")"
+assert_contains "$cuerpo_62" '"aviso":"Corrió en READ UNCOMMITTED' "AC62 la respuesta de sqlserver trae el aviso"
+assert_contains "$cuerpo_62" 'otra transacción todavía no confirmó' "AC62 el aviso nombra las filas sin confirmar"
+assert_contains "$cuerpo_62" 'filas leídas dos veces o salteadas' "AC62 el aviso nombra las filas leídas dos veces o salteadas"
+orden="$("$NODE_BIN" -e "process.stdout.write(Object.keys(JSON.parse(process.argv[1])).join(','))" "$cuerpo_62")"
 assert_eq "$orden" "conexion,dialecto,aislamiento,aviso,filas,filas_devueltas,truncado,motivo_truncado" \
   "AC62 el aviso va antes de las filas"
 reiniciar_registros
@@ -740,6 +748,11 @@ cuerpo_pg="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 
 assert_contains "$cuerpo_pg" '"dialecto":"postgres"' "AC62 (control) la consulta postgres responde"
 assert_no_contains "$cuerpo_pg" '"aislamiento"' "AC62 la respuesta de postgres no lleva aislamiento"
 assert_no_contains "$cuerpo_pg" '"aviso"' "AC62 la respuesta de postgres no lleva aviso"
+# v30: un nivel sin aviso escrito no se cubre con un texto genérico.
+nivel_sin_aviso="$("$NODE_BIN" -e "
+const c = require('$DIR_SCRIPTS/conexion.js');
+try { c.avisoParaNivel('SNAPSHOT'); process.stdout.write('devolvio'); } catch (e) { process.stdout.write('rechaza'); }")"
+assert_eq "$nivel_sin_aviso" "rechaza" "AC62 un nivel sin aviso escrito se rechaza"
 
 # ---------------------------------------------------------------------------
 # AC57 (v25) — el error de sqlcmd sale por stdout
@@ -755,6 +768,7 @@ for modo in falla-stdout filas-y-error larga-sin-msg timeout-stdout datos-con-ti
       assert_contains "$cuerpo" "VIEW SERVER STATE permission was denied" "AC57 el mensaje de un error de sqlcmd no llega vacío"
       assert_no_contains "$cuerpo" "$VALOR_CREDENCIAL" "AC57 la credencial no sale en el mensaje tomado de stdout"
       assert_contains "$cuerpo" "[redactado]" "AC57 (control) el mensaje tomado de stdout pasa por la redacción"
+      assert_contains "$cuerpo" '"aislamiento":"READ UNCOMMITTED"' "AC63 un error de consulta de sqlserver informa el aislamiento"
       ;;
     larga-sin-msg)
       assert_contains "$cuerpo" "FIN-DEL-ERROR" "AC57 sin Msg, el mensaje es el final de stdout"
@@ -767,6 +781,7 @@ for modo in falla-stdout filas-y-error larga-sin-msg timeout-stdout datos-con-ti
       ;;
     timeout-stdout)
       assert_contains "$cuerpo" '"error":"tiempo_agotado"' "AC57 el corte por -t de sqlcmd se informa como tiempo_agotado"
+      assert_contains "$cuerpo" '"aislamiento":"READ UNCOMMITTED"' "AC63 un corte de sqlserver informa el aislamiento"
       ;;
     datos-con-timeout)
       assert_no_contains "$cuerpo" '"error"' "AC57 una corrida exitosa cuyo dato dice Timeout expired no es un error"

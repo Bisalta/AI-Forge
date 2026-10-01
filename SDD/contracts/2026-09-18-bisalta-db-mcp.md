@@ -1,6 +1,17 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v29
+- **Versión**: v30
+
+### Cambios v29 → v30 (review profunda del PR #16, 1-oct-2026)
+
+Ian Vargas pidió una review profunda del PR #16 antes de pedírsela a Patrick, y corrigió seis de los ocho hallazgos. Entra **`AC63`** y cambia la condición de **`AC62`**, por eso el bump.
+
+- **`AC63`: los errores de consulta de SQL Server también llevan `aislamiento`.** La descripción decía que lo llevaba "cada respuesta de SQL Server", y no era cierto en los errores. El caso que importa es el `Msg 601`: existe sólo por `READ UNCOMMITTED` y llegaba como `conexion_fallida`, sin nada que lo relacionara con el nivel. Lo llevan los códigos 6 y 7, que son los que corrieron con el prefijo. El 5 (secreto) no llegó a correr nada y no lo lleva, y Postgres tampoco. La descripción ahora distingue entre respuestas exitosas y errores.
+- **`AC62`: el aviso es propio de cada nivel.** Antes interpolaba el nivel en un texto que sólo vale para `READ UNCOMMITTED`, así que cambiar el nivel daba un aviso falso. Ahora sale de un mapa nivel→aviso, y un nivel sin aviso escrito se rechaza: el módulo no carga y el servidor no arranca.
+- **`AC34`** (paga `D87`): su texto nombra la condición de versión que ya verificaba su assert. El assert ahora parsea la respuesta, en vez de buscar un literal con las claves en un orden fijo.
+- El test de `AC62` hace su propia consulta, en vez de usar las variables de un bloque anterior.
+- El CHANGELOG fecha la 0.2.0 el 1-oct, el día de la aprobación, y el README raíz suma `bisalta-db` a la tabla de plugins.
+- **Quedan como deuda** (`D88`, `D89`): el aviso completo se repite en cada respuesta, y la bitácora no registra el nivel.
 
 ### Cambios v28 → v29 (el aviso del aislamiento viaja en la respuesta, 30-sep-2026)
 
@@ -686,7 +697,7 @@ Que esa asimetría esté escrita en `garantias`, entrada por entrada, es lo que 
 
 ### R2 — protocolo MCP y empaquetado
 
-**AC34** — El servidor responde `initialize` y luego `tools/list` con exactamente las herramientas `consultar` y `listar_conexiones`, corriendo con `node` sin ningún paquete instalado.
+**AC34** — El servidor responde `initialize` y luego `tools/list` con exactamente las herramientas `consultar` y `listar_conexiones`, corriendo con `node` sin ningún paquete instalado. Desde v30, además, `serverInfo.version` de `initialize` es la de `plugin.json`, comparada sobre la respuesta parseada. **Mutación declarada**: volver `VERSION_SERVIDOR` a `0.1.0` pone rojo ese assert.
 
 **AC35** — `listar_conexiones` no devuelve `host`, `puerto`, `secret_id` ni `region` en ninguna entrada.
 **Mutación declarada**: agregar `host` a la proyección; `test_servidor_mcp.sh` tiene que ponerse rojo; quitarlo.
@@ -791,13 +802,18 @@ Casos del test — rechazados: en `postgres`, `WITH x AS (INSERT INTO t VALUES (
 - (f) sin el corte con el error 601, el del 601.
 **Parte `manual-only`**, contra la instancia real: `transaction_isolation_level` de la propia sesión (`sys.dm_exec_sessions`) da `1`, y una consulta con `WITH` responde.
 
-**AC62** (detección, v29) — En SQL Server, la respuesta de `consultar` lleva `aislamiento` y `aviso`, en ese orden, después de `dialecto` y antes de `filas`. `aislamiento` es el mismo nivel que viaja en el prefijo de `-Q` (`AC61`), y sale de la misma constante. `aviso` empieza con `Corrió en <nivel>` y nombra las filas sin confirmar y las filas leídas dos veces o salteadas. En Postgres no aparece ninguno de los dos. Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC62`: el nivel, el nivel igual al enviado, el aviso, sus filas sin confirmar, sus filas salteadas, el orden de las claves, y en Postgres la ausencia de los dos campos, con su control. **Mutaciones declaradas**:
+**AC62** (detección, v29) — En SQL Server, la respuesta de `consultar` lleva `aislamiento` y `aviso`, en ese orden, después de `dialecto` y antes de `filas`. `aislamiento` es el mismo nivel que viaja en el prefijo de `-Q` (`AC61`), y sale de la misma constante. `aviso` sale del mapa nivel→aviso de `conexion.js` (`avisoParaNivel`, v30), que rechaza un nivel sin aviso escrito. El de `READ UNCOMMITTED` empieza con `Corrió en READ UNCOMMITTED` y nombra las filas sin confirmar y las filas leídas dos veces o salteadas. En Postgres no aparece ninguno de los dos. Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC62`: el nivel, el nivel igual al enviado, el aviso, sus filas sin confirmar, sus filas salteadas, el orden de las claves, y en Postgres la ausencia de los dos campos, con su control. **Mutaciones declaradas**:
 - (a) sin los dos campos, los de nivel, aviso, sus dos cláusulas y orden;
 - (b) el nivel informado distinto del constante (`'READ COMMITTED'` a mano), los dos de nivel;
 - (c) los dos campos también en Postgres, los dos de ausencia;
 - (d) el aviso después de las filas, el del orden;
 - (e) el nivel del prefijo escrito a mano y no desde la constante, con otro valor: el de nivel igual al enviado y el de `AC61`;
-- (f) el aviso sin la cláusula de las filas sin confirmar, el de esa cláusula.
+- (f) el aviso sin la cláusula de las filas sin confirmar, el de esa cláusula;
+- (g) un nivel sin aviso escrito devuelve un texto genérico en vez de rechazarse, el de "un nivel sin aviso escrito se rechaza".
+
+**AC63** (detección, v30) — En SQL Server, un error de la consulta, con código 6 (`conexion_fallida`) o 7 (`tiempo_agotado`), lleva `aislamiento` con el mismo nivel que la respuesta exitosa. No lo lleva un error de Postgres, ni uno de SQL Server anterior a correr la consulta (código 5, el secreto). Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC63`: el error de consulta y el corte de SQL Server lo llevan, y el error de Postgres no. **Mutaciones declaradas**:
+- (a) sin el campo en los errores, los dos de SQL Server;
+- (b) el campo también en los errores de Postgres, el de Postgres.
 **Parte `manual-only`**, contra la instancia real a través del plugin: una consulta de SQL Server trae los dos campos, y una de Postgres no.
 
 **AC51** (detección) — La normalización de la lista blanca es **un solo recorrido de izquierda a derecha** que conoce las reglas de comillado de cada dialecto, de modo que **el validador ve las mismas sentencias que ejecuta el motor**:
