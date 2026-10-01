@@ -1,22 +1,22 @@
 # Gates run — generado por sdd-run-gates.sh v0.12.0
 
-- **Branch**: `feat-GEN-108-aviso-aislamiento` · **Commit**: `fa4af6b` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-10-01T15:49:03Z
-- Tree: `914dd5b6781dc93f2c0e916ee879b887f4cd3744` — LIMPIO
+- **Branch**: `feat-GEN-108-aviso-aislamiento` · **Commit**: `8d475cc` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-10-01T16:35:51Z
+- Tree: `1181defd1a520b30847eaeea74f6d03bba7624bf` — LIMPIO
 - Este archivo lo escribió el runner, no un modelo. Editarlo a mano invalida la evidencia.
 
 | # | Gate | Comando | Exit | Timestamp UTC | Resultado |
 |---|---|---|---|---|---|
-| 1 | format / style | — | — | 2026-10-01T15:46:03Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
-| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-10-01T15:46:03Z | verde |
-| 3 | type-check | — | — | 2026-10-01T15:46:04Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
-| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-10-01T15:46:05Z | verde |
-| 5 | integration | — | — | 2026-10-01T15:47:32Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
-| 6 | build | — | — | 2026-10-01T15:47:32Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
-| 7 | e2e | — | — | 2026-10-01T15:47:32Z | [SKIPPED] sin comando en el doc (N/A) |
-| 8 | cobertura del diff | — | — | 2026-10-01T15:47:32Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
-| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-10-01T15:47:32Z | verde |
-| 10 | smoke manual | — | — | 2026-10-01T15:47:35Z | [SKIPPED] sin comando en el doc (N/A) |
-| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-10-01T15:47:35Z | verde |
+| 1 | format / style | — | — | 2026-10-01T16:32:41Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
+| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-10-01T16:32:41Z | verde |
+| 3 | type-check | — | — | 2026-10-01T16:32:43Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
+| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-10-01T16:32:43Z | verde |
+| 5 | integration | — | — | 2026-10-01T16:34:13Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
+| 6 | build | — | — | 2026-10-01T16:34:13Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
+| 7 | e2e | — | — | 2026-10-01T16:34:13Z | [SKIPPED] sin comando en el doc (N/A) |
+| 8 | cobertura del diff | — | — | 2026-10-01T16:34:13Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
+| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-10-01T16:34:13Z | verde |
+| 10 | smoke manual | — | — | 2026-10-01T16:34:16Z | [SKIPPED] sin comando en el doc (N/A) |
+| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-10-01T16:34:16Z | verde |
 
 ## Output por gate (últimas 15 líneas)
 
@@ -49,7 +49,7 @@ PASS  test_usage_summary.sh
 ### Gate 9 — security (exit 0)
 
 ```
-secret-scan: sin hallazgos sobre 189 archivos versionados (1 excluido: self)
+secret-scan: sin hallazgos sobre 190 archivos versionados (1 excluido: self)
 ```
 
 ### Gate — — suite completa (exit 0)
@@ -77,12 +77,12 @@ PASS  test_usage_summary.sh
 
 # Addendum del planner — v30 (NO lo escribió el runner)
 
-Salida literal de los scripts, pegados al final de cada sección. Las mutaciones y la medición en vivo corrieron sobre el árbol del código sellado arriba (`fa4af6b`), con el árbol limpio al empezar y al terminar; cada salida dice sobre qué commit corrió.
+Salida literal de los scripts, pegados al final de cada sección. Las mutaciones y la medición en vivo corrieron sobre el árbol del código sellado arriba (`8d475cc`), con el árbol limpio al empezar y al terminar; cada salida dice sobre qué commit corrió.
 
 ## 1. En vivo, servidor del repo
 
 ```
-árbol fa4af6b
+árbol 8d475cc
 ### AC62: SQL Server trae aislamiento y aviso antes de las filas, y el nivel coincide con el de la sesión
 { "conexion": "compras", "dialecto": "sqlserver", "aislamiento": "READ UNCOMMITTED", "aviso": "Corrió en READ UNCOMMITTED: puede incluir filas que otra transacción todavía no confirmó y, si alguien escribía mientras tanto, filas leídas dos veces o salteadas. Un COUNT o un total pueden estar mal.", "filas": [ { "nivel": "1" } ], "filas_devueltas": 1, "truncado": false, "motivo_truncado": null }
 ### AC62: Postgres no trae ninguno de los dos
@@ -117,10 +117,10 @@ call proveedores-dev "SELECT x FROM tabla_que_no_existe_bisalta_db"
 echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio || echo SUCIO )"
 ```
 
-## 2. Mutaciones de `AC61` (reescritas) y `AC62` — salida literal
+## 2. Mutaciones de `AC34`, `AC61` (reescritas), `AC62` y `AC63` — salida literal
 
 ```
-árbol fa4af6b
+árbol 8d475cc
 
 ### AC61 (a) sin el prefijo
 - verde (árbol real): exit=0 fail=0
@@ -138,7 +138,7 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
 
 ### AC61 (c) READ COMMITTED en lugar de READ UNCOMMITTED
 - verde (árbol real): exit=0 fail=0
-- mutado:             exit=1 fail=117
+- mutado:             exit=1 fail=122
       FAIL  AC34 initialize responde el protocolVersion declarado — no encontré ["protocolVersion":"2024-11-05"] en la salida
       FAIL  AC34 initialize se identifica como bisalta-db — no encontré ["name":"bisalta-db"] en la salida
       FAIL  AC34 serverInfo.version es la de plugin.json
@@ -225,11 +225,14 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
       FAIL  AC61 sqlcmd recibe el nivel de aislamiento antes de la consulta, y la consulta intacta — no encontré [ARG -Q|ARG SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED; SELECT 1|] en la salida
       FAIL  AC62 la respuesta de sqlserver informa el nivel de aislamiento
       FAIL  AC62 la respuesta de sqlserver trae el aviso — no encontré ["aviso":"Corrió en READ UNCOMMITTED] en la salida
+      FAIL  AC62 el aviso nombra el mismo nivel que el campo aislamiento — no encontré ["aviso":"Corrió en :] en la salida
       FAIL  AC62 el aviso nombra las filas sin confirmar — no encontré [otra transacción todavía no confirmó] en la salida
       FAIL  AC62 el aviso nombra las filas leídas dos veces o salteadas — no encontré [filas leídas dos veces o salteadas] en la salida
       FAIL  AC62 el aviso va antes de las filas
       FAIL  AC62 (control) la consulta postgres responde — no encontré ["dialecto":"postgres"] en la salida
       FAIL  AC62 un nivel sin aviso escrito se rechaza
+      FAIL  AC62 (control) la copia lleva el nivel sustituido
+      FAIL  AC62 (control) la copia sin tocar de conexion.js carga
       FAIL  AC57 un error de sqlcmd se informa como conexion_fallida — no encontré ["error":"conexion_fallida"] en la salida
       FAIL  AC57 el mensaje de un error de sqlcmd no llega vacío — no encontré [VIEW SERVER STATE permission was denied] en la salida
       FAIL  AC57 (control) el mensaje tomado de stdout pasa por la redacción — no encontré [[redactado]] en la salida
@@ -239,6 +242,8 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
       FAIL  AC57 sin Msg, el mensaje es el final de stdout — no encontré [FIN-DEL-ERROR] en la salida
       FAIL  AC57 el corte por -t de sqlcmd se informa como tiempo_agotado — no encontré ["error":"tiempo_agotado"] en la salida
       FAIL  AC63 un corte de sqlserver informa el aislamiento — no encontré ["aislamiento":"READ UNCOMMITTED"] en la salida
+      FAIL  AC63 (control) un secreto de sqlserver que no resuelve da el código 5 — no encontré ["codigo":5] en la salida
+      FAIL  AC63 (control) sin sqlcmd en el PATH la consulta da el código 8 — no encontré ["codigo":8] en la salida
       FAIL  AC55/AC58 psql exige TLS y autentica al servidor (PGSSLMODE=verify-full) — no encontré [PGSSLMODE verify-full] en la salida
       FAIL  AC58 psql apunta PGSSLROOTCERT al bundle de RDS del plugin — no encontré [certificados/rds-global-bundle.pem] en la salida
       FAIL  AC58 el archivo al que apunta PGSSLROOTCERT existe — no encontré [PGSSLROOTCERT_EXISTE si] en la salida
@@ -282,10 +287,11 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
 
 ### AC62 (a) sin los dos campos
 - verde (árbol real): exit=0 fail=0
-- mutado:             exit=1 fail=6
+- mutado:             exit=1 fail=7
       FAIL  AC62 la respuesta de sqlserver informa el nivel de aislamiento
       FAIL  AC62 el nivel informado es el mismo que se mandó a sqlcmd
       FAIL  AC62 la respuesta de sqlserver trae el aviso — no encontré ["aviso":"Corrió en READ UNCOMMITTED] en la salida
+      FAIL  AC62 el aviso nombra el mismo nivel que el campo aislamiento — no encontré ["aviso":"Corrió en undefined:] en la salida
       FAIL  AC62 el aviso nombra las filas sin confirmar — no encontré [otra transacción todavía no confirmó] en la salida
       FAIL  AC62 el aviso nombra las filas leídas dos veces o salteadas — no encontré [filas leídas dos veces o salteadas] en la salida
       FAIL  AC62 el aviso va antes de las filas
@@ -293,9 +299,10 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
 
 ### AC62 (b) nivel informado a mano, distinto
 - verde (árbol real): exit=0 fail=0
-- mutado:             exit=1 fail=2
+- mutado:             exit=1 fail=3
       FAIL  AC62 la respuesta de sqlserver informa el nivel de aislamiento
       FAIL  AC62 el nivel informado es el mismo que se mandó a sqlcmd
+      FAIL  AC62 el aviso nombra el mismo nivel que el campo aislamiento — no encontré ["aviso":"Corrió en READ COMMITTED:] en la salida
 - verde (restaurado): exit=0 fail=0
 
 ### AC62 (c) los dos campos también en Postgres
@@ -326,8 +333,15 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
 
 ### AC62 (g) un nivel sin aviso devuelve un texto genérico
 - verde (árbol real): exit=0 fail=0
-- mutado:             exit=1 fail=1
+- mutado:             exit=1 fail=2
       FAIL  AC62 un nivel sin aviso escrito se rechaza
+      FAIL  AC62 con un nivel sin aviso escrito, conexion.js no carga
+- verde (restaurado): exit=0 fail=0
+
+### AC62 (h) el aviso sale del mapa sin pasar por avisoParaNivel
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=1
+      FAIL  AC62 con un nivel sin aviso escrito, conexion.js no carga
 - verde (restaurado): exit=0 fail=0
 
 ### AC63 (a) sin aislamiento en los errores
@@ -341,6 +355,13 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
 - verde (árbol real): exit=0 fail=0
 - mutado:             exit=1 fail=1
       FAIL  AC63 un error de postgres no lleva aislamiento — encontré ["aislamiento"] y no debería estar
+- verde (restaurado): exit=0 fail=0
+
+### AC63 (c) aislamiento en todo error de SQL Server
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=2
+      FAIL  AC63 el código 5 de sqlserver no lleva aislamiento — encontré ["aislamiento"] y no debería estar
+      FAIL  AC63 el código 8 de sqlserver no lleva aislamiento — encontré ["aislamiento"] y no debería estar
 - verde (restaurado): exit=0 fail=0
 
 ### AC34 serverInfo.version desalineada de plugin.json
@@ -441,11 +462,15 @@ mutar "AC62 (f) el aviso sin la cláusula de las filas sin confirmar" "$CX" "$TS
     'filas"
 mutar "AC62 (g) un nivel sin aviso devuelve un texto genérico" "$CX" "$TS" \
   "    throw new Error('nivel de aislamiento sin aviso escrito: ' + String(nivel));" "    return 'Corrió en ' + String(nivel) + '.';"
+mutar "AC62 (h) el aviso sale del mapa sin pasar por avisoParaNivel" "$CX" "$TS" \
+  "const AVISO_AISLAMIENTO_SQLSERVER = avisoParaNivel(NIVEL_AISLAMIENTO_SQLSERVER);" "const AVISO_AISLAMIENTO_SQLSERVER = AVISOS_POR_NIVEL['READ UNCOMMITTED'];"
 mutar "AC63 (a) sin aislamiento en los errores" "$SV" "$TS" \
   "      extra.aislamiento = conexion.NIVEL_AISLAMIENTO_SQLSERVER;
 " ""
 mutar "AC63 (b) aislamiento también en los errores de Postgres" "$SV" "$TS" \
   "if (entrada.dialecto === 'sqlserver' && (codigo === 6 || codigo === 7)) {" "if (codigo === 6 || codigo === 7) {"
+mutar "AC63 (c) aislamiento en todo error de SQL Server" "$SV" "$TS" \
+  "if (entrada.dialecto === 'sqlserver' && (codigo === 6 || codigo === 7)) {" "if (entrada.dialecto === 'sqlserver') {"
 mutar "AC34 serverInfo.version desalineada de plugin.json" "$SV" "$TS" \
   "const VERSION_SERVIDOR = '0.2.0';" "const VERSION_SERVIDOR = '0.1.0';"
 echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio || echo SUCIO )"
