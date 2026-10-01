@@ -37,7 +37,7 @@ const listaBlanca = require('./lista-blanca.js');
 const conexion = require('./conexion.js');
 
 const NOMBRE_SERVIDOR = 'bisalta-db';
-const VERSION_SERVIDOR = '0.2.0';
+const VERSION_SERVIDOR = '0.3.0';
 const VERSION_PROTOCOLO = '2024-11-05';
 
 // Topes duros de la respuesta (contract v3, "Respuesta de `consultar`"). Son
@@ -101,6 +101,36 @@ function aplicarTopes(filas) {
     bytes += extra;
   }
   return { filas: aceptadas, truncado: motivo !== null, motivo_truncado: motivo };
+}
+
+// AC65 (v31): columnas cuyo nombre indica una credencial. Su valor se
+// reemplaza en la respuesta, en todos los dialectos. Es por NOMBRE: una
+// columna renombrada en la consulta (`SELECT token AS t`) no se detecta. Es
+// higiene contra la exposición accidental, no una barrera de acceso; el
+// acceso lo decide el rol de la base (decisión de Ian, 1-oct).
+const COLUMNA_SENSIBLE = /token|secret|pass(?:word|wd)|key_hash|api_?key/i;
+const VALOR_REDACTADO = '[redactado]';
+
+/**
+ * Reemplaza el valor de las columnas sensibles y devuelve cuáles fueron. Un
+ * nulo queda nulo: dice que no hay dato, y no expone nada.
+ */
+function redactarColumnasSensibles(filas) {
+  const redactadas = [];
+  const vistas = {};
+  const salida = filas.map(function (fila) {
+    const copia = {};
+    Object.keys(fila).forEach(function (columna) {
+      if (COLUMNA_SENSIBLE.test(columna)) {
+        if (!Object.prototype.hasOwnProperty.call(vistas, columna)) { vistas[columna] = true; redactadas.push(columna); }
+        copia[columna] = fila[columna] === null ? null : VALOR_REDACTADO;
+      } else {
+        copia[columna] = fila[columna];
+      }
+    });
+    return copia;
+  });
+  return { filas: salida, redactadas: redactadas };
 }
 
 function cuerpoDeError(codigo, error, extra) {
@@ -197,7 +227,10 @@ function manejarConsultar(args) {
     return terminar(codigo, cuerpoDeError(codigo, nombreError, extra), 0, false);
   }
 
-  const topes = aplicarTopes(resultado.filas);
+  // AC65: se redacta ANTES de los topes, así el tope de bytes mide lo que de
+  // verdad sale.
+  const redaccion = redactarColumnasSensibles(resultado.filas);
+  const topes = aplicarTopes(redaccion.filas);
   const cuerpo = {
     conexion: entrada.nombre,
     dialecto: entrada.dialecto
@@ -208,6 +241,11 @@ function manejarConsultar(args) {
   if (entrada.dialecto === 'sqlserver') {
     cuerpo.aislamiento = conexion.NIVEL_AISLAMIENTO_SQLSERVER;
     cuerpo.aviso = conexion.AVISO_AISLAMIENTO_SQLSERVER;
+  }
+  // AC65: qué columnas se taparon, para que quien lee no tome '[redactado]'
+  // por el dato.
+  if (redaccion.redactadas.length > 0) {
+    cuerpo.columnas_redactadas = redaccion.redactadas;
   }
   Object.assign(cuerpo, {
     filas: topes.filas,
@@ -391,6 +429,7 @@ module.exports = {
   manejarConsultar: manejarConsultar,
   manejarListar: manejarListar,
   aplicarTopes: aplicarTopes,
+  redactarColumnasSensibles: redactarColumnasSensibles,
   HERRAMIENTAS: HERRAMIENTAS,
   LIMITE_FILAS: LIMITE_FILAS,
   LIMITE_BYTES: LIMITE_BYTES,

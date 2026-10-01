@@ -1,6 +1,19 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v30
+- **Versión**: v31
+
+### Cambios v30 → v31 (multitenant: el tenant por sesión y la redacción de columnas sensibles, 1-oct-2026)
+
+Entran **`AC64`** y **`AC65`**, por eso el bump. Lo pidió la sesión PROV-302/PROV-208: `claude_lectura` ve 0 filas en `smartcheck_qa`, porque sus tablas tienen RLS por `app.tenant_ids` y el rol no tiene el parámetro. Ian Vargas pidió una solución general, porque cada vez más bases van a dividirse por `tenant_id`.
+
+- **Medido el 1-oct con el plugin**, sólo metadatos: SmartCheck dev y qa tienen RLS por `app.tenant_ids` (una lista) en 44 y 43 tablas; SmartFleet qa, por **`app.tenant_id`** (un solo UUID) en 75 de 119; Proveedores no usa RLS. Como hay dos convenciones, la entrada declara el parámetro y su formato.
+- **Por qué por sesión** (medido por Patrick Ocampo el 1-oct): en PG 14.20, `ALTER ROLE … SET` de un parámetro sin declarar exige un superuser de verdad (`GRANT SET ON PARAMETER` es de PG 15), y el propio rol no puede porque tiene `default_transaction_read_only`. Por sesión funciona.
+- **El valor no va en el catálogo, que es público.** Va en el secreto que el plugin ya lee, como `tenant_<nombre>`, y lo carga Ian (decisión del 1-oct, opción b). No se lee de `dev/tenant_construplaza` porque la política `LecturaSecretosClaudeDB` sólo cubre `dev/bd/claude-lectura-*`. El costo aceptado: el valor queda duplicado, y si cambia en un lado no cambia en el otro.
+- **Sólo Construplaza y sólo en `smartcheck-qa`**, por ahora (decisión de Ian). Sumar un tenant es sumar la clave al secreto y el nombre a la entrada.
+- **El alcance queda escrito en la entrada** (`sesion.alcance`): el parámetro destraba las 43 tablas del esquema `smartcheck`, entre ellas `push_tokens`, `corp_api_keys` y `logs`, con columnas `token`. Patrick decidió seguir con `claude_lectura` sabiéndolo.
+- **`AC65`: redacción por nombre** de las columnas que indican una credencial, en todos los dialectos (decisión de Ian). Es higiene, no barrera: una columna renombrada no se detecta. La barrera sería un rol sin `pg_read_all_data` con permisos por columna, y eso queda como decisión de Patrick.
+- `bisalta-db` pasa de 0.2.0 a 0.3.0.
+- **Hallazgo de la medición, que no es de este plugin** (`D90`): en SmartFleet qa, 109 tablas tienen `tenant_id` y 75 tienen la política, así que unas 34 tablas multitenant se leen sin filtro de tenant.
 
 ### Cambios v29 → v30 (review profunda del PR #16, 1-oct-2026)
 
@@ -551,7 +564,7 @@ Arreglo de objetos. El validador **rechaza cualquier campo no listado acá** y c
 
 ### Respuesta de `listar_conexiones`
 
-Arreglo con `nombre`, `dialecto`, `ambiente`, `base` y `garantias` de cada entrada. **No incluye `host`, `puerto`, `secret_id` ni `region`**: son superficie de reconocimiento que el consumidor no necesita.
+Arreglo con `nombre`, `dialecto`, `ambiente`, `base`, `garantias` y, desde v31, `sesion` (`parametro`, `tenants` y `alcance`, o `null`; `AC64`) de cada entrada. **No incluye `host`, `puerto`, `secret_id` ni `region`**: son superficie de reconocimiento que el consumidor no necesita.
 
 ## Comportamiento de error
 
@@ -820,6 +833,36 @@ En v30 también se verifica que el aviso nombre el mismo nivel que el campo `ais
 - (b) el campo también en los errores de Postgres, el de Postgres;
 - (c) el campo en todo error de SQL Server, sin mirar el código, los del 5 y el 8.
 **Parte `manual-only`**, contra la instancia real: un error real de consulta de SQL Server (una tabla inexistente) llega con `aislamiento`, y el mismo error en Postgres, sin él.
+
+**AC64** (detección, v31) — Una entrada del catálogo puede declarar un bloque `sesion` con `parametro`, `formato`, `tenants` y `alcance`, y sólo en dialecto `postgres`.
+- **Catálogo**: `parametro` es `<prefijo>.<nombre>` (minúsculas, dígitos y guiones bajos); `formato` es `uuid` o `uuid_lista`; `tenants` es un arreglo no vacío de nombres sin repetir (minúsculas, dígitos y guiones bajos), y con `uuid` admite exactamente uno; `alcance` dice qué destraba el parámetro. Cualquier otro campo en `sesion` rechaza el catálogo entero. **El catálogo no trae UUID**: es público.
+- **Valor**: cada tenant es la clave `tenant_<nombre>` del mismo secreto de la entrada. Tiene que ser un UUID canónico; se baja a minúsculas. `uuid_lista` los une con coma y sin espacios, en el orden del catálogo.
+- **Si falta un tenant o no es un UUID**: código 5 (`secreto_inaccesible`), con el nombre de la clave y sin su valor, y `psql` no se invoca.
+- **Comando**: un `--command` `SET <parametro> = '<valor>'` entre la guarda de réplica y el SQL del consumidor. Una entrada sin `sesion` no manda ningún `SET`.
+- **`listar_conexiones`** muestra `sesion` con `parametro`, `tenants` y `alcance` (`null` sin bloque), nunca un UUID.
+- El catálogo real lo declara sólo en `smartcheck-qa`: `app.tenant_ids`, `uuid_lista`, `["construplaza"]` (decisión de Ian Vargas, 1-oct).
+
+Casos en `SDD/tests/test_catalogo.sh` y `SDD/tests/test_servidor_mcp.sh`, asserts `AC64`. **Mutaciones declaradas**:
+- (a) sin el `--command` del `SET`, el del orden de los comandos;
+- (b) el `SET` después del SQL, el mismo;
+- (c) un `SET` también sin `sesion`, el de "una entrada sin sesion no manda ningún SET";
+- (d) sin validar el UUID, los de `no-uuid` e `inyeccion`;
+- (e) unir con `, `, el de `uuid_lista`;
+- (f) un tenant que falta no frena (`null` en vez de error), los de `falta`;
+- (g) el validador sin la regla de un solo tenant con `uuid`, el de esa forma;
+- (h) el validador sin el patrón del parámetro, los dos del parámetro;
+- (i) el validador acepta `sesion` en `sqlserver`, el de esa forma;
+- (j) el validador sin exigir `alcance`, el de esa forma;
+- (k) el mensaje de error incluye el valor, el de "no repite el valor".
+**Parte `manual-only`**, contra la base real a través del plugin: en `smartcheck-qa`, `count(*)` de `smartcheck.requests` da 2998 y `count(DISTINCT tenant_id)` da 1 (lo medido por Patrick el 1-oct); en `proveedores-dev` la consulta responde igual que antes.
+
+**AC65** (detección, v31) — En la respuesta de `consultar`, en los dos dialectos, el valor de toda columna cuyo nombre contenga `token`, `secret`, `password`, `passwd`, `key_hash` o `api_key`/`apikey` (sin mirar mayúsculas) se reemplaza por `[redactado]`; un nulo queda nulo. La respuesta lleva `columnas_redactadas`, con sus nombres, antes de `filas`, y sólo si hubo alguna. Se redacta antes de los topes. **Es por nombre**: una columna renombrada en la consulta no se detecta. Protege de la exposición accidental, no es una barrera de acceso (decisión de Ian, 1-oct). Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC65`. **Mutaciones declaradas**:
+- (a) sin redactar, los del valor y el de `[redactado]`;
+- (b) sin `columnas_redactadas`, el de esa lista;
+- (c) el patrón sensible a mayúsculas, el de los patrones;
+- (d) redactar también el nulo, el mismo;
+- (e) sin `passwd`, el mismo.
+**Parte `manual-only`**, contra la base real a través del plugin: una consulta a una tabla con una columna `token` la devuelve redactada.
 
 **AC51** (detección) — La normalización de la lista blanca es **un solo recorrido de izquierda a derecha** que conoce las reglas de comillado de cada dialecto, de modo que **el validador ve las mismas sentencias que ejecuta el motor**:
 - **en los dos dialectos**: literales entre comillas simples con `''` como escape; identificadores entre comillas dobles con `""` como escape (se copian tal cual); comentarios de línea (`--` hasta el fin de línea); comentarios de bloque **anidados**;

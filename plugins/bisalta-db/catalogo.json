@@ -101,7 +101,15 @@
         "nivel": "condicional",
         "condicion": "el plugin no la comprueba: la pide al abrir la sesión y no verifica que rija. Dentro de una llamada no se puede apagar (medido el 23-sep-2026: 'transaction read-write mode must be set before any query'), y el rol la tiene además fijada por ALTER ROLE."
       }
-    ]
+    ],
+    "sesion": {
+      "parametro": "app.tenant_ids",
+      "formato": "uuid_lista",
+      "tenants": [
+        "construplaza"
+      ],
+      "alcance": "Destraba para el tenant de Construplaza las 43 tablas del esquema smartcheck con la política tenant_isolation, no sólo requests y supplier_requests. Entre ellas push_tokens (token, user_email), corp_api_keys (key_hash) y logs (6,98 millones de filas, con columna token), medido el 1-oct-2026. Patrick Ocampo decidió seguir con claude_lectura sabiéndolo. Las columnas cuyo nombre indica una credencial se redactan en la respuesta (AC65), por nombre."
+    }
   },
   {
     "nombre": "smartfleet-dev",

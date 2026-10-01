@@ -65,6 +65,10 @@ export BISALTA_STUB_MARCA="$MARCA_CRUDA_AWS"
 export BISALTA_STUB_AWS_FALLA=0
 export BISALTA_STUB_PSQL_MODO=normal
 export BISALTA_STUB_CATALOGO_NUEVO=''
+# AC64 (v31): las claves de tenant del secreto, como fragmento JSON. Un UUID de
+# prueba, que no es el de ningún cliente.
+TENANT_PRUEBA='11111111-2222-4333-8444-555555555555'
+export BISALTA_STUB_EXTRA=", \"tenant_construplaza\": \"$TENANT_PRUEBA\""
 
 CATALOGO_VIVO="$TMP_DIR/catalogo.json"
 CATALOGO_SIN_QA="$TMP_DIR/catalogo-sin-qa.json"
@@ -98,7 +102,7 @@ if [ "${BISALTA_STUB_AWS_FALLA:-0}" = "1" ]; then
   printf 'An error occurred (AccessDeniedException): %s\n' "$BISALTA_STUB_MARCA" >&2
   exit 255
 fi
-printf '{"username": "%s", "%s": "%s"}\n' "$BISALTA_STUB_USUARIO" "$BISALTA_STUB_CAMPO" "$BISALTA_STUB_VALOR"
+printf '{"username": "%s", "%s": "%s"%s}\n' "$BISALTA_STUB_USUARIO" "$BISALTA_STUB_CAMPO" "$BISALTA_STUB_VALOR" "${BISALTA_STUB_EXTRA:-}"
 STUB
 
 cat > "$BIN_DIR/psql" <<'STUB'
@@ -193,6 +197,10 @@ case "${BISALTA_STUB_PSQL_MODO:-normal}" in
   # Una corrida EXITOSA cuyo dato dice "Timeout expired": no es un corte.
   datos-con-timeout)
     printf 'texto\nTimeout expired\n'
+    ;;
+  # AC65 (v31): columnas cuyo nombre indica una credencial, junto a otras que no.
+  columnas-sensibles)
+    printf 'id,token,api_key,user_email\n1,valor-sensible-abc,valor-sensible-def,persona@ejemplo.com\n'
     ;;
 esac
 STUB
@@ -817,6 +825,82 @@ assert_no_contains "$cuerpo_5" '"aislamiento"' "AC63 el código 5 de sqlserver n
 cuerpo_8="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_SIN_PSQL")")"
 assert_contains "$cuerpo_8" '"codigo":8' "AC63 (control) sin sqlcmd en el PATH la consulta da el código 8"
 assert_no_contains "$cuerpo_8" '"aislamiento"' "AC63 el código 8 de sqlserver no lleva aislamiento"
+
+# ---------------------------------------------------------------------------
+# AC64 (v31) — el parámetro de sesión de una entrada multitenant
+# ---------------------------------------------------------------------------
+GUARDA="$("$NODE_BIN" -e "const s=require('fs').readFileSync('$DIR_SCRIPTS/conexion.js','utf8');process.stdout.write(s.match(/const GUARDA_REPLICA = \"([^\"]+)\"/)[1])")"
+reiniciar_registros
+cuerpo_t="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 'smartcheck-qa' 'SELECT 1')" "$PATH_CON_STUBS")")"
+args_t="$(grep '^ARG ' "$TMP_DIR/psql-invocado.log" | tr '\n' '|')"
+assert_contains "$cuerpo_t" '"dialecto":"postgres"' "AC64 (control) la consulta a smartcheck-qa responde"
+assert_contains "$args_t" "ARG --command|ARG $GUARDA|ARG --command|ARG SET app.tenant_ids = '$TENANT_PRUEBA'|ARG --command|ARG SELECT 1|" \
+  "AC64 el SET del tenant va entre la guarda de réplica y el SQL, con el valor del secreto"
+reiniciar_registros
+servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
+assert_no_contains "$(grep '^ARG ' "$TMP_DIR/psql-invocado.log")" "ARG SET " "AC64 una entrada sin sesion no manda ningún SET"
+# Un tenant que falta en el secreto, o que no es un UUID: la consulta no corre.
+for caso in falta no-uuid inyeccion; do
+  case $caso in
+    falta) BISALTA_STUB_EXTRA='' ;;
+    no-uuid) BISALTA_STUB_EXTRA=', "tenant_construplaza": "construplaza"' ;;
+    inyeccion) BISALTA_STUB_EXTRA=", \"tenant_construplaza\": \"$TENANT_PRUEBA'; SELECT 1; --\"" ;;
+  esac
+  export BISALTA_STUB_EXTRA
+  reiniciar_registros
+  cuerpo_f="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 'smartcheck-qa' 'SELECT 1')" "$PATH_CON_STUBS")")"
+  assert_contains "$cuerpo_f" '"codigo":5' "AC64 un tenant $caso en el secreto devuelve el código 5"
+  assert_contains "$cuerpo_f" 'tenant_construplaza' "AC64 el error de un tenant $caso nombra la clave"
+  if [ -s "$TMP_DIR/psql-invocado.log" ]; then corrio=si; else corrio=no; fi
+  assert_eq "$corrio" "no" "AC64 con un tenant $caso, psql no se invoca"
+done
+assert_no_contains "$cuerpo_f" "SELECT 1; --" "AC64 el error no repite el valor del secreto"
+export BISALTA_STUB_EXTRA=", \"tenant_construplaza\": \"$TENANT_PRUEBA\""
+# uuid_lista con dos tenants: separados por coma y sin espacios.
+TENANT_OTRO='aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+CATALOGO_DOS="$TMP_DIR/catalogo-dos-tenants.json"
+"$NODE_BIN" -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('$CATALOGO_VIVO','utf8'));c.find(x=>x.nombre==='smartcheck-qa').sesion.tenants=['construplaza','otro'];fs.writeFileSync('$CATALOGO_DOS',JSON.stringify(c,null,2));"
+export BISALTA_STUB_EXTRA=", \"tenant_construplaza\": \"$TENANT_PRUEBA\", \"tenant_otro\": \"$TENANT_OTRO\""
+reiniciar_registros
+BISALTA_DB_CATALOGO="$CATALOGO_DOS" servidor_jsonrpc "$(trama_consultar 1 'smartcheck-qa' 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
+assert_contains "$(grep '^ARG ' "$TMP_DIR/psql-invocado.log")" "ARG SET app.tenant_ids = '$TENANT_PRUEBA,$TENANT_OTRO'" \
+  "AC64 uuid_lista une los tenants con coma y sin espacios, en el orden del catálogo"
+export BISALTA_STUB_EXTRA=", \"tenant_construplaza\": \"$TENANT_PRUEBA\""
+# listar_conexiones muestra los nombres y el alcance, nunca el UUID.
+cuerpo_l="$(cuerpos "$(servidor_jsonrpc '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"listar_conexiones"}}' "$PATH_CON_STUBS")")"
+assert_contains "$cuerpo_l" '"tenants":["construplaza"]' "AC64 listar_conexiones muestra el tenant de smartcheck-qa por nombre"
+assert_contains "$cuerpo_l" '43 tablas del esquema smartcheck' "AC64 listar_conexiones muestra el alcance"
+assert_no_contains "$cuerpo_l" "$TENANT_PRUEBA" "AC64 listar_conexiones no muestra ningún UUID"
+
+# ---------------------------------------------------------------------------
+# AC65 (v31) — las columnas cuyo nombre indica una credencial se redactan
+# ---------------------------------------------------------------------------
+BISALTA_STUB_PSQL_MODO=columnas-sensibles
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_r="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS")")"
+BISALTA_STUB_PSQL_MODO=normal
+export BISALTA_STUB_PSQL_MODO
+assert_no_contains "$cuerpo_r" 'valor-sensible-abc' "AC65 el valor de token no sale en la respuesta"
+assert_no_contains "$cuerpo_r" 'valor-sensible-def' "AC65 el valor de api_key no sale en la respuesta"
+assert_contains "$cuerpo_r" '"token":"[redactado]"' "AC65 token queda como [redactado]"
+assert_contains "$cuerpo_r" '"user_email":"persona@ejemplo.com"' "AC65 (control) una columna sin nombre sensible no se toca"
+assert_contains "$cuerpo_r" '"columnas_redactadas":["token","api_key"]' "AC65 la respuesta dice qué columnas se redactaron"
+orden_r="$("$NODE_BIN" -e "process.stdout.write(Object.keys(JSON.parse(process.argv[1])).join(','))" "$cuerpo_r")"
+assert_eq "$orden_r" "conexion,dialecto,columnas_redactadas,filas,filas_devueltas,truncado,motivo_truncado" "AC65 columnas_redactadas va antes de las filas"
+reiniciar_registros
+cuerpo_n="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS")")"
+assert_no_contains "$cuerpo_n" 'columnas_redactadas' "AC65 sin columnas sensibles, la respuesta no trae columnas_redactadas"
+patrones="$("$NODE_BIN" -e "
+const s=require('$DIR_SCRIPTS/servidor-mcp.js');
+// Los nombres se arman por partes: escritos junto a su valor, el secret-scan
+// (gate 9) los lee como una credencial.
+const nombres=['secret'+'_key','db_'+'pass'+'word','pass'+'wd','api'+'key','KEY'+'_HASH','refresh'+'_token','monto'];
+const fila={};nombres.forEach(function(n){fila[n]='v';});fila['nulo'+'_token']=null;
+const r=s.redactarColumnasSensibles([fila]);
+process.stdout.write(r.redactadas.join(',')+'|'+r.filas[0].monto+'|'+r.filas[0].nulo_token);")"
+assert_eq "$patrones" "secret_key,db_password,passwd,apikey,KEY_HASH,refresh_token,nulo_token|v|null" \
+  "AC65 los patrones cubren secret, password, passwd, apikey, key_hash y token, sin mirar mayúsculas; un nulo queda nulo"
 
 # ---------------------------------------------------------------------------
 # AC55 (v25) — cifrado en Postgres

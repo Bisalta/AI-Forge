@@ -286,6 +286,24 @@ En SQL Server la consulta corre en `READ UNCOMMITTED`. Ninguna de las seis bases
 - **Lo pone el plugin**, delante de tu consulta. Vos no podés mandar `SET` (lo rechaza la lista blanca).
 - **Postgres no lo necesita**: una lectura no bloquea la escritura de filas, y el plugin lee de la réplica.
 
+## Bases multitenant (v31, `AC64`)
+
+Algunas bases filtran por tenant con RLS: sin un parámetro de sesión, el rol ve 0 filas. La entrada del catálogo lo declara:
+
+```json
+"sesion": { "parametro": "app.tenant_ids", "formato": "uuid_lista",
+            "tenants": ["construplaza"], "alcance": "qué tablas destraba" }
+```
+
+- **Los UUID no van en el catálogo, que es público.** Van en el secreto de la entrada, como `tenant_<nombre>` (por ejemplo, `tenant_construplaza`). El plugin los lee en cada consulta y fija el parámetro antes de tu SQL.
+- **`formato`**: `uuid_lista` une los tenants con coma y sin espacios (SmartCheck, `app.tenant_ids`); `uuid` admite exactamente uno (SmartFleet, `app.tenant_id`).
+- **Sumar un tenant**: la clave `tenant_<nombre>` en el secreto y el nombre en `tenants`. Si la clave falta o no es un UUID, la consulta no corre (código 5).
+- **Hoy**: sólo `smartcheck-qa`, con el tenant de Construplaza. `alcance` dice qué destraba: las 43 tablas del esquema `smartcheck`, no sólo las que motivaron la entrada.
+
+## Columnas sensibles (v31, `AC65`)
+
+El valor de las columnas cuyo nombre contiene `token`, `secret`, `password`, `passwd`, `key_hash` o `api_key` sale como `[redactado]`, y la respuesta trae `columnas_redactadas` con cuáles. **Es por nombre**: si renombrás la columna en la consulta, no se detecta. Sirve para que una credencial no termine en el contexto por accidente, no para impedir que alguien la busque.
+
 ## Quién consulta (v27, `AC60`)
 
 Todos entran con el mismo rol de Postgres y el mismo login de SQL Server. Para que el motor distinga personas, el nombre de la sesión lleva además un **seudónimo de quien consulta**, sacado de su identidad de AWS: `<usuario del secreto>/u-<8 hex>`. Por ejemplo, `claude_lectura/u-349175ad` en Postgres (`application_name`) y `bisalta_lectura/u-349175ad` en SQL Server (`HOST_NAME()`).

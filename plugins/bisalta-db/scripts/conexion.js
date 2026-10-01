@@ -243,7 +243,37 @@ function resolverCredencial(entrada) {
     throw fallo(5, 'secreto_inaccesible',
       'al secreto de la conexión `' + entrada.nombre + '` (secret_id `' + entrada.secret_id + '`) le falta alguno de los dos campos de la forma estándar de RDS');
   }
-  return { usuario: usuario, contrasena: contrasena };
+  return { usuario: usuario, contrasena: contrasena, valorSesion: valorDeSesion(entrada, carga) };
+}
+
+// AC64 (v31): un UUID en su forma canónica. Se interpola en un SET, que no
+// acepta parámetros, así que no pasa nada que no sea exactamente esto.
+const UUID_VALIDO = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * AC64 (v31): el valor del parámetro de sesión de una entrada multitenant,
+ * armado desde el secreto. Cada tenant es la clave `tenant_<nombre>`; el
+ * catálogo sólo nombra cuáles. `uuid_lista` los une con coma y sin espacios
+ * (medido el 1-oct: con un espacio, el cast a uuid falla y rompe la consulta
+ * entera). Si falta uno o no es un UUID, la consulta no corre: correrla sin
+ * el filtro, o con un filtro a medias, daría un resultado que parece válido.
+ * El mensaje nombra la clave, nunca el valor.
+ * @returns {null|{parametro: string, valor: string}}
+ */
+function valorDeSesion(entrada, carga) {
+  if (!entrada.sesion) return null;
+  const valores = [];
+  for (let i = 0; i < entrada.sesion.tenants.length; i += 1) {
+    const clave = 'tenant_' + entrada.sesion.tenants[i];
+    const valor = carga[clave];
+    if (typeof valor !== 'string' || !UUID_VALIDO.test(valor)) {
+      throw fallo(5, 'secreto_inaccesible',
+        'al secreto de la conexión `' + entrada.nombre + '` (secret_id `' + entrada.secret_id + '`) le falta `' +
+        clave + '` o no es un UUID');
+    }
+    valores.push(valor.toLowerCase());
+  }
+  return { parametro: entrada.sesion.parametro, valor: valores.join(',') };
 }
 
 /**
@@ -264,13 +294,20 @@ function resolverCredencial(entrada) {
  * réplica y después el SQL del consumidor. Sin `--quiet`, psql imprime `DO`
  * como primera línea del CSV (medido).
  */
-function construirComandoPostgres(entrada, usuario, rutaPassfile, sql, identidad) {
+function construirComandoPostgres(entrada, usuario, rutaPassfile, sql, identidad, valorSesion) {
   const conninfo = 'postgresql://' + encodeURIComponent(usuario) + '@' +
     entrada.host + ':' + entrada.puerto + '/' + encodeURIComponent(entrada.base);
   return {
     comando: 'psql',
     args: ['--no-psqlrc', '--pset=pager=off', '--csv', '--quiet', '--variable=ON_ERROR_STOP=1',
-      '--command', GUARDA_REPLICA, '--command', sql, conninfo],
+      '--command', GUARDA_REPLICA].concat(
+      // AC64 (v31): el parámetro de sesión de una entrada multitenant, entre
+      // la guarda y el SQL. Lo arma el plugin después de la lista blanca: la
+      // consulta del usuario sigue sin poder traer SET ni set_config. Es
+      // sesión y no rol porque en PG 14 un parámetro sin declarar no se puede
+      // fijar con ALTER ROLE sin un superuser (medido por Patrick el 1-oct).
+      valorSesion ? ['--command', 'SET ' + valorSesion.parametro + " = '" + valorSesion.valor + "'"] : [],
+      ['--command', sql, conninfo]),
     env: {
       PGPASSFILE: rutaPassfile,
       // AC28 (v19): PGOPTIONS deja de llevar `statement_timeout` — el rol lo
@@ -416,7 +453,7 @@ function ejecutarConsulta(entrada, sql) {
       ].join(':') + '\n';
       fs.writeFileSync(rutaPassfile, linea, { mode: 0o600 });
       fs.chmodSync(rutaPassfile, 0o600);
-      plan = construirComandoPostgres(entrada, credencial.usuario, rutaPassfile, sql, identidad);
+      plan = construirComandoPostgres(entrada, credencial.usuario, rutaPassfile, sql, identidad, credencial.valorSesion);
     } else {
       plan = construirComandoSqlserver(entrada, credencial.usuario, credencial.contrasena, sql, identidad);
     }
@@ -532,6 +569,7 @@ module.exports = {
   avisoParaNivel: avisoParaNivel,
   BUNDLE_RDS: BUNDLE_RDS,
   resolverCredencial: resolverCredencial,
+  valorDeSesion: valorDeSesion,
   nombreDeArn: nombreDeArn,
   seudonimo: seudonimo,
   resolverIdentidad: resolverIdentidad,
