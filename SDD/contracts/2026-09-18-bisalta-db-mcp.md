@@ -13,6 +13,7 @@ Entran **`AC64`** y **`AC65`**, por eso el bump. Lo pidió la sesión PROV-302/P
 - **El alcance queda escrito en la entrada** (`sesion.alcance`): el parámetro destraba las 43 tablas del esquema `smartcheck`, entre ellas `push_tokens`, `corp_api_keys` y `logs`, con columnas `token`. Patrick decidió seguir con `claude_lectura` sabiéndolo.
 - **`AC65`: redacción por nombre** de las columnas que indican una credencial, en todos los dialectos (decisión de Ian). Es higiene, no barrera: una columna renombrada no se detecta. La barrera sería un rol sin `pg_read_all_data` con permisos por columna, y eso queda como decisión de Patrick.
 - `bisalta-db` pasa de 0.2.0 a 0.3.0.
+- **Ronda 1 de la review: `ESCALATE`** (`E24`). La consulta del usuario puede cambiar el parámetro de sesión por una forma que la lista blanca no reconoce; el reviewer lo reprodujo en un PostgreSQL 14.18 local. El ajuste de la lista blanca lo escribe una persona, como en v20 (decisión de Ian, 1-oct). Entran además los asserts de las cláusulas de `AC64` y `AC65` que no tenían, y la redacción pasa a cubrir el vacío y el nulo.
 - **Hallazgo de la medición, que no es de este plugin** (`D90`): en SmartFleet qa, 109 tablas tienen `tenant_id` y 75 tienen la política, así que unas 34 tablas multitenant se leen sin filtro de tenant.
 
 ### Cambios v29 → v30 (review profunda del PR #16, 1-oct-2026)
@@ -443,7 +444,7 @@ Superficie pública nueva: dos herramientas MCP. No hay consumidor previo, así 
 1. **¿Quién puede invocarlo?** Cualquier proceso local que tenga el plugin habilitado **y** credenciales AWS con permiso de lectura sobre el secreto de esa conexión. La barrera real es IAM, no el plugin: sin permiso sobre el secreto, la conexión falla aunque la entrada del catálogo esté presente.
 2. **¿Qué pasa con el rol equivocado?** Sin permiso IAM sobre el secreto, `consultar` devuelve `{ "error": "secreto_inaccesible" }` nombrando la conexión y el identificador del secreto, **sin volcar la respuesta cruda de AWS** (puede traer el ARN de la identidad llamante). Exit code 5.
 3. **¿Qué pasa con input hostil?** El único campo de entrada libre es `sql`. Lo valida la lista blanca del dialecto de la conexión, **antes de conectar**: se quitan comentarios y literales, se parte en sentencias, y cada sentencia debe empezar con `SELECT` o `WITH` **y no contener una escritura embebida** (AC47, v16: un `WITH` puede llevar un `INSERT`/`UPDATE`/`DELETE`/`MERGE`, y un `SELECT … INTO` crea una tabla). La lista blanca es **la primera** barrera, no la única: detrás están la sesión de solo lectura, la réplica —comprobada en cada consulta desde v16 (AC46)— y los permisos del rol. Al rechazar, el error devuelve los primeros 90 caracteres de la sentencia ofensora — nunca el archivo completo, nunca un stack trace. Exit code 4.
-4. **¿Qué datos toca y de quién?** Datos de proveedores, empleados y operación de Construplaza. Las conexiones de Postgres son de `dev`/`qa`. Las de SQL Server son **copias de producción** (`EXACTUS` 395 GB, `BI` 177 GB, `COMPRAS` 107 GB): los tamaños no son de desarrollo. No hay acceso por ID de recurso, así que **no hay superficie de IDOR**: la unidad de autorización es la conexión entera, no una fila.
+4. **¿Qué datos toca y de quién?** Datos de proveedores, empleados y operación de Construplaza. Las conexiones de Postgres son de `dev`/`qa`. Las de SQL Server son **copias de producción** (`EXACTUS` 395 GB, `BI` 177 GB, `COMPRAS` 107 GB): los tamaños no son de desarrollo. No hay acceso por ID de recurso. **Hasta v30, la unidad de autorización era la conexión entera.** Desde v31, en las entradas con `sesion`, hay además autorización **por fila**: el RLS de la base filtra por el tenant que fija el plugin (`AC64`). Esa superficie necesita que la consulta del usuario no pueda cambiar el parámetro de sesión. **La review de v31, ronda 1, encontró una forma de cambiarlo (`E24`)**: hasta que entre la regla que la cierra, con su AC negativo, el alcance por tenant **no es una barrera** y v31 no se despliega. Las columnas sensibles que el tenant destraba se redactan por nombre (`AC65`), como higiene y no como barrera (`D91`).
 
 ### Riesgo aceptado, con dueño
 
@@ -467,7 +468,7 @@ concerns:
   seo:           n/a        # sin frontend
 ```
 
-- **security** (blocking): threat model de arriba; ACs negativos AC15–AC25, AC31, AC33, AC35.
+- **security** (blocking): threat model de arriba; ACs negativos AC15–AC25, AC31, AC33, AC35, y desde v31 los de `AC64` (un tenant que falta o no es UUID no corre; el catálogo rechaza un parámetro fuera de patrón) y `AC65`. Falta el AC negativo de que la consulta no pueda cambiar el parámetro de sesión (`E24`).
 - **observability** (blocking): AC30 (bitácora por invocación) y AC29 (`application_name` que distingue el rol del lado del motor). Cómo se detecta que se rompió: toda invocación con exit code distinto de 0 deja su línea en la bitácora con la causa.
 - **data-privacy** (blocking): AC25 cierra el ítem de PII y credenciales fuera de logs y mensajes de error; AC26 y AC27 acotan los campos expuestos a lo que la consulta pida, con tope duro. Retención y borrado: `N/A — el plugin no crea datos personales nuevos, sólo lee`. Datos personales hacia terceros: **riesgo aceptado con dueño** (ver arriba), no AC.
 - **performance** (advisory): `PERF1` — una consulta que recorre una tabla sin índice sobre `BI` o `EXACTUS` es responsabilidad de quien la escribe; el servidor la corta a los 120 s. El reviewer lo reporta, no lo bloquea.
@@ -537,6 +538,7 @@ Arreglo de objetos. El validador **rechaza cualquier campo no listado acá** y c
 | `secret_id` | requerido | identificador o ARN del secreto | el catálogo entero se rechaza |
 | `region` | requerido | cadena no vacía | el catálogo entero se rechaza |
 | `garantias` | requerido | arreglo de al menos un objeto. Cada objeto lleva `nombre` —exactamente `rol-solo-lectura`, `sesion-read-only`, `endpoint-replica-lectura` o `deny-escritura` (v4)— y `nivel` —exactamente `incondicional` o `condicional` (v15)—. Un objeto con `nivel` = `condicional` lleva además `condicion`, cadena no vacía; uno `incondicional` no la lleva. Ningún otro campo | el catálogo entero se rechaza |
+| `sesion` | opcional (v31, `AC64`) | sólo en `postgres`: objeto con exactamente `parametro` (`<prefijo>.<nombre>`), `formato` (`uuid` o `uuid_lista`), `tenants` (nombres; con `uuid`, exactamente uno) y `alcance` (texto no vacío). Nunca un UUID: los valores salen del secreto, como `tenant_<nombre>` |
 
 **No existe un campo de usuario ni de contraseña.** Los dos salen del secreto, que tiene la forma estándar de RDS: un campo llamado `username` y otro llamado `password`, ambos en la carga JSON del secreto.
 
@@ -550,6 +552,7 @@ Arreglo de objetos. El validador **rechaza cualquier campo no listado acá** y c
   "dialecto": "<postgres|sqlserver>",
   "aislamiento": "READ UNCOMMITTED",        // sólo en sqlserver (v29, AC62)
   "aviso": "Corrió en READ UNCOMMITTED: …", // sólo en sqlserver (v29, AC62)
+  "columnas_redactadas": [ "<nombre>" ],     // sólo si se redactó alguna (v31, AC65)
   "filas": [ { ... } ],
   "filas_devueltas": <entero>,
   "truncado": <booleano>,
@@ -573,7 +576,7 @@ Arreglo con `nombre`, `dialecto`, `ambiente`, `base`, `garantias` y, desde v31, 
 | Uso incorrecto (falta `conexion` o `sql`) | 2 | `{ "error": "uso" }` con la firma esperada |
 | Nombre de conexión ausente del catálogo | 3 | `{ "error": "conexion_desconocida" }` con la lista de nombres válidos |
 | Sentencia rechazada por la lista blanca | 4 | `{ "error": "no_es_lectura" }` con los primeros 90 caracteres de la sentencia ofensora |
-| Secreto que no resuelve | 5 | `{ "error": "secreto_inaccesible" }` con nombre de conexión e identificador del secreto, sin la respuesta cruda de AWS |
+| Secreto que no resuelve | 5 | `{ "error": "secreto_inaccesible" }` con nombre de conexión e identificador del secreto, sin la respuesta cruda de AWS. Desde v31, también si al secreto le falta un `tenant_<nombre>` de la entrada o no es un UUID: el mensaje nombra la clave, nunca el valor (`AC64`) |
 | Conexión rechazada o caída | 6 | `{ "error": "conexion_fallida" }` con el mensaje del cliente, sin la credencial. En SQL Server el mensaje sale de stdout (v25, `AC57`) |
 | Tiempo agotado — en Postgres, el `statement_timeout` del rol (60 s desde v19); en SQL Server, `sqlcmd -t 60` (v25, `AC54`); en los dos motores, el corte del proceso a los 125 s | 7 | `{ "error": "tiempo_agotado" }` |
 | Binario del cliente ausente | 8 | `{ "error": "cliente_ausente" }` nombrando el binario que falta |
@@ -839,7 +842,7 @@ En v30 también se verifica que el aviso nombre el mismo nivel que el campo `ais
 - **Valor**: cada tenant es la clave `tenant_<nombre>` del mismo secreto de la entrada. Tiene que ser un UUID canónico; se baja a minúsculas. `uuid_lista` los une con coma y sin espacios, en el orden del catálogo.
 - **Si falta un tenant o no es un UUID**: código 5 (`secreto_inaccesible`), con el nombre de la clave y sin su valor, y `psql` no se invoca.
 - **Comando**: un `--command` `SET <parametro> = '<valor>'` entre la guarda de réplica y el SQL del consumidor. Una entrada sin `sesion` no manda ningún `SET`.
-- **`listar_conexiones`** muestra `sesion` con `parametro`, `tenants` y `alcance` (`null` sin bloque), nunca un UUID.
+- **`listar_conexiones`** muestra `sesion` con exactamente `parametro`, `tenants` y `alcance`, y `null` en una entrada sin bloque. Nunca un UUID. "Nunca un UUID" vale para el catálogo y para `listar_conexiones`: el consumidor puede ver el UUID igual, en una columna `tenant_id` o leyendo el parámetro de sesión.
 - El catálogo real lo declara sólo en `smartcheck-qa`: `app.tenant_ids`, `uuid_lista`, `["construplaza"]` (decisión de Ian Vargas, 1-oct).
 
 Casos en `SDD/tests/test_catalogo.sh` y `SDD/tests/test_servidor_mcp.sh`, asserts `AC64`. **Mutaciones declaradas**:
@@ -853,16 +856,22 @@ Casos en `SDD/tests/test_catalogo.sh` y `SDD/tests/test_servidor_mcp.sh`, assert
 - (h) el validador sin el patrón del parámetro, los dos del parámetro;
 - (i) el validador acepta `sesion` en `sqlserver`, el de esa forma;
 - (j) el validador sin exigir que `alcance` diga algo, el del alcance en blanco (un `alcance` ausente ya lo frena la lista de campos requeridos);
-- (k) el mensaje de error incluye el valor, el de "no repite el valor".
+- (k) el mensaje de error incluye el valor, el de "no repite el valor";
+- (l) sin bajar a minúsculas, el del UUID en mayúsculas;
+- (m) proyectar `sesion` entera, con `formato`, el de las claves exactas;
+- (n) proyectar `sesion` sin `null` en una entrada sin bloque (`undefined`), el mismo.
 **Parte `manual-only`**, contra la base real a través del plugin: en `smartcheck-qa`, `count(*)` de `smartcheck.requests` da 2998 y `count(DISTINCT tenant_id)` da 1 (lo medido por Patrick el 1-oct); en `proveedores-dev` la consulta responde igual que antes.
 
-**AC65** (detección, v31) — En la respuesta de `consultar`, en los dos dialectos, el valor de toda columna cuyo nombre contenga `token`, `secret`, `password`, `passwd`, `key_hash` o `api_key`/`apikey` (sin mirar mayúsculas) se reemplaza por `[redactado]`; un nulo queda nulo. La respuesta lleva `columnas_redactadas`, con sus nombres, antes de `filas`, y sólo si hubo alguna. Se redacta antes de los topes. **Es por nombre**: una columna renombrada en la consulta no se detecta. Protege de la exposición accidental, no es una barrera de acceso (decisión de Ian, 1-oct). Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC65`. **Mutaciones declaradas**:
+**AC65** (detección, v31) — En la respuesta de `consultar`, en los dos dialectos, el valor de toda columna cuyo nombre contenga `token`, `secret`, `password`, `passwd`, `key_hash` o `api_key`/`apikey` (sin mirar mayúsculas) se reemplaza por `[redactado]`, también si está vacío o es nulo: `psql --csv` entrega un NULL como campo vacío, y el parser no los distingue (review de v31, ronda 1). La respuesta lleva `columnas_redactadas`, con sus nombres, antes de `filas`, y sólo si hubo alguna. Se redacta antes de los topes. **Es por nombre**: una columna renombrada en la consulta no se detecta. Protege de la exposición accidental, no es una barrera de acceso (decisión de Ian, 1-oct). Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC65`. **Mutaciones declaradas**:
 - (a) sin redactar, los del valor y el de `[redactado]`;
 - (b) sin `columnas_redactadas`, el de esa lista;
 - (c) el patrón sensible a mayúsculas, el de los patrones;
-- (d) redactar también el nulo, el mismo;
+- (d) dejar sin redactar el vacío, el del valor vacío;
+- (f) redactar sólo en `postgres`, los de SQL Server;
+- (g) redactar después de los topes, los del token de más de 1 MiB;
 - (e) sin `passwd`, el mismo.
 **Parte `manual-only`**, contra la base real a través del plugin: una consulta a una tabla con una columna `token` la devuelve redactada.
+**Límites conocidos** (`D91`): es por nombre, así que una columna renombrada no se detecta, y el `mensaje` de un error de `psql` puede traer el valor de una columna (por ejemplo, en un error de conversión).
 
 **AC51** (detección) — La normalización de la lista blanca es **un solo recorrido de izquierda a derecha** que conoce las reglas de comillado de cada dialecto, de modo que **el validador ve las mismas sentencias que ejecuta el motor**:
 - **en los dos dialectos**: literales entre comillas simples con `''` como escape; identificadores entre comillas dobles con `""` como escape (se copian tal cual); comentarios de línea (`--` hasta el fin de línea); comentarios de bloque **anidados**;

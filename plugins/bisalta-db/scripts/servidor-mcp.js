@@ -112,8 +112,10 @@ const COLUMNA_SENSIBLE = /token|secret|pass(?:word|wd)|key_hash|api_?key/i;
 const VALOR_REDACTADO = '[redactado]';
 
 /**
- * Reemplaza el valor de las columnas sensibles y devuelve cuáles fueron. Un
- * nulo queda nulo: dice que no hay dato, y no expone nada.
+ * Reemplaza el valor de las columnas sensibles y devuelve cuáles fueron.
+ * Todo valor, también el vacío y el nulo: `psql --csv` entrega un NULL como
+ * campo vacío y el parser no los distingue (review de v31, ronda 1), así que
+ * dejar pasar uno de los dos dejaría pasar los dos.
  */
 function redactarColumnasSensibles(filas) {
   const redactadas = [];
@@ -123,7 +125,7 @@ function redactarColumnasSensibles(filas) {
     Object.keys(fila).forEach(function (columna) {
       if (COLUMNA_SENSIBLE.test(columna)) {
         if (!Object.prototype.hasOwnProperty.call(vistas, columna)) { vistas[columna] = true; redactadas.push(columna); }
-        copia[columna] = fila[columna] === null ? null : VALOR_REDACTADO;
+        copia[columna] = VALOR_REDACTADO;
       } else {
         copia[columna] = fila[columna];
       }
@@ -287,7 +289,10 @@ const HERRAMIENTAS = [
       'confirmadas (un COUNT o un total pueden dar mal) o cortar con el error 601. Las respuestas exitosas de ' +
       'SQL Server lo repiten en los campos aislamiento y aviso, y sus errores de consulta, en aislamiento. ' +
       'En Postgres, si la conexión no llegó a una réplica de lectura, se niega con no_es_replica sin ' +
-      'ejecutar el SQL. Tope de ' + LIMITE_FILAS + ' filas y ' + LIMITE_BYTES + ' bytes.',
+      'ejecutar el SQL. En una conexión multitenant (la que tiene sesion en listar_conexiones), el plugin fija ' +
+      'el tenant antes de la consulta. Las columnas cuyo nombre indica una credencial (token, secret, password, ' +
+      'key_hash, api_key) salen como [redactado], y columnas_redactadas dice cuáles. Tope de ' + LIMITE_FILAS +
+      ' filas y ' + LIMITE_BYTES + ' bytes.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -302,7 +307,8 @@ const HERRAMIENTAS = [
   {
     name: 'listar_conexiones',
     description: 'Lista las conexiones disponibles con su dialecto, ambiente, base y las garantías de solo ' +
-      'lectura que cada una tiene. No expone host, puerto, identificador del secreto ni región.',
+      'lectura que cada una tiene, y en las multitenant, sesion: el parámetro, los tenants y qué destraba. ' +
+      'No expone host, puerto, identificador del secreto, región ni ningún UUID de tenant.',
     inputSchema: { type: 'object', properties: {}, required: [] }
   }
 ];

@@ -200,7 +200,18 @@ case "${BISALTA_STUB_PSQL_MODO:-normal}" in
     ;;
   # AC65 (v31): columnas cuyo nombre indica una credencial, junto a otras que no.
   columnas-sensibles)
-    printf 'id,token,api_key,user_email\n1,valor-sensible-abc,valor-sensible-def,persona@ejemplo.com\n'
+    printf 'id,token,api_key,user_email\n1,valor-sensible-abc,valor-sensible-def,persona@ejemplo.com\n2,,,\n'
+    ;;
+  # La misma forma para sqlcmd: separador 0x1F y la línea de guiones.
+  columnas-sensibles-mssql)
+    s="$(printf '\037')"
+    printf 'id%stoken%suser_email\n--%s-----%s----------\n1%svalor-sensible-mssql%spersona@ejemplo.com\n' "$s" "$s" "$s" "$s" "$s" "$s"
+    ;;
+  # Un token de más de 1 MiB: sin redactar, la fila no entra en el tope de bytes.
+  token-enorme)
+    printf 'id,token\n1,'
+    head -c 1100000 /dev/zero | tr '\0' 'z'
+    printf '\n'
     ;;
 esac
 STUB
@@ -856,6 +867,14 @@ for caso in falta no-uuid inyeccion; do
 done
 assert_no_contains "$cuerpo_f" "SELECT 1; --" "AC64 el error no repite el valor del secreto"
 export BISALTA_STUB_EXTRA=", \"tenant_construplaza\": \"$TENANT_PRUEBA\""
+# Un UUID en mayúsculas en el secreto viaja en minúsculas.
+TENANT_MAYUS='ABCDEF12-3456-4789-8ABC-DEF012345678'
+export BISALTA_STUB_EXTRA=", \"tenant_construplaza\": \"$TENANT_MAYUS\""
+reiniciar_registros
+servidor_jsonrpc "$(trama_consultar 1 'smartcheck-qa' 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
+assert_contains "$(grep '^ARG ' "$TMP_DIR/psql-invocado.log")" "ARG SET app.tenant_ids = 'abcdef12-3456-4789-8abc-def012345678'" \
+  "AC64 un UUID en mayúsculas en el secreto viaja en minúsculas"
+export BISALTA_STUB_EXTRA=", \"tenant_construplaza\": \"$TENANT_PRUEBA\""
 # uuid_lista con dos tenants: separados por coma y sin espacios.
 TENANT_OTRO='aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
 CATALOGO_DOS="$TMP_DIR/catalogo-dos-tenants.json"
@@ -871,6 +890,12 @@ cuerpo_l="$(cuerpos "$(servidor_jsonrpc '{"jsonrpc":"2.0","id":1,"method":"tools
 assert_contains "$cuerpo_l" '"tenants":["construplaza"]' "AC64 listar_conexiones muestra el tenant de smartcheck-qa por nombre"
 assert_contains "$cuerpo_l" '43 tablas del esquema smartcheck' "AC64 listar_conexiones muestra el alcance"
 assert_no_contains "$cuerpo_l" "$TENANT_PRUEBA" "AC64 listar_conexiones no muestra ningún UUID"
+proyeccion="$("$NODE_BIN" -e "
+const c=JSON.parse(process.argv[1]).conexiones;
+const sc=c.find(x=>x.nombre==='smartcheck-qa'); const pd=c.find(x=>x.nombre==='proveedores-dev');
+process.stdout.write(Object.keys(sc.sesion).join(',')+'|'+sc.sesion.parametro+'|'+JSON.stringify(pd.sesion));" "$cuerpo_l")"
+assert_eq "$proyeccion" "parametro,tenants,alcance|app.tenant_ids|null" \
+  "AC64 listar_conexiones proyecta sesion con parametro, tenants y alcance, y null sin bloque"
 
 # ---------------------------------------------------------------------------
 # AC65 (v31) — las columnas cuyo nombre indica una credencial se redactan
@@ -886,6 +911,8 @@ assert_no_contains "$cuerpo_r" 'valor-sensible-def' "AC65 el valor de api_key no
 assert_contains "$cuerpo_r" '"token":"[redactado]"' "AC65 token queda como [redactado]"
 assert_contains "$cuerpo_r" '"user_email":"persona@ejemplo.com"' "AC65 (control) una columna sin nombre sensible no se toca"
 assert_contains "$cuerpo_r" '"columnas_redactadas":["token","api_key"]' "AC65 la respuesta dice qué columnas se redactaron"
+vacio_r="$("$NODE_BIN" -e "const f=JSON.parse(process.argv[1]).filas[1];process.stdout.write(f.token+'|'+f.api_key+'|'+f.user_email)" "$cuerpo_r")"
+assert_eq "$vacio_r" "[redactado]|[redactado]|" "AC65 un valor vacío (un NULL de psql) también se redacta, y una columna no sensible vacía queda vacía"
 orden_r="$("$NODE_BIN" -e "process.stdout.write(Object.keys(JSON.parse(process.argv[1])).join(','))" "$cuerpo_r")"
 assert_eq "$orden_r" "conexion,dialecto,columnas_redactadas,filas,filas_devueltas,truncado,motivo_truncado" "AC65 columnas_redactadas va antes de las filas"
 reiniciar_registros
@@ -899,8 +926,25 @@ const nombres=['secret'+'_key','db_'+'pass'+'word','pass'+'wd','api'+'key','KEY'
 const fila={};nombres.forEach(function(n){fila[n]='v';});fila['nulo'+'_token']=null;
 const r=s.redactarColumnasSensibles([fila]);
 process.stdout.write(r.redactadas.join(',')+'|'+r.filas[0].monto+'|'+r.filas[0].nulo_token);")"
-assert_eq "$patrones" "secret_key,db_password,passwd,apikey,KEY_HASH,refresh_token,nulo_token|v|null" \
-  "AC65 los patrones cubren secret, password, passwd, apikey, key_hash y token, sin mirar mayúsculas; un nulo queda nulo"
+assert_eq "$patrones" "secret_key,db_password,passwd,apikey,KEY_HASH,refresh_token,nulo_token|v|[redactado]" \
+  "AC65 los patrones cubren secret, password, passwd, apikey, key_hash y token, sin mirar mayúsculas; un nulo también se redacta"
+# En SQL Server, la misma redacción.
+BISALTA_STUB_PSQL_MODO=columnas-sensibles-mssql
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_rm="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+assert_contains "$cuerpo_rm" '"dialecto":"sqlserver"' "AC65 (control) la consulta sqlserver responde"
+assert_no_contains "$cuerpo_rm" 'valor-sensible-mssql' "AC65 en sqlserver el valor de token no sale"
+assert_contains "$cuerpo_rm" '"columnas_redactadas":["token"]' "AC65 en sqlserver la respuesta dice qué columnas se redactaron"
+# Se redacta antes de los topes: un token de más de 1 MiB, redactado, entra.
+BISALTA_STUB_PSQL_MODO=token-enorme
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_te="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS")")"
+BISALTA_STUB_PSQL_MODO=normal
+export BISALTA_STUB_PSQL_MODO
+assert_contains "$cuerpo_te" '"filas_devueltas":1' "AC65 una fila con un token de más de 1 MiB, redactada, entra en el tope de bytes"
+assert_contains "$cuerpo_te" '"truncado":false' "AC65 esa respuesta no se trunca, porque se mide después de redactar"
 
 # ---------------------------------------------------------------------------
 # AC55 (v25) — cifrado en Postgres

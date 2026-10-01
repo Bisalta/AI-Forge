@@ -5,8 +5,8 @@ Plugin de Claude Code que expone dos herramientas MCP para leer las bases de
 
 | Herramienta | Qué hace |
 |---|---|
-| `listar_conexiones()` | Lista las conexiones del catálogo con su dialecto, ambiente, base y las garantías de solo lectura de cada una. |
-| `consultar(conexion, sql)` | Corre una consulta de solo lectura y devuelve las filas. |
+| `listar_conexiones()` | Lista las conexiones del catálogo con su dialecto, ambiente, base y las garantías de solo lectura de cada una, y en las multitenant, `sesion` (el parámetro, los tenants y qué destraba). |
+| `consultar(conexion, sql)` | Corre una consulta de solo lectura y devuelve las filas, con las columnas sensibles redactadas. |
 
 ## Para qué existe
 
@@ -302,7 +302,7 @@ Algunas bases filtran por tenant con RLS: sin un parámetro de sesión, el rol v
 
 ## Columnas sensibles (v31, `AC65`)
 
-El valor de las columnas cuyo nombre contiene `token`, `secret`, `password`, `passwd`, `key_hash` o `api_key` sale como `[redactado]`, y la respuesta trae `columnas_redactadas` con cuáles. **Es por nombre**: si renombrás la columna en la consulta, no se detecta. Sirve para que una credencial no termine en el contexto por accidente, no para impedir que alguien la busque.
+El valor de las columnas cuyo nombre contiene `token`, `secret`, `password`, `passwd`, `key_hash`, `api_key` o `apikey` sale como `[redactado]`, también si está vacío o es nulo, y la respuesta trae `columnas_redactadas` con cuáles. **Es por nombre**: si renombrás la columna en la consulta, no se detecta. Sirve para que una credencial no termine en el contexto por accidente, no para impedir que alguien la busque.
 
 ## Quién consulta (v27, `AC60`)
 
