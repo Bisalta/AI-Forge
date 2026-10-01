@@ -10,7 +10,8 @@ Ian Vargas pidió una review profunda del PR #16 antes de pedírsela a Patrick, 
 - **`AC62`: el aviso es propio de cada nivel.** Antes interpolaba el nivel en un texto que sólo vale para `READ UNCOMMITTED`, así que cambiar el nivel daba un aviso falso. Ahora sale de un mapa nivel→aviso, y un nivel sin aviso escrito se rechaza: el módulo no carga y el servidor no arranca.
 - **`AC34`** (paga `D87`): su texto nombra la condición de versión que ya verificaba su assert. El assert ahora parsea la respuesta, en vez de buscar un literal con las claves en un orden fijo.
 - El test de `AC62` hace su propia consulta, en vez de usar las variables de un bloque anterior.
-- El CHANGELOG fecha la 0.2.0 el 1-oct, el día de la aprobación, y el README raíz suma `bisalta-db` a la tabla de plugins.
+- El CHANGELOG fecha la 0.2.0 el 1-oct, el día de la aprobación, y el README raíz suma `bisalta-db` a la tabla de plugins y a la estructura.
+- **Ronda 1 de la review: `REJECTED`** (`E23`), por dos cláusulas sin assert. Entran los casos de los códigos 5 y 8 de `AC63`, la carga de `conexion.js` con un nivel sin aviso, el aviso que nombra el nivel derivado del campo, y las mutaciones `AC63` (c) y `AC62` (h). Ronda 2: `APPROVED`.
 - **Quedan como deuda** (`D88`, `D89`): el aviso completo se repite en cada respuesta, y la bitácora no registra el nivel.
 
 ### Cambios v28 → v29 (el aviso del aislamiento viaja en la respuesta, 30-sep-2026)
@@ -804,7 +805,7 @@ Casos del test — rechazados: en `postgres`, `WITH x AS (INSERT INTO t VALUES (
 
 **AC62** (detección, v29) — En SQL Server, la respuesta de `consultar` lleva `aislamiento` y `aviso`, en ese orden, después de `dialecto` y antes de `filas`. `aislamiento` es el mismo nivel que viaja en el prefijo de `-Q` (`AC61`), y sale de la misma constante. `aviso` sale del mapa nivel→aviso de `conexion.js` (`avisoParaNivel`, v30), que rechaza un nivel sin aviso escrito. El de `READ UNCOMMITTED` empieza con `Corrió en READ UNCOMMITTED` y nombra las filas sin confirmar y las filas leídas dos veces o salteadas. En Postgres no aparece ninguno de los dos. Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC62`: el nivel, el nivel igual al enviado, el aviso, sus filas sin confirmar, sus filas salteadas, el orden de las claves, y en Postgres la ausencia de los dos campos, con su control. **Mutaciones declaradas**:
 - (a) sin los dos campos, los de nivel, aviso, sus dos cláusulas y orden;
-- (b) el nivel informado distinto del constante (`'READ COMMITTED'` a mano), los dos de nivel;
+- (b) el nivel informado distinto del constante (`'READ COMMITTED'` a mano), los dos de nivel y, desde v30, el del aviso que nombra el mismo nivel que el campo;
 - (c) los dos campos también en Postgres, los dos de ausencia;
 - (d) el aviso después de las filas, el del orden;
 - (e) el nivel del prefijo escrito a mano y no desde la constante, con otro valor: el de nivel igual al enviado y el de `AC61`;
