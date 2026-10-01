@@ -283,6 +283,9 @@ rechaza_sesion sesion-sin-tenants "sc.sesion.tenants=[]" "tenants vacío"
 rechaza_sesion sesion-tenant-raro "sc.sesion.tenants=['Construplaza Ltda']" "un tenant fuera de minúsculas, dígitos y guiones bajos"
 rechaza_sesion sesion-tenant-repetido "sc.sesion.tenants=['construplaza','construplaza']" "un tenant repetido"
 rechaza_sesion sesion-sin-alcance "delete sc.sesion.alcance" "sesion sin alcance"
+# Un alcance en blanco lo deja pasar la lista de campos requeridos: sólo lo
+# frena la regla propia del alcance (mutación AC64 (j)).
+rechaza_sesion sesion-alcance-blanco "sc.sesion.alcance='   '" "un alcance en blanco"
 rechaza_sesion sesion-campo-extra "sc.sesion.valor='976ab659-0000-0000-0000-000000000000'" "un campo de sesion no declarado (un valor escrito en el catálogo)"
 # Control: la misma entrada con formato uuid y un solo tenant es válida.
 ruta="$(fixture sesion-uuid-uno.json "$SC sc.sesion.formato='uuid';sc.sesion.parametro='app.tenant_id'")"

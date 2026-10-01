@@ -852,7 +852,7 @@ Casos en `SDD/tests/test_catalogo.sh` y `SDD/tests/test_servidor_mcp.sh`, assert
 - (g) el validador sin la regla de un solo tenant con `uuid`, el de esa forma;
 - (h) el validador sin el patrón del parámetro, los dos del parámetro;
 - (i) el validador acepta `sesion` en `sqlserver`, el de esa forma;
-- (j) el validador sin exigir `alcance`, el de esa forma;
+- (j) el validador sin exigir que `alcance` diga algo, el del alcance en blanco (un `alcance` ausente ya lo frena la lista de campos requeridos);
 - (k) el mensaje de error incluye el valor, el de "no repite el valor".
 **Parte `manual-only`**, contra la base real a través del plugin: en `smartcheck-qa`, `count(*)` de `smartcheck.requests` da 2998 y `count(DISTINCT tenant_id)` da 1 (lo medido por Patrick el 1-oct); en `proveedores-dev` la consulta responde igual que antes.
 
