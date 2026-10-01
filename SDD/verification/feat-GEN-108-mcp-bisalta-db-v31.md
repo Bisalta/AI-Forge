@@ -1,22 +1,22 @@
 # Gates run — generado por sdd-run-gates.sh v0.12.0
 
-- **Branch**: `feat-GEN-108-tenant-por-sesion` · **Commit**: `bc6a015` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-10-01T20:52:39Z
-- Tree: `8f8bc964125e2e67e8280e77a24c0d3f248fa05b` — LIMPIO
+- **Branch**: `feat-GEN-108-tenant-por-sesion` · **Commit**: `2c8c656` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-10-01T21:56:53Z
+- Tree: `2bea07d9cb78ec1bfa190613ba184a38e813c9f5` — LIMPIO
 - Este archivo lo escribió el runner, no un modelo. Editarlo a mano invalida la evidencia.
 
 | # | Gate | Comando | Exit | Timestamp UTC | Resultado |
 |---|---|---|---|---|---|
-| 1 | format / style | — | — | 2026-10-01T20:49:48Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
-| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-10-01T20:49:48Z | verde |
-| 3 | type-check | — | — | 2026-10-01T20:49:50Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
-| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-10-01T20:49:50Z | verde |
-| 5 | integration | — | — | 2026-10-01T20:51:10Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
-| 6 | build | — | — | 2026-10-01T20:51:10Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
-| 7 | e2e | — | — | 2026-10-01T20:51:10Z | [SKIPPED] sin comando en el doc (N/A) |
-| 8 | cobertura del diff | — | — | 2026-10-01T20:51:10Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
-| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-10-01T20:51:10Z | verde |
-| 10 | smoke manual | — | — | 2026-10-01T20:51:13Z | [SKIPPED] sin comando en el doc (N/A) |
-| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-10-01T20:51:13Z | verde |
+| 1 | format / style | — | — | 2026-10-01T21:53:58Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
+| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-10-01T21:53:58Z | verde |
+| 3 | type-check | — | — | 2026-10-01T21:53:59Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
+| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-10-01T21:53:59Z | verde |
+| 5 | integration | — | — | 2026-10-01T21:55:24Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
+| 6 | build | — | — | 2026-10-01T21:55:24Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
+| 7 | e2e | — | — | 2026-10-01T21:55:24Z | [SKIPPED] sin comando en el doc (N/A) |
+| 8 | cobertura del diff | — | — | 2026-10-01T21:55:24Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
+| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-10-01T21:55:24Z | verde |
+| 10 | smoke manual | — | — | 2026-10-01T21:55:27Z | [SKIPPED] sin comando en el doc (N/A) |
+| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-10-01T21:55:27Z | verde |
 
 ## Output por gate (últimas 15 líneas)
 
@@ -49,7 +49,7 @@ PASS  test_usage_summary.sh
 ### Gate 9 — security (exit 0)
 
 ```
-secret-scan: sin hallazgos sobre 190 archivos versionados (1 excluido: self)
+secret-scan: sin hallazgos sobre 191 archivos versionados (1 excluido: self)
 ```
 
 ### Gate — — suite completa (exit 0)
@@ -77,14 +77,14 @@ PASS  test_usage_summary.sh
 
 # Addendum del planner — v31 (NO lo escribió el runner)
 
-Salida literal de los scripts, pegados al final de cada sección. Las mutaciones y la medición en vivo corrieron sobre el árbol del código sellado arriba (`bc6a015`), con el árbol limpio al empezar y al terminar; cada salida dice sobre qué commit corrió.
+Salida literal de los scripts, pegados al final de cada sección. Las mutaciones y la medición en vivo corrieron sobre el árbol del código sellado arriba (`2c8c656`), con el árbol limpio al empezar y al terminar; cada salida dice sobre qué commit corrió.
 
 ## 1. En vivo, servidor del repo
 
 ```
-árbol bc6a015
+árbol 2c8c656
 ### AC64: smartcheck-qa con el tenant por sesión (esperado: 2998 filas, 1 tenant)
-{ "conexion": "smartcheck-qa", "dialecto": "postgres", "filas": [ { "filas": "2998", "tenants": "1" } ], "filas_devueltas": 1, "truncado": false, "motivo_truncado": null }
+{ "conexion": "smartcheck-qa", "dialecto": "postgres", "filas": [ { "filas": "3020", "tenants": "1" } ], "filas_devueltas": 1, "truncado": false, "motivo_truncado": null }
 ### AC64: proveedores-dev, sin sesion, responde igual que antes
 { "conexion": "proveedores-dev", "dialecto": "postgres", "filas": [ { "uno": "1" } ], "filas_devueltas": 1, "truncado": false, "motivo_truncado": null }
 ### AC65: una tabla con columna token sale redactada (sólo dos filas)
@@ -116,12 +116,13 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
 ## 2. Mutaciones de `AC64` y `AC65` — salida literal
 
 ```
-árbol bc6a015
+árbol 2c8c656
 
 ### AC64 (a) sin el --command del SET
 - verde (árbol real): exit=0 fail=0
-- mutado:             exit=1 fail=2
+- mutado:             exit=1 fail=3
       FAIL  AC64 el SET del tenant va entre la guarda de réplica y el SQL, con el valor del secreto — no encontré [ARG --command|ARG DO $guarda$ BEGIN IF NOT pg_is_in_recovery() THEN RAISE EXCEPTION 'bisalta-db: la conexion no llego a una replica de lectura'; END IF; END $guarda$|ARG --command|ARG SET app.tenant_ids = '11111111-2222-4333-8444-555555555555'|ARG --command|ARG SELECT 1|] en la salida
+      FAIL  AC64 un UUID en mayúsculas en el secreto viaja en minúsculas — no encontré [ARG SET app.tenant_ids = 'abcdef12-3456-4789-8abc-def012345678'] en la salida
       FAIL  AC64 uuid_lista une los tenants con coma y sin espacios, en el orden del catálogo — no encontré [ARG SET app.tenant_ids = '11111111-2222-4333-8444-555555555555,aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'] en la salida
 - verde (restaurado): exit=0 fail=0
 
@@ -203,38 +204,76 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
 
 ### AC65 (a) sin redactar
 - verde (árbol real): exit=0 fail=0
-- mutado:             exit=1 fail=6
+- mutado:             exit=1 fail=11
       FAIL  AC65 el valor de token no sale en la respuesta — encontré [valor-sensible-abc] y no debería estar
       FAIL  AC65 el valor de api_key no sale en la respuesta — encontré [valor-sensible-def] y no debería estar
       FAIL  AC65 token queda como [redactado] — no encontré ["token":"[redactado]"] en la salida
       FAIL  AC65 la respuesta dice qué columnas se redactaron — no encontré ["columnas_redactadas":["token","api_key"]] en la salida
+      FAIL  AC65 un valor vacío (un NULL de psql) también se redacta, y una columna no sensible vacía queda vacía
       FAIL  AC65 columnas_redactadas va antes de las filas
-      FAIL  AC65 los patrones cubren secret, password, passwd, apikey, key_hash y token, sin mirar mayúsculas; un nulo queda nulo
+      FAIL  AC65 los patrones cubren secret, password, passwd, apikey, key_hash y token, sin mirar mayúsculas; un nulo también se redacta
+      FAIL  AC65 en sqlserver el valor de token no sale — encontré [valor-sensible-mssql] y no debería estar
+      FAIL  AC65 en sqlserver la respuesta dice qué columnas se redactaron — no encontré ["columnas_redactadas":["token"]] en la salida
+      FAIL  AC65 una fila con un token de más de 1 MiB, redactada, entra en el tope de bytes — no encontré ["filas_devueltas":1] en la salida
+      FAIL  AC65 esa respuesta no se trunca, porque se mide después de redactar — no encontré ["truncado":false] en la salida
 - verde (restaurado): exit=0 fail=0
 
 ### AC65 (b) sin columnas_redactadas
 - verde (árbol real): exit=0 fail=0
-- mutado:             exit=1 fail=2
+- mutado:             exit=1 fail=3
       FAIL  AC65 la respuesta dice qué columnas se redactaron — no encontré ["columnas_redactadas":["token","api_key"]] en la salida
       FAIL  AC65 columnas_redactadas va antes de las filas
+      FAIL  AC65 en sqlserver la respuesta dice qué columnas se redactaron — no encontré ["columnas_redactadas":["token"]] en la salida
 - verde (restaurado): exit=0 fail=0
 
 ### AC65 (c) el patrón sensible a mayúsculas
 - verde (árbol real): exit=0 fail=0
 - mutado:             exit=1 fail=1
-      FAIL  AC65 los patrones cubren secret, password, passwd, apikey, key_hash y token, sin mirar mayúsculas; un nulo queda nulo
+      FAIL  AC65 los patrones cubren secret, password, passwd, apikey, key_hash y token, sin mirar mayúsculas; un nulo también se redacta
 - verde (restaurado): exit=0 fail=0
 
-### AC65 (d) redactar también el nulo
+### AC65 (d) dejar sin redactar el vacío
 - verde (árbol real): exit=0 fail=0
 - mutado:             exit=1 fail=1
-      FAIL  AC65 los patrones cubren secret, password, passwd, apikey, key_hash y token, sin mirar mayúsculas; un nulo queda nulo
+      FAIL  AC65 un valor vacío (un NULL de psql) también se redacta, y una columna no sensible vacía queda vacía
 - verde (restaurado): exit=0 fail=0
 
 ### AC65 (e) sin passwd
 - verde (árbol real): exit=0 fail=0
 - mutado:             exit=1 fail=1
-      FAIL  AC65 los patrones cubren secret, password, passwd, apikey, key_hash y token, sin mirar mayúsculas; un nulo queda nulo
+      FAIL  AC65 los patrones cubren secret, password, passwd, apikey, key_hash y token, sin mirar mayúsculas; un nulo también se redacta
+- verde (restaurado): exit=0 fail=0
+
+### AC64 (l) sin bajar a minúsculas
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=1
+      FAIL  AC64 un UUID en mayúsculas en el secreto viaja en minúsculas — no encontré [ARG SET app.tenant_ids = 'abcdef12-3456-4789-8abc-def012345678'] en la salida
+- verde (restaurado): exit=0 fail=0
+
+### AC64 (m) proyectar sesion entera
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=1
+      FAIL  AC64 listar_conexiones proyecta sesion con parametro, tenants y alcance, y null sin bloque
+- verde (restaurado): exit=0 fail=0
+
+### AC64 (n) sin null en una entrada sin bloque
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=1
+      FAIL  AC64 listar_conexiones proyecta sesion con parametro, tenants y alcance, y null sin bloque
+- verde (restaurado): exit=0 fail=0
+
+### AC65 (f) redactar sólo en postgres
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=2
+      FAIL  AC65 en sqlserver el valor de token no sale — encontré [valor-sensible-mssql] y no debería estar
+      FAIL  AC65 en sqlserver la respuesta dice qué columnas se redactaron — no encontré ["columnas_redactadas":["token"]] en la salida
+- verde (restaurado): exit=0 fail=0
+
+### AC65 (g) redactar después de los topes
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=2
+      FAIL  AC65 una fila con un token de más de 1 MiB, redactada, entra en el tope de bytes — no encontré ["filas_devueltas":1] en la salida
+      FAIL  AC65 esa respuesta no se trunca, porque se mide después de redactar — no encontré ["truncado":false] en la salida
 - verde (restaurado): exit=0 fail=0
 
 Árbol al terminar: limpio
@@ -313,10 +352,27 @@ mutar "AC65 (b) sin columnas_redactadas" "$SV" "$TS" \
 " ""
 mutar "AC65 (c) el patrón sensible a mayúsculas" "$SV" "$TS" \
   "/token|secret|pass(?:word|wd)|key_hash|api_?key/i;" "/token|secret|pass(?:word|wd)|key_hash|api_?key/;"
-mutar "AC65 (d) redactar también el nulo" "$SV" "$TS" \
-  "fila[columna] === null ? null : VALOR_REDACTADO" "VALOR_REDACTADO"
+mutar "AC65 (d) dejar sin redactar el vacío" "$SV" "$TS" \
+  "        copia[columna] = VALOR_REDACTADO;" "        copia[columna] = fila[columna] === '' ? '' : VALOR_REDACTADO;"
 mutar "AC65 (e) sin passwd" "$SV" "$TS" \
   "/token|secret|pass(?:word|wd)|key_hash|api_?key/i;" "/token|secret|password|key_hash|api_?key/i;"
+mutar "AC64 (l) sin bajar a minúsculas" "$CX" "$TS" \
+  "valores.push(valor.toLowerCase());" "valores.push(valor);"
+mutar "AC64 (m) proyectar sesion entera" "$CAT" "$TS" \
+  "    sesion: entrada.sesion === undefined ? null : {
+      parametro: entrada.sesion.parametro,
+      tenants: entrada.sesion.tenants,
+      alcance: entrada.sesion.alcance
+    }" "    sesion: entrada.sesion === undefined ? null : entrada.sesion"
+mutar "AC64 (n) sin null en una entrada sin bloque" "$CAT" "$TS" \
+  "    sesion: entrada.sesion === undefined ? null : {" "    sesion: entrada.sesion === undefined ? undefined : {"
+mutar "AC65 (f) redactar sólo en postgres" "$SV" "$TS" \
+  "  const redaccion = redactarColumnasSensibles(resultado.filas);" "  const redaccion = entrada.dialecto === 'postgres' ? redactarColumnasSensibles(resultado.filas) : { filas: resultado.filas, redactadas: [] };"
+mutar "AC65 (g) redactar después de los topes" "$SV" "$TS" \
+  "  const redaccion = redactarColumnasSensibles(resultado.filas);
+  const topes = aplicarTopes(redaccion.filas);" "  const topesCrudos = aplicarTopes(resultado.filas);
+  const redaccion = redactarColumnasSensibles(topesCrudos.filas);
+  const topes = Object.assign({}, topesCrudos, { filas: redaccion.filas });"
 echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio || echo SUCIO )"
 ```
 
