@@ -1,22 +1,22 @@
 # Gates run — generado por sdd-run-gates.sh v0.12.0
 
-- **Branch**: `feat-GEN-108-tenant-por-sesion` · **Commit**: `2c8c656` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-10-01T21:56:53Z
-- Tree: `2bea07d9cb78ec1bfa190613ba184a38e813c9f5` — LIMPIO
+- **Branch**: `feat-GEN-108-tenant-por-sesion` · **Commit**: `c11a810` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-10-02T12:50:02Z
+- Tree: `d4d6db3e6ccfffd8a42cac25c34158121f2f2a02` — LIMPIO
 - Este archivo lo escribió el runner, no un modelo. Editarlo a mano invalida la evidencia.
 
 | # | Gate | Comando | Exit | Timestamp UTC | Resultado |
 |---|---|---|---|---|---|
-| 1 | format / style | — | — | 2026-10-01T21:53:58Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
-| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-10-01T21:53:58Z | verde |
-| 3 | type-check | — | — | 2026-10-01T21:53:59Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
-| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-10-01T21:53:59Z | verde |
-| 5 | integration | — | — | 2026-10-01T21:55:24Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
-| 6 | build | — | — | 2026-10-01T21:55:24Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
-| 7 | e2e | — | — | 2026-10-01T21:55:24Z | [SKIPPED] sin comando en el doc (N/A) |
-| 8 | cobertura del diff | — | — | 2026-10-01T21:55:24Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
-| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-10-01T21:55:24Z | verde |
-| 10 | smoke manual | — | — | 2026-10-01T21:55:27Z | [SKIPPED] sin comando en el doc (N/A) |
-| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-10-01T21:55:27Z | verde |
+| 1 | format / style | — | — | 2026-10-02T12:47:10Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
+| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-10-02T12:47:10Z | verde |
+| 3 | type-check | — | — | 2026-10-02T12:47:11Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
+| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-10-02T12:47:11Z | verde |
+| 5 | integration | — | — | 2026-10-02T12:48:38Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
+| 6 | build | — | — | 2026-10-02T12:48:38Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
+| 7 | e2e | — | — | 2026-10-02T12:48:38Z | [SKIPPED] sin comando en el doc (N/A) |
+| 8 | cobertura del diff | — | — | 2026-10-02T12:48:38Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
+| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-10-02T12:48:38Z | verde |
+| 10 | smoke manual | — | — | 2026-10-02T12:48:41Z | [SKIPPED] sin comando en el doc (N/A) |
+| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-10-02T12:48:41Z | verde |
 
 ## Output por gate (últimas 15 líneas)
 
@@ -49,7 +49,7 @@ PASS  test_usage_summary.sh
 ### Gate 9 — security (exit 0)
 
 ```
-secret-scan: sin hallazgos sobre 191 archivos versionados (1 excluido: self)
+secret-scan: sin hallazgos sobre 192 archivos versionados (1 excluido: self)
 ```
 
 ### Gate — — suite completa (exit 0)
@@ -77,12 +77,12 @@ PASS  test_usage_summary.sh
 
 # Addendum del planner — v31 (NO lo escribió el runner)
 
-Salida literal de los scripts, pegados al final de cada sección. Las mutaciones y la medición en vivo corrieron sobre el árbol del código sellado arriba (`2c8c656`), con el árbol limpio al empezar y al terminar; cada salida dice sobre qué commit corrió.
+Salida literal de los scripts, pegados al final de cada sección. Las mutaciones y la medición en vivo corrieron sobre el árbol del código sellado arriba (`c11a810`), con el árbol limpio al empezar y al terminar; cada salida dice sobre qué commit corrió.
 
 ## 1. En vivo, servidor del repo
 
 ```
-árbol 2c8c656
+árbol c11a810
 ### AC64: smartcheck-qa con el tenant por sesión (esperado: 2998 filas, 1 tenant)
 { "conexion": "smartcheck-qa", "dialecto": "postgres", "filas": [ { "filas": "3020", "tenants": "1" } ], "filas_devueltas": 1, "truncado": false, "motivo_truncado": null }
 ### AC64: proveedores-dev, sin sesion, responde igual que antes
@@ -116,7 +116,7 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
 ## 2. Mutaciones de `AC64` y `AC65` — salida literal
 
 ```
-árbol 2c8c656
+árbol c11a810
 
 ### AC64 (a) sin el --command del SET
 - verde (árbol real): exit=0 fail=0
@@ -276,6 +276,34 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
       FAIL  AC65 esa respuesta no se trunca, porque se mide después de redactar — no encontré ["truncado":false] en la salida
 - verde (restaurado): exit=0 fail=0
 
+### AC47 v31-a apagar la regla identificador_unicode
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=10
+      FAIL  AC47 v31 caso 0 (postgres): el hueco: set_config escrito con escape Unicode
+      FAIL  AC47 v31 caso 1 (postgres): minuscula: U& no distingue mayusculas
+      FAIL  AC47 v31 caso 2 (postgres): con caracter de escape propio via UESCAPE
+      FAIL  AC47 v31 caso 3 (postgres): escondido dentro de un CTE
+      FAIL  AC47 v31 caso 4 (postgres): inocente, pero se rechaza igual: no decodificamos, rechazamos la forma
+      FAIL  AC47 v31 caso 0: el motivo es identificador_unicode
+      FAIL  AC47 v31 caso 1: el motivo es identificador_unicode
+      FAIL  AC47 v31 caso 2: el motivo es identificador_unicode
+      FAIL  AC47 v31 caso 3: el motivo es identificador_unicode
+      FAIL  AC47 v31 caso 4: el motivo es identificador_unicode
+- verde (restaurado): exit=0 fail=0
+
+### AC47 v31-b sin el borde de palabra
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=1
+      FAIL  AC47 v31 caso 6 (postgres): borde: col_u es un identificador y & es el operador; no es U&
+- verde (restaurado): exit=0 fail=0
+
+### AC47 v31-c distinguir mayúsculas
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=2
+      FAIL  AC47 v31 caso 1 (postgres): minuscula: U& no distingue mayusculas
+      FAIL  AC47 v31 caso 1: el motivo es identificador_unicode
+- verde (restaurado): exit=0 fail=0
+
 Árbol al terminar: limpio
 ```
 
@@ -373,6 +401,12 @@ mutar "AC65 (g) redactar después de los topes" "$SV" "$TS" \
   const topes = aplicarTopes(redaccion.filas);" "  const topesCrudos = aplicarTopes(resultado.filas);
   const redaccion = redactarColumnasSensibles(topesCrudos.filas);
   const topes = Object.assign({}, topesCrudos, { filas: redaccion.filas });"
+mutar "AC47 v31-a apagar la regla identificador_unicode" "$LB" "$TL" \
+  "    if (dialecto === 'postgres' && IDENTIFICADOR_UNICODE_POSTGRES.test(sentencia)) {" "    if (false) {"
+mutar "AC47 v31-b sin el borde de palabra" "$LB" "$TL" \
+  '/(^|[^A-Za-z0-9_$])[Uu]&"/' '/[Uu]&"/'
+mutar "AC47 v31-c distinguir mayúsculas" "$LB" "$TL" \
+  '[Uu]&"/;' 'U&"/;'
 echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio || echo SUCIO )"
 ```
 
