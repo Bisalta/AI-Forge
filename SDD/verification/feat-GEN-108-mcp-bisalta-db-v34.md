@@ -527,3 +527,7 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
 $ bash plugins/sdd-flow/scripts/sdd-lint-contract.sh SDD/contracts/2026-09-18-bisalta-db-mcp.md
 exit 0
 ```
+
+---
+
+**Superada por `feat-GEN-108-mcp-bisalta-db-v35.md`** (nota del planner, 2-oct-2026): en esta corrida, 2 de las 33 mutaciones no cayeron, AC66 (a) y (b). Ver `SDD/retro.md` RT61.

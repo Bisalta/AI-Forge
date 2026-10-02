@@ -1,6 +1,15 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v34
+- **Versión**: v35
+
+### Cambios v34 → v35 (los avisos del motor en los dos transportes, 2-oct-2026)
+
+Cambia la condición de aprobación de **`AC66`**, por eso el bump. Al sellar v34, 2 de sus 33 mutaciones no cayeron: AC66 (a) y (b). Con `FOR JSON`, los casos de AC66 pasaban por el parser de JSON, y el filtro del parser de tabla quedó sin ningún test que lo matara. El pipeline commiteó la evidencia igual, porque sólo frenaba con el runner en rojo (`RT61`).
+
+- **Casos nuevos**: el mismo aviso en la tabla de respaldo. El stub responde `Msg 13605` a la consulta con `FOR JSON` y la tabla con el aviso a la de respaldo.
+- **Mutación nueva** (d): el filtro del parser de JSON.
+- **Medido el 2-oct**, con una consulta sintética: en `FOR JSON`, el aviso llega después de la línea vacía que cierra el resultado. Por eso se sacó la búsqueda de avisos antes del encabezado: nunca aparece en vivo, y ningún test la mataba.
+- **El pipeline** ya no commitea la evidencia si alguna mutación no cae.
 
 ### Cambios v33 → v34 (el transporte de SQL Server, 2-oct-2026)
 
@@ -915,7 +924,10 @@ Casos en `SDD/tests/test_catalogo.sh` y `SDD/tests/test_servidor_mcp.sh`, assert
 **AC66** (detección, v33) — En SQL Server, una línea de la salida que no trae separador y empieza con `Warning: ` no es una fila. Es un aviso ANSI del motor, por ejemplo "Null value is eliminated by an aggregate…", que `sqlcmd` imprime en stdout. Va en `avisos_motor`, antes de `filas`, y sólo si hubo alguno. No cuenta en `filas_devueltas`. Una fila cuyo primer valor empieza igual pero trae separador sigue siendo una fila. **Límite conocido**: en un resultado de una sola columna, un valor que empiece con `Warning: ` se toma por aviso. Medido el 2-oct: `sqlcmd -m 11` no lo saca, porque no tiene nivel de severidad. `SET ANSI_WARNINGS OFF` se descartó, porque cambia la semántica de la consulta (por ejemplo, una división por cero deja de ser error). Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC66`. **Mutaciones declaradas**:
 - (a) sin apartar el aviso, los de `filas_devueltas` y `avisos_motor`;
 - (b) apartar toda línea que empiece con `Warning: `, aunque traiga separador, el del control;
-- (c) apartarlo sin informarlo, el de `avisos_motor`.
+- (c) apartarlo sin informarlo, el de `avisos_motor`;
+- (d) (v35) en JSON, sin apartar el aviso, el de `avisos_motor`.
+
+(a) y (b) se miden con los casos de la tabla de respaldo (v35). Con `FOR JSON`, el aviso llega después de la línea vacía que cierra el resultado y fuera del arreglo, y se aparta sólo por igualdad exacta con un aviso conocido. El **límite conocido** de arriba aplica sólo a la tabla de respaldo.
 **Parte `manual-only`**, contra la instancia real: una consulta con un `count` sobre una columna con nulos devuelve las filas sin el aviso, y el aviso en `avisos_motor`.
 
 **AC67** (detección, v34) — En SQL Server, el plugin le agrega a la consulta un salto de línea y `FOR JSON PATH, INCLUDE_NULL_VALUES`, y llama a `sqlcmd` con `-y 8000`. La salida es una columna con un nombre fijo, partida en trozos que se concatenan. Las filas son el arreglo JSON: un salto de línea llega dentro del valor, un texto largo llega entero y un número o un nulo llegan con su tipo JSON. Un resultado vacío da cero filas.

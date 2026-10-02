@@ -163,7 +163,7 @@ if printf '%s' "$*" | grep -q 'FOR JSON'; then
       printf '\n\n(1 rows affected)\n'
       exit 0 ;;
     json-vacio) printf '%s\n------\n\n(0 rows affected)\n' "$ENC_JSON"; exit 0 ;;
-    sin-nombre)
+    sin-nombre|aviso-ansi-tabla)
       printf 'Msg 13605, Level 16, State 1, Server EC2X, Line 1\nColumn expressions and data sources without names or aliases cannot be formatted as JSON text using FOR JSON clause.\n'
       exit 1 ;;
   esac
@@ -244,7 +244,7 @@ case "${BISALTA_STUB_PSQL_MODO:-normal}" in
   # AC66 (v33): un aviso ANSI de sqlcmd, en su línea y sin separador, después
   # de las filas; y una fila cuyo primer valor empieza igual pero trae
   # separador, que es un dato.
-  aviso-ansi)
+  aviso-ansi|aviso-ansi-tabla)
     s="$(printf '\037')"
     printf 'tipo%sn\n----%s-\nP%s6\nWarning: dato%s1\nWarning: Null value is eliminated by an aggregate or other SET operation.\n' "$s" "$s" "$s" "$s"
     ;;
@@ -1002,6 +1002,18 @@ assert_contains "$cuerpo_av" '"tipo":"Warning: dato"' "AC66 (control) un valor q
 reiniciar_registros
 cuerpo_sinav="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
 assert_no_contains "$cuerpo_sinav" 'avisos_motor' "AC66 sin avisos, la respuesta no trae avisos_motor"
+# v34: el mismo aviso en la tabla de respaldo (AC67). Sin este caso, el filtro
+# del parser de tabla no corría en ningún test (mutaciones AC66 (a) y (b)).
+BISALTA_STUB_PSQL_MODO=aviso-ansi-tabla
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_avt="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+BISALTA_STUB_PSQL_MODO=normal
+export BISALTA_STUB_PSQL_MODO
+assert_contains "$cuerpo_avt" '"formato_tabla"' "AC66 (control) el caso de respaldo se leyó como tabla"
+assert_contains "$cuerpo_avt" '"filas_devueltas":2' "AC66 en la tabla de respaldo el aviso no cuenta como fila"
+assert_contains "$cuerpo_avt" '"avisos_motor":["Warning: Null value is eliminated by an aggregate or other SET operation."]' "AC66 en la tabla de respaldo el aviso llega en avisos_motor"
+assert_contains "$cuerpo_avt" '"tipo":"Warning: dato"' "AC66 en la tabla de respaldo un valor que empieza con Warning: y trae separador sigue siendo una fila"
 
 # ---------------------------------------------------------------------------
 # AC67 (v34) — el transporte de SQL Server: FOR JSON, con la tabla de respaldo

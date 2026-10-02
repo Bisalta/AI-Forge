@@ -470,16 +470,15 @@ function parsearSalidaSqlserver(texto) {
  * AC67 (v34): la salida de una consulta con FOR JSON. El motor devuelve una
  * sola columna, con un nombre fijo, partida en trozos que se concatenan. Un
  * resultado vacío no trae ningún trozo. Los avisos ANSI conocidos se apartan
- * igual que en la tabla (AC66).
+ * igual que en la tabla (AC66), por igualdad exacta con AVISOS_ANSI_SQLSERVER.
  */
 function parsearSalidaJsonSqlserver(texto) {
   const lineas = String(texto).split(/\r?\n/);
   const avisos = [];
   let i = 0;
-  while (i < lineas.length && lineas[i].indexOf(ENCABEZADO_JSON_SQLSERVER) !== 0) {
-    if (AVISOS_ANSI_SQLSERVER.indexOf(lineas[i].replace(/\s+$/, '')) !== -1) avisos.push(lineas[i].replace(/\s+$/, ''));
-    i += 1;
-  }
+  // Medido en vivo (v34): el aviso llega después de la línea vacía que cierra
+  // el resultado, nunca antes del encabezado.
+  while (i < lineas.length && lineas[i].indexOf(ENCABEZADO_JSON_SQLSERVER) !== 0) i += 1;
   if (i >= lineas.length) {
     throw fallo(6, 'conexion_fallida', 'la salida de SQL Server no trae el resultado en JSON');
   }
