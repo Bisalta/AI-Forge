@@ -1,6 +1,15 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v32
+- **Versión**: v33
+
+### Cambios v32 → v33 (leer definiciones de SPs, y los avisos del motor, 2-oct-2026)
+
+Entra **`AC66`**, por eso el bump. Ian Vargas pidió que el equipo pueda leer el código de los SPs.
+
+- **Medido el 2-oct con el plugin**, sólo metadatos. En SQL Server el login no tiene `VIEW DEFINITION`: en EXACTUS se ven 0 de 37 SPs, 0 de 2024 triggers y 0 de 484 vistas, y en COMPRAS 0 de 6 SPs. En Postgres ya funciona: en proveedores-dev se ven las 57 funciones.
+- **El plugin no necesita cambios para leerlos.** `sys.sql_modules` y `OBJECT_DEFINITION` pasan la lista blanca, y `sp_helptext` no, porque es un `EXEC` y un nombre `sp_`. Va documentado en el README. El permiso lo da Patrick Ocampo: `GRANT VIEW DEFINITION TO bisalta_lectura` en las seis bases. Se lo pidió Ian el 2-oct.
+- **Riesgo aceptado por Ian (opción a, 2-oct)**: si un SP tiene una credencial escrita en su código, al leerlo termina en el contexto. La redacción de `AC65` no lo cubre, porque mira el nombre de la columna (`definition`), no el contenido. Queda como `D93`.
+- **`AC66`**, un defecto encontrado al medir: un aviso ANSI de `sqlcmd` llegaba como una fila más. Ahora se aparta y va en `avisos_motor`.
 
 ### Cambios v31 → v32 (lo que cambió la ronda 1 de la review de v31, 2-oct-2026)
 
@@ -564,6 +573,7 @@ Arreglo de objetos. El validador **rechaza cualquier campo no listado acá** y c
   "aislamiento": "READ UNCOMMITTED",        // sólo en sqlserver (v29, AC62)
   "aviso": "Corrió en READ UNCOMMITTED: …", // sólo en sqlserver (v29, AC62)
   "columnas_redactadas": [ "<nombre>" ],     // sólo si se redactó alguna (v31, AC65)
+  "avisos_motor": [ "Warning: …" ],          // sólo sqlserver, sólo si hubo (v33, AC66)
   "filas": [ { ... } ],
   "filas_devueltas": <entero>,
   "truncado": <booleano>,
@@ -885,6 +895,12 @@ Casos en `SDD/tests/test_catalogo.sh` y `SDD/tests/test_servidor_mcp.sh`, assert
 - (e) sin `passwd`, el mismo.
 **Parte `manual-only`**, contra la base real a través del plugin: una consulta a una tabla con una columna `token` la devuelve redactada.
 **Límites conocidos** (`D91`): es por nombre, así que una columna renombrada no se detecta, y el `mensaje` de un error de `psql` puede traer el valor de una columna (por ejemplo, en un error de conversión).
+
+**AC66** (detección, v33) — En SQL Server, una línea de la salida que no trae separador y empieza con `Warning: ` no es una fila. Es un aviso ANSI del motor, por ejemplo "Null value is eliminated by an aggregate…", que `sqlcmd` imprime en stdout. Va en `avisos_motor`, antes de `filas`, y sólo si hubo alguno. No cuenta en `filas_devueltas`. Una fila cuyo primer valor empieza igual pero trae separador sigue siendo una fila. **Límite conocido**: en un resultado de una sola columna, un valor que empiece con `Warning: ` se toma por aviso. Medido el 2-oct: `sqlcmd -m 11` no lo saca, porque no tiene nivel de severidad. `SET ANSI_WARNINGS OFF` se descartó, porque cambia la semántica de la consulta (por ejemplo, una división por cero deja de ser error). Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC66`. **Mutaciones declaradas**:
+- (a) sin apartar el aviso, los de `filas_devueltas` y `avisos_motor`;
+- (b) apartar toda línea que empiece con `Warning: `, aunque traiga separador, el del control;
+- (c) apartarlo sin informarlo, el de `avisos_motor`.
+**Parte `manual-only`**, contra la instancia real: una consulta con un `count` sobre una columna con nulos devuelve las filas sin el aviso, y el aviso en `avisos_motor`.
 
 **AC51** (detección) — La normalización de la lista blanca es **un solo recorrido de izquierda a derecha** que conoce las reglas de comillado de cada dialecto, de modo que **el validador ve las mismas sentencias que ejecuta el motor**:
 - **en los dos dialectos**: literales entre comillas simples con `''` como escape; identificadores entre comillas dobles con `""` como escape (se copian tal cual); comentarios de línea (`--` hasta el fin de línea); comentarios de bloque **anidados**;

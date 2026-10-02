@@ -249,6 +249,10 @@ function manejarConsultar(args) {
   if (redaccion.redactadas.length > 0) {
     cuerpo.columnas_redactadas = redaccion.redactadas;
   }
+  // AC66 (v33): los avisos del motor que no son filas, para que no se pierdan.
+  if (resultado.avisos && resultado.avisos.length > 0) {
+    cuerpo.avisos_motor = resultado.avisos;
+  }
   Object.assign(cuerpo, {
     filas: topes.filas,
     filas_devueltas: topes.filas.length,

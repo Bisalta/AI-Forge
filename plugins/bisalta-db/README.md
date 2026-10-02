@@ -304,6 +304,13 @@ Algunas bases filtran por tenant con RLS: sin un parámetro de sesión, el rol v
 
 El valor de las columnas cuyo nombre contiene `token`, `secret`, `password`, `passwd`, `key_hash`, `api_key` o `apikey` sale como `[redactado]`, también si está vacío o es nulo, y la respuesta trae `columnas_redactadas` con cuáles. **Es por nombre**: si renombrás la columna en la consulta, no se detecta. Sirve para que una credencial no termine en el contexto por accidente, no para impedir que alguien la busque.
 
+## Leer el código de SPs, vistas y triggers (v33)
+
+- **Postgres**: `SELECT pg_get_functiondef('<esquema>.<funcion>'::regproc)`, o `prosrc` de `pg_proc`. Ya funciona.
+- **SQL Server**: `SELECT definition FROM sys.sql_modules WHERE object_id = OBJECT_ID('dbo.<nombre>')`, o `SELECT OBJECT_DEFINITION(OBJECT_ID('dbo.<nombre>'))`. **`sp_helptext` no funciona**: es un `EXEC` sobre un `sp_`, y la lista blanca lo rechaza. Hace falta que el login tenga `VIEW DEFINITION` en la base; si no, la definición sale nula.
+- **Ojo**: si el código tiene una credencial escrita, la vas a ver, y queda en el transcript. Es un riesgo aceptado (`D93`).
+- Un aviso del motor, como "Null value is eliminated by an aggregate…", no llega como fila sino en `avisos_motor` (`AC66`).
+
 ## Quién consulta (v27, `AC60`)
 
 Todos entran con el mismo rol de Postgres y el mismo login de SQL Server. Para que el motor distinga personas, el nombre de la sesión lleva además un **seudónimo de quien consulta**, sacado de su identidad de AWS: `<usuario del secreto>/u-<8 hex>`. Por ejemplo, `claude_lectura/u-349175ad` en Postgres (`application_name`) y `bisalta_lectura/u-349175ad` en SQL Server (`HOST_NAME()`).

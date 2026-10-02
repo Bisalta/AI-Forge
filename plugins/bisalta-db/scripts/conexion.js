@@ -409,12 +409,21 @@ function parsearSalidaSqlserver(texto) {
   let columnas = null;
   let indiceUtil = 0;
   const objetos = [];
+  const avisos = [];
   for (let i = 0; i < lineas.length; i += 1) {
     const linea = lineas[i];
     if (linea.replace(/\s+/g, '') === '') continue;
     if (/^\(\d+ rows? affected\)/i.test(linea.replace(/^\s+/, ''))) continue;
     const celdas = linea.split(SEPARADOR_SQLSERVER);
     if (columnas === null) { columnas = celdas; indiceUtil = 1; continue; }
+    // AC66 (v33): un aviso ANSI del motor ("Warning: Null value is eliminated
+    // by an aggregate…") viaja por stdout, en su propia línea y sin
+    // separador. Medido el 2-oct: llegaba como una fila más, con el texto en
+    // la primera columna. No es un dato: se aparta y se informa. `-m 11` no lo
+    // saca (no tiene nivel de severidad), y SET ANSI_WARNINGS OFF cambiaría la
+    // semántica de la consulta. Límite: en un resultado de una sola columna,
+    // un valor que empiece con "Warning: " se toma por aviso.
+    if (celdas.length === 1 && /^Warning: /.test(linea)) { avisos.push(linea.replace(/\s+$/, '')); continue; }
     if (indiceUtil === 1 && /^-+$/.test(celdas[0].replace(/\s+/g, ''))) { indiceUtil = 2; continue; }
     indiceUtil = 2;
     const obj = {};
@@ -423,7 +432,7 @@ function parsearSalidaSqlserver(texto) {
     }
     objetos.push(obj);
   }
-  return { columnas: columnas || [], filas: objetos };
+  return { columnas: columnas || [], filas: objetos, avisos: avisos };
 }
 
 /**
@@ -504,7 +513,7 @@ function ejecutarConsulta(entrada, sql) {
 
     const salida = String(r.stdout);
     const resultado = entrada.dialecto === 'postgres' ? parsearCsv(salida) : parsearSalidaSqlserver(salida);
-    return { columnas: resultado.columnas, filas: resultado.filas, usuario: credencial.usuario, plan: plan };
+    return { columnas: resultado.columnas, filas: resultado.filas, avisos: resultado.avisos || [], usuario: credencial.usuario, plan: plan };
   } finally {
     // 🔴 EL BORRADO VA ACÁ Y NO DESPUÉS DEL `spawnSync`: corre también cuando
     // la consulta falla, que es justo el camino donde es fácil olvidarlo

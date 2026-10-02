@@ -207,6 +207,13 @@ case "${BISALTA_STUB_PSQL_MODO:-normal}" in
     s="$(printf '\037')"
     printf 'id%stoken%suser_email\n--%s-----%s----------\n1%svalor-sensible-mssql%spersona@ejemplo.com\n' "$s" "$s" "$s" "$s" "$s" "$s"
     ;;
+  # AC66 (v33): un aviso ANSI de sqlcmd, en su línea y sin separador, después
+  # de las filas; y una fila cuyo primer valor empieza igual pero trae
+  # separador, que es un dato.
+  aviso-ansi)
+    s="$(printf '\037')"
+    printf 'tipo%sn\n----%s-\nP%s6\nWarning: dato%s1\nWarning: Null value is eliminated by an aggregate or other SET operation.\n' "$s" "$s" "$s" "$s"
+    ;;
   # Un token de más de 1 MiB: sin redactar, la fila no entra en el tope de bytes.
   token-enorme)
     printf 'id,token\n1,'
@@ -945,6 +952,22 @@ BISALTA_STUB_PSQL_MODO=normal
 export BISALTA_STUB_PSQL_MODO
 assert_contains "$cuerpo_te" '"filas_devueltas":1' "AC65 una fila con un token de más de 1 MiB, redactada, entra en el tope de bytes"
 assert_contains "$cuerpo_te" '"truncado":false' "AC65 esa respuesta no se trunca, porque se mide después de redactar"
+
+# ---------------------------------------------------------------------------
+# AC66 (v33) — un aviso del motor no es una fila
+# ---------------------------------------------------------------------------
+BISALTA_STUB_PSQL_MODO=aviso-ansi
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_av="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+BISALTA_STUB_PSQL_MODO=normal
+export BISALTA_STUB_PSQL_MODO
+assert_contains "$cuerpo_av" '"filas_devueltas":2' "AC66 el aviso no cuenta como fila"
+assert_contains "$cuerpo_av" '"avisos_motor":["Warning: Null value is eliminated by an aggregate or other SET operation."]' "AC66 el aviso llega en avisos_motor"
+assert_contains "$cuerpo_av" '"tipo":"Warning: dato"' "AC66 (control) un valor que empieza con Warning: pero trae separador sigue siendo una fila"
+reiniciar_registros
+cuerpo_sinav="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+assert_no_contains "$cuerpo_sinav" 'avisos_motor' "AC66 sin avisos, la respuesta no trae avisos_motor"
 
 # ---------------------------------------------------------------------------
 # AC55 (v25) — cifrado en Postgres
