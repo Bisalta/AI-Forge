@@ -1,22 +1,22 @@
 # Gates run — generado por sdd-run-gates.sh v0.12.0
 
-- **Branch**: `feat-GEN-108-tenant-por-sesion` · **Commit**: `c11a810` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-10-02T12:50:02Z
-- Tree: `d4d6db3e6ccfffd8a42cac25c34158121f2f2a02` — LIMPIO
+- **Branch**: `feat-GEN-108-tenant-por-sesion` · **Commit**: `26cbe49` · **Doc**: `SDD/docs/doc_quality_gates.md` (`sha256:56736c3e5b778ea1`) · **Fecha**: 2026-10-02T15:26:26Z
+- Tree: `452dc757d8fa7cc8130124dec81633671f142e0a` — LIMPIO
 - Este archivo lo escribió el runner, no un modelo. Editarlo a mano invalida la evidencia.
 
 | # | Gate | Comando | Exit | Timestamp UTC | Resultado |
 |---|---|---|---|---|---|
-| 1 | format / style | — | — | 2026-10-02T12:47:10Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
-| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-10-02T12:47:10Z | verde |
-| 3 | type-check | — | — | 2026-10-02T12:47:11Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
-| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-10-02T12:47:11Z | verde |
-| 5 | integration | — | — | 2026-10-02T12:48:38Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
-| 6 | build | — | — | 2026-10-02T12:48:38Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
-| 7 | e2e | — | — | 2026-10-02T12:48:38Z | [SKIPPED] sin comando en el doc (N/A) |
-| 8 | cobertura del diff | — | — | 2026-10-02T12:48:38Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
-| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-10-02T12:48:38Z | verde |
-| 10 | smoke manual | — | — | 2026-10-02T12:48:41Z | [SKIPPED] sin comando en el doc (N/A) |
-| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-10-02T12:48:41Z | verde |
+| 1 | format / style | — | — | 2026-10-02T15:23:39Z | [SKIPPED] sin comando en el doc (N/A — shfmt no está instalado) |
+| 2 | lint | `shellcheck --severity=warning plugins/sdd-flow/scripts/*.sh plugins/sdd-flow/hooks/*.sh plugins/usage-monitor/scripts/*.sh SDD/tests/*.sh SDD/scripts/*.sh` | 0 | 2026-10-02T15:23:39Z | verde |
+| 3 | type-check | — | — | 2026-10-02T15:23:40Z | [SKIPPED] sin comando en el doc (N/A — bash no es tipado) |
+| 4 | unit tests | `bash SDD/tests/run.sh` | 0 | 2026-10-02T15:23:40Z | verde |
+| 5 | integration | — | — | 2026-10-02T15:24:59Z | [SKIPPED] sin comando en el doc (N/A — los tests del harness ya ejercitan los scripts end-to-end) |
+| 6 | build | — | — | 2026-10-02T15:24:59Z | [SKIPPED] sin comando en el doc (N/A — el plugin no compila) |
+| 7 | e2e | — | — | 2026-10-02T15:24:59Z | [SKIPPED] sin comando en el doc (N/A) |
+| 8 | cobertura del diff | — | — | 2026-10-02T15:24:59Z | [SKIPPED] sin comando en el doc (N/A — sin reporte de coverage; se verifica con el binding AC↔test) |
+| 9 | security | `bash SDD/tests/secret-scan.sh` | 0 | 2026-10-02T15:24:59Z | verde |
+| 10 | smoke manual | — | — | 2026-10-02T15:25:03Z | [SKIPPED] sin comando en el doc (N/A) |
+| — | suite completa | `bash SDD/tests/run.sh` | 0 | 2026-10-02T15:25:03Z | verde |
 
 ## Output por gate (últimas 15 líneas)
 
@@ -77,18 +77,20 @@ PASS  test_usage_summary.sh
 
 # Addendum del planner — v31 (NO lo escribió el runner)
 
-Salida literal de los scripts, pegados al final de cada sección. Las mutaciones y la medición en vivo corrieron sobre el árbol del código sellado arriba (`c11a810`), con el árbol limpio al empezar y al terminar; cada salida dice sobre qué commit corrió.
+Salida literal de los scripts, pegados al final de cada sección. Las mutaciones y la medición en vivo corrieron sobre el árbol del código sellado arriba (`26cbe49`), con el árbol limpio al empezar y al terminar; cada salida dice sobre qué commit corrió.
 
 ## 1. En vivo, servidor del repo
 
 ```
-árbol c11a810
+árbol 26cbe49
 ### AC64: smartcheck-qa con el tenant por sesión (esperado: 2998 filas, 1 tenant)
 { "conexion": "smartcheck-qa", "dialecto": "postgres", "filas": [ { "filas": "3020", "tenants": "1" } ], "filas_devueltas": 1, "truncado": false, "motivo_truncado": null }
 ### AC64: proveedores-dev, sin sesion, responde igual que antes
 { "conexion": "proveedores-dev", "dialecto": "postgres", "filas": [ { "uno": "1" } ], "filas_devueltas": 1, "truncado": false, "motivo_truncado": null }
 ### AC65: una tabla con columna token sale redactada (sólo dos filas)
 { "conexion": "smartcheck-qa", "dialecto": "postgres", "columnas_redactadas": [ "token" ], "filas": [ { "token": "[redactado]" }, { "token": "[redactado]" } ], "filas_devueltas": 2, "truncado": false, "motivo_truncado": null }
+### AC66: el aviso del motor va en avisos_motor, no en filas
+{ "conexion": "compras", "dialecto": "sqlserver", "aislamiento": "READ UNCOMMITTED", "aviso": "Corrió en READ UNCOMMITTED: puede incluir filas que otra transacción todavía no confirmó y, si alguien escribía mientras tanto, filas leídas dos veces o salteadas. Un COUNT o un total pueden estar mal.", "avisos_motor": [ "Warning: Null value is eliminated by an aggregate or other SET operation." ], "filas": [ { "tipo": "SQL_SCALAR_FUNCTION", "objetos": "1", "visibles": "0" }, { "tipo": "SQL_STORED_PROCEDURE", "objetos": "6", "visibles": "0" } ], "filas_devueltas": 2, "truncado": false, "motivo_truncado": null }
 Árbol al terminar: limpio
 ```
 
@@ -110,13 +112,15 @@ echo "### AC64: proveedores-dev, sin sesion, responde igual que antes"
 call proveedores-dev "SELECT 1 AS uno"
 echo "### AC65: una tabla con columna token sale redactada (sólo dos filas)"
 call smartcheck-qa "SELECT token FROM smartcheck.push_tokens LIMIT 2"
+echo "### AC66: el aviso del motor va en avisos_motor, no en filas"
+call compras "SELECT o.type_desc AS tipo, count(*) AS objetos, count(m.definition) AS visibles FROM sys.objects o LEFT JOIN sys.sql_modules m ON m.object_id = o.object_id WHERE o.type IN ('P','FN') GROUP BY o.type_desc"
 echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio || echo SUCIO )"
 ```
 
-## 2. Mutaciones de `AC64` y `AC65` — salida literal
+## 2. Mutaciones de `AC47` (regla de Patrick), `AC64`, `AC65` y `AC66` — salida literal
 
 ```
-árbol c11a810
+árbol 26cbe49
 
 ### AC64 (a) sin el --command del SET
 - verde (árbol real): exit=0 fail=0
@@ -304,6 +308,27 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
       FAIL  AC47 v31 caso 1: el motivo es identificador_unicode
 - verde (restaurado): exit=0 fail=0
 
+### AC66 (a) sin apartar el aviso
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=2
+      FAIL  AC66 el aviso no cuenta como fila — no encontré ["filas_devueltas":2] en la salida
+      FAIL  AC66 el aviso llega en avisos_motor — no encontré ["avisos_motor":["Warning: Null value is eliminated by an aggregate or other SET operation."]] en la salida
+- verde (restaurado): exit=0 fail=0
+
+### AC66 (b) apartar toda línea que empiece con Warning:
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=3
+      FAIL  AC66 el aviso no cuenta como fila — no encontré ["filas_devueltas":2] en la salida
+      FAIL  AC66 el aviso llega en avisos_motor — no encontré ["avisos_motor":["Warning: Null value is eliminated by an aggregate or other SET operation."]] en la salida
+      FAIL  AC66 (control) un valor que empieza con Warning: pero trae separador sigue siendo una fila — no encontré ["tipo":"Warning: dato"] en la salida
+- verde (restaurado): exit=0 fail=0
+
+### AC66 (c) apartarlo sin informarlo
+- verde (árbol real): exit=0 fail=0
+- mutado:             exit=1 fail=1
+      FAIL  AC66 el aviso llega en avisos_motor — no encontré ["avisos_motor":["Warning: Null value is eliminated by an aggregate or other SET operation."]] en la salida
+- verde (restaurado): exit=0 fail=0
+
 Árbol al terminar: limpio
 ```
 
@@ -311,7 +336,7 @@ echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio |
 
 ```bash
 #!/usr/bin/env bash
-# Mutaciones declaradas de AC64 y AC65 (contract v31). Cada una cambia una
+# Mutaciones declaradas de AC47 v31, AC64, AC65 y AC66 (contract v33). Cada una cambia una
 # línea con reemplazo exacto (tiene que aparecer una sola vez), verifica que
 # se aplicó, corre el test del AC, restaura con git checkout y verifica que
 # se restauró. Imprime exit code, cantidad de asserts que caen y sus nombres.
@@ -407,6 +432,12 @@ mutar "AC47 v31-b sin el borde de palabra" "$LB" "$TL" \
   '/(^|[^A-Za-z0-9_$])[Uu]&"/' '/[Uu]&"/'
 mutar "AC47 v31-c distinguir mayúsculas" "$LB" "$TL" \
   '[Uu]&"/;' 'U&"/;'
+mutar "AC66 (a) sin apartar el aviso" "$CX" "$TS" \
+  "    if (celdas.length === 1 && /^Warning: /.test(linea)) { avisos.push(linea.replace(/\\s+\$/, '')); continue; }" ""
+mutar "AC66 (b) apartar toda línea que empiece con Warning:" "$CX" "$TS" \
+  "    if (celdas.length === 1 && /^Warning: /.test(linea)) {" "    if (/^Warning: /.test(linea)) {"
+mutar "AC66 (c) apartarlo sin informarlo" "$SV" "$TS" \
+  "    cuerpo.avisos_motor = resultado.avisos;" ""
 echo "Árbol al terminar: $( [ -z "$(git status --porcelain)" ] && echo limpio || echo SUCIO )"
 ```
 
