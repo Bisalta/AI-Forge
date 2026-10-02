@@ -304,10 +304,14 @@ Algunas bases filtran por tenant con RLS: sin un parámetro de sesión, el rol v
 
 El valor de las columnas cuyo nombre contiene `token`, `secret`, `password`, `passwd`, `key_hash`, `api_key` o `apikey` sale como `[redactado]`, también si está vacío o es nulo, y la respuesta trae `columnas_redactadas` con cuáles. **Es por nombre**: si renombrás la columna en la consulta, no se detecta. Sirve para que una credencial no termine en el contexto por accidente, no para impedir que alguien la busque.
 
-## Leer el código de SPs, vistas y triggers (v33)
+## Cómo llegan los datos de SQL Server (v34, `AC67`)
+
+El plugin le agrega `FOR JSON` a tu consulta. Así los textos largos llegan enteros, los saltos de línea quedan dentro del valor, y los números y los nulos llegan con su tipo, no como texto. Si la consulta tiene una columna **sin nombre** (`SELECT count(*)` sin alias) o dos columnas con el **mismo nombre**, `FOR JSON` no se puede aplicar: el plugin la lee como tabla y la respuesta trae `formato_tabla`, que avisa los límites (8000 caracteres, saltos de línea). **Poné un alias distinto a cada columna** y llega completa.
+
+## Leer el código de SPs, vistas y triggers (v33 y v34)
 
 - **Postgres**: `SELECT pg_get_functiondef('<esquema>.<funcion>'::regproc)`, o `prosrc` de `pg_proc`. Ya funciona.
-- **SQL Server**: `SELECT definition FROM sys.sql_modules WHERE object_id = OBJECT_ID('dbo.<nombre>')`, o `SELECT OBJECT_DEFINITION(OBJECT_ID('dbo.<nombre>'))`. **`sp_helptext` no funciona**: es un `EXEC` sobre un `sp_`, y la lista blanca lo rechaza. Hace falta que el login tenga `VIEW DEFINITION` en la base; si no, la definición sale nula.
+- **SQL Server**: `SELECT definition FROM sys.sql_modules WHERE object_id = OBJECT_ID('dbo.<nombre>')`, o `SELECT OBJECT_DEFINITION(OBJECT_ID('dbo.<nombre>'))`. **`sp_helptext` no funciona**: es un `EXEC` sobre un `sp_`, y la lista blanca lo rechaza. Hace falta que el login tenga `VIEW DEFINITION` en la base: lo dio Patrick el 2-oct en las seis. **Desde v34 la definición llega entera y con sus saltos de línea** (`AC67`). Hasta v33 se cortaba a 256 caracteres y se partía en filas.
 - **Ojo**: si el código tiene una credencial escrita, la vas a ver, y queda en el transcript. Es un riesgo aceptado (`D93`).
 - Un aviso del motor, como "Null value is eliminated by an aggregate…", no llega como fila sino en `avisos_motor` (`AC66`).
 

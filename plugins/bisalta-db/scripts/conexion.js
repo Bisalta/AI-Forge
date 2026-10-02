@@ -87,6 +87,10 @@ const AVISO_AISLAMIENTO_SQLSERVER = avisoParaNivel(NIVEL_AISLAMIENTO_SQLSERVER);
 // Separador de campos para SQL Server: un carácter de control que no aparece
 // en datos de texto normales (unit separator, 0x1F).
 const SEPARADOR_SQLSERVER = String.fromCharCode(31);
+// AC66 y AC67: los avisos ANSI del motor que se apartan en el formato JSON,
+// por texto exacto. En JSON una línea no puede ser un pedazo de dato que
+// empiece igual, pero tampoco se adivina: sólo los medidos.
+const AVISOS_ANSI_SQLSERVER = ['Warning: Null value is eliminated by an aggregate or other SET operation.'];
 // Nombre de la variable de entorno de la contraseña de sqlcmd, armado en dos
 // piezas a propósito: escrito entero y contiguo junto a su asignación, este
 // archivo dispararía el propio gate 9 (secret-scan) contra sí mismo.
@@ -339,7 +343,25 @@ function construirComandoPostgres(entrada, usuario, rutaPassfile, sql, identidad
 }
 
 /** Comando de SQL Server. La contraseña va por entorno, nunca por argv. */
-function construirComandoSqlserver(entrada, usuario, contrasena, sql, identidad) {
+// AC67 (v34): el transporte de SQL Server. Medido el 2-oct: en formato de
+// tabla, `sqlcmd` corta todo texto a 256 caracteres (5000 llegaron 256) y un
+// valor con saltos de línea se parte en varias filas, sin forma segura de
+// rearmarlo cuando el valor no está en la última columna. Con FOR JSON el
+// motor escapa los saltos de línea y parte el texto en trozos de 2033, que se
+// vuelven a juntar: un valor de 20000 caracteres llega entero. `-y 8000` hace
+// falta igual, porque si no, cada trozo se corta a 256; `-y 0` no sirve,
+// porque saca el encabezado. FOR JSON falla con una columna sin nombre (Msg
+// 13605) o con nombres repetidos (Msg 13601): ahí se vuelve a la tabla.
+const SUFIJO_JSON_SQLSERVER = '\nFOR JSON PATH, INCLUDE_NULL_VALUES';
+const ANCHO_SQLSERVER = '8000';
+const ENCABEZADO_JSON_SQLSERVER = 'JSON_F52E2B61-18A1-11d1-B105-00805F49916B';
+const SIN_JSON_SQLSERVER = /^Msg 1360[15],/m;
+
+function construirComandoSqlserver(entrada, usuario, contrasena, sql, identidad, formato) {
+  // El salto de línea antes de FOR JSON corta un comentario de línea con que
+  // termine la consulta. Un comentario de bloque sin cerrar ya lo rechaza la
+  // lista blanca (AC51).
+  const sufijo = formato === 'tabla' ? '' : SUFIJO_JSON_SQLSERVER;
   const env = {};
   env[VARIABLE_CREDENCIAL_SQLSERVER] = contrasena;
   return {
@@ -354,8 +376,9 @@ function construirComandoSqlserver(entrada, usuario, contrasena, sql, identidad)
       // AC60 (v27): `-H` fija lo que el motor muestra como `HOST_NAME()`. Sin
       // él, sqlcmd manda el nombre de la máquina, que no identifica a nadie.
       '-H', nombreDeSesion(usuario, identidad),
-      '-b', '-s', SEPARADOR_SQLSERVER, '-W', '-Q', AISLAMIENTO_SQLSERVER + sql],
-    env: env
+      '-b', '-y', ANCHO_SQLSERVER, '-s', SEPARADOR_SQLSERVER, '-W', '-Q', AISLAMIENTO_SQLSERVER + sql + sufijo],
+    env: env,
+    formato: formato === 'tabla' ? 'tabla' : 'json'
   };
 }
 
@@ -412,6 +435,14 @@ function parsearSalidaSqlserver(texto) {
   const avisos = [];
   for (let i = 0; i < lineas.length; i += 1) {
     const linea = lineas[i];
+    // AC67 (v34): una columna sin nombre deja la línea de encabezado vacía, y
+    // la primera no vacía es la de guiones. Se nombran por posición, para que
+    // la de guiones no pase por encabezado (medido el 2-oct: salía `-`).
+    if (columnas === null && /^-+$/.test(linea.split(SEPARADOR_SQLSERVER).join('').replace(/\s+/g, '')) && linea.indexOf('-') !== -1) {
+      columnas = linea.split(SEPARADOR_SQLSERVER).map(function (x, n) { return 'columna_' + (n + 1); });
+      indiceUtil = 2;
+      continue;
+    }
     if (linea.replace(/\s+/g, '') === '') continue;
     if (/^\(\d+ rows? affected\)/i.test(linea.replace(/^\s+/, ''))) continue;
     const celdas = linea.split(SEPARADOR_SQLSERVER);
@@ -433,6 +464,49 @@ function parsearSalidaSqlserver(texto) {
     objetos.push(obj);
   }
   return { columnas: columnas || [], filas: objetos, avisos: avisos };
+}
+
+/**
+ * AC67 (v34): la salida de una consulta con FOR JSON. El motor devuelve una
+ * sola columna, con un nombre fijo, partida en trozos que se concatenan. Un
+ * resultado vacío no trae ningún trozo. Los avisos ANSI conocidos se apartan
+ * igual que en la tabla (AC66).
+ */
+function parsearSalidaJsonSqlserver(texto) {
+  const lineas = String(texto).split(/\r?\n/);
+  const avisos = [];
+  let i = 0;
+  while (i < lineas.length && lineas[i].indexOf(ENCABEZADO_JSON_SQLSERVER) !== 0) {
+    if (AVISOS_ANSI_SQLSERVER.indexOf(lineas[i].replace(/\s+$/, '')) !== -1) avisos.push(lineas[i].replace(/\s+$/, ''));
+    i += 1;
+  }
+  if (i >= lineas.length) {
+    throw fallo(6, 'conexion_fallida', 'la salida de SQL Server no trae el resultado en JSON');
+  }
+  i += 1;
+  if (i < lineas.length && /^-+$/.test(lineas[i].replace(/\s+/g, ''))) i += 1;
+  const trozos = [];
+  let cerrado = false;
+  for (; i < lineas.length; i += 1) {
+    const linea = lineas[i];
+    if (AVISOS_ANSI_SQLSERVER.indexOf(linea.replace(/\s+$/, '')) !== -1) { avisos.push(linea.replace(/\s+$/, '')); continue; }
+    // Un trozo nunca está vacío: la primera línea vacía cierra el resultado,
+    // y después sólo se buscan avisos.
+    if (linea === '') { cerrado = true; continue; }
+    if (!cerrado) trozos.push(linea);
+  }
+  let filas = [];
+  if (trozos.length > 0) {
+    try {
+      filas = JSON.parse(trozos.join(''));
+    } catch (e) {
+      throw fallo(6, 'conexion_fallida', 'la salida de SQL Server no se pudo leer como JSON');
+    }
+  }
+  if (!Array.isArray(filas)) {
+    throw fallo(6, 'conexion_fallida', 'la salida de SQL Server no es un arreglo JSON');
+  }
+  return { columnas: filas.length > 0 ? Object.keys(filas[0]) : [], filas: filas, avisos: avisos };
 }
 
 /**
@@ -464,16 +538,27 @@ function ejecutarConsulta(entrada, sql) {
       fs.chmodSync(rutaPassfile, 0o600);
       plan = construirComandoPostgres(entrada, credencial.usuario, rutaPassfile, sql, identidad, credencial.valorSesion);
     } else {
-      plan = construirComandoSqlserver(entrada, credencial.usuario, credencial.contrasena, sql, identidad);
+      plan = construirComandoSqlserver(entrada, credencial.usuario, credencial.contrasena, sql, identidad, 'json');
     }
 
-    const entorno = Object.assign({}, process.env, plan.env);
-    const r = spawnSync(plan.comando, plan.args, {
-      encoding: 'utf8',
-      env: entorno,
-      maxBuffer: MAX_BUFFER,
-      timeout: TIMEOUT_PROCESO_MS
-    });
+    const correr = function (p) {
+      return spawnSync(p.comando, p.args, {
+        encoding: 'utf8',
+        env: Object.assign({}, process.env, p.env),
+        maxBuffer: MAX_BUFFER,
+        timeout: TIMEOUT_PROCESO_MS
+      });
+    };
+    let r = correr(plan);
+    // AC67 (v34): si FOR JSON no se puede aplicar a esta consulta (una columna
+    // sin nombre o repetida), se vuelve a correr en formato de tabla, y la
+    // respuesta lo dice. Cualquier otro error sigue su camino.
+    let respaldo = false;
+    if (entrada.dialecto === 'sqlserver' && r.status !== 0 && SIN_JSON_SQLSERVER.test(String(r.stdout))) {
+      plan = construirComandoSqlserver(entrada, credencial.usuario, credencial.contrasena, sql, identidad, 'tabla');
+      respaldo = true;
+      r = correr(plan);
+    }
 
     if (r.error && r.error.code === 'ENOENT') {
       throw fallo(8, 'cliente_ausente', 'falta el binario `' + plan.comando + '` en el PATH');
@@ -512,8 +597,9 @@ function ejecutarConsulta(entrada, sql) {
     }
 
     const salida = String(r.stdout);
-    const resultado = entrada.dialecto === 'postgres' ? parsearCsv(salida) : parsearSalidaSqlserver(salida);
-    return { columnas: resultado.columnas, filas: resultado.filas, avisos: resultado.avisos || [], usuario: credencial.usuario, plan: plan };
+    const resultado = entrada.dialecto === 'postgres' ? parsearCsv(salida)
+      : (plan.formato === 'json' ? parsearSalidaJsonSqlserver(salida) : parsearSalidaSqlserver(salida));
+    return { columnas: resultado.columnas, filas: resultado.filas, avisos: resultado.avisos || [], respaldo: respaldo, usuario: credencial.usuario, plan: plan };
   } finally {
     // 🔴 EL BORRADO VA ACÁ Y NO DESPUÉS DEL `spawnSync`: corre también cuando
     // la consulta falla, que es justo el camino donde es fácil olvidarlo
@@ -589,6 +675,7 @@ module.exports = {
   construirComandoSqlserver: construirComandoSqlserver,
   parsearCsv: parsearCsv,
   parsearSalidaSqlserver: parsearSalidaSqlserver,
+  parsearSalidaJsonSqlserver: parsearSalidaJsonSqlserver,
   redactar: redactar,
   TIMEOUT_SENTENCIA_MS: TIMEOUT_SENTENCIA_MS,
   PREFIJO_TEMP: PREFIJO_TEMP,

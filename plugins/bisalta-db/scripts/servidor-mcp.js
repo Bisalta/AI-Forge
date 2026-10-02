@@ -110,6 +110,10 @@ function aplicarTopes(filas) {
 // acceso lo decide el rol de la base (decisión de Ian, 1-oct).
 const COLUMNA_SENSIBLE = /token|secret|pass(?:word|wd)|key_hash|api_?key/i;
 const VALOR_REDACTADO = '[redactado]';
+// AC67 (v34): por qué una respuesta de SQL Server vino en formato de tabla.
+const AVISO_FORMATO_TABLA = 'Se leyó como tabla porque la consulta tiene una columna sin nombre o con un nombre ' +
+  'repetido: un texto de más de 8000 caracteres llega cortado, y un salto de línea dentro de un valor puede ' +
+  'partir la fila. Poné un alias distinto a cada columna.';
 
 /**
  * Reemplaza el valor de las columnas sensibles y devuelve cuáles fueron.
@@ -253,6 +257,10 @@ function manejarConsultar(args) {
   if (resultado.avisos && resultado.avisos.length > 0) {
     cuerpo.avisos_motor = resultado.avisos;
   }
+  // AC67 (v34): la consulta se leyó como tabla, con los límites de la tabla.
+  if (resultado.respaldo) {
+    cuerpo.formato_tabla = AVISO_FORMATO_TABLA;
+  }
   Object.assign(cuerpo, {
     filas: topes.filas,
     filas_devueltas: topes.filas.length,
@@ -291,7 +299,9 @@ const HERRAMIENTAS = [
       'READ UNCOMMITTED para no bloquear a quien escribe: puede devolver filas que otra transacción ' +
       'todavía no confirmó y, si alguien escribe mientras tanto, leer dos veces o saltear filas ya ' +
       'confirmadas (un COUNT o un total pueden dar mal) o cortar con el error 601. Las respuestas exitosas de ' +
-      'SQL Server lo repiten en los campos aislamiento y aviso, y sus errores de consulta, en aislamiento. ' +
+      'SQL Server lo repiten en los campos aislamiento y aviso, y sus errores de consulta, en aislamiento. Un aviso ' +
+      'del motor llega en avisos_motor. En SQL Server poné un alias distinto a cada columna: si falta o se repite, ' +
+      'la consulta se lee como tabla (formato_tabla) y un texto de más de 8000 caracteres llega cortado. ' +
       'En Postgres, si la conexión no llegó a una réplica de lectura, se niega con no_es_replica sin ' +
       'ejecutar el SQL. En una conexión multitenant (la que tiene sesion en listar_conexiones), el plugin fija ' +
       'el tenant antes de la consulta. Las columnas cuyo nombre indica una credencial (token, secret, password, ' +

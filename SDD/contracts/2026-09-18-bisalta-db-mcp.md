@@ -1,13 +1,28 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v33
+- **Versión**: v34
+
+### Cambios v33 → v34 (el transporte de SQL Server, 2-oct-2026)
+
+Entra **`AC67`**, por eso el bump. La ronda 1 de la review de v33 salió `ESCALATE` (`E27`). v33 afirmaba que leer SPs en SQL Server "no necesita cambios del plugin", y era falso: nunca se había leído una definición.
+
+- **Medido el 2-oct**, con valores sintéticos y sin leer el código de ningún SP:
+  - en formato de tabla, `sqlcmd` cortaba **todo** texto a 256 caracteres;
+  - un valor con saltos de línea se partía en varias filas, sin forma segura de rearmarlo cuando el valor no está en la última columna;
+  - en COMPRAS, 751 de 753 módulos superan los 256 caracteres y los 753 son multilínea.
+  
+  Era un defecto de transporte desde la primera versión, y afectaba a cualquier columna de texto largo, no sólo a los SPs.
+- **Decisión de Ian Vargas (2-oct)**: `FOR JSON` con la tabla de respaldo. La alternativa descartada era quedarse en tabla con `-y 8000` y recetas (`STRING_ESCAPE`, `SUBSTRING`).
+- **Cambio visible**: en SQL Server, los números y los nulos llegan con su tipo JSON, y ya no todo como texto.
+- **Patrick Ocampo dio `VIEW DEFINITION`** en las seis bases (2-oct). Verificado desde el plugin: en EXACTUS 3476 de 3497 módulos, y en COMPRAS 753 de 753. Además midió el riesgo de `D93`: hay 21 objetos que mencionan palabras de credencial, y ninguno tiene una asignación.
+- **`D92` pagada**: Patrick le sacó a `PUBLIC` el `EXECUTE` de las tres funciones `SECURITY DEFINER`. Hacerlo con `REVOKE … FROM claude_lectura` no habría servido, porque el permiso venía de `PUBLIC`. Verificado desde el plugin: `claude_lectura` ya no las puede ejecutar.
 
 ### Cambios v32 → v33 (leer definiciones de SPs, y los avisos del motor, 2-oct-2026)
 
 Entra **`AC66`**, por eso el bump. Ian Vargas pidió que el equipo pueda leer el código de los SPs.
 
 - **Medido el 2-oct con el plugin**, sólo metadatos. En SQL Server el login no tiene `VIEW DEFINITION`: en EXACTUS se ven 0 de 37 SPs, 0 de 2024 triggers y 0 de 484 vistas, y en COMPRAS 0 de 6 SPs. En Postgres ya funciona: en proveedores-dev se ven las 57 funciones.
-- **El plugin no necesita cambios para leerlos.** `sys.sql_modules` y `OBJECT_DEFINITION` pasan la lista blanca, y `sp_helptext` no, porque es un `EXEC` y un nombre `sp_`. Va documentado en el README. El permiso lo da Patrick Ocampo: `GRANT VIEW DEFINITION TO bisalta_lectura` en las seis bases. Se lo pidió Ian el 2-oct.
+- ~~**El plugin no necesita cambios para leerlos.**~~ **Falso** (review de v33, ronda 1, `E27`): en SQL Server el transporte cortaba a 256 caracteres y partía los saltos de línea, y lo corrige v34 (`AC67`). `sys.sql_modules` y `OBJECT_DEFINITION` pasan la lista blanca, y `sp_helptext` no, porque es un `EXEC` y un nombre `sp_`. Va documentado en el README. El permiso lo da Patrick Ocampo: `GRANT VIEW DEFINITION TO bisalta_lectura` en las seis bases. Se lo pidió Ian el 2-oct.
 - **Riesgo aceptado por Ian (opción a, 2-oct)**: si un SP tiene una credencial escrita en su código, al leerlo termina en el contexto. La redacción de `AC65` no lo cubre, porque mira el nombre de la columna (`definition`), no el contenido. Queda como `D93`.
 - **`AC66`**, un defecto encontrado al medir: un aviso ANSI de `sqlcmd` llegaba como una fila más. Ahora se aparta y va en `avisos_motor`.
 
@@ -574,6 +589,7 @@ Arreglo de objetos. El validador **rechaza cualquier campo no listado acá** y c
   "aviso": "Corrió en READ UNCOMMITTED: …", // sólo en sqlserver (v29, AC62)
   "columnas_redactadas": [ "<nombre>" ],     // sólo si se redactó alguna (v31, AC65)
   "avisos_motor": [ "Warning: …" ],          // sólo sqlserver, sólo si hubo (v33, AC66)
+  "formato_tabla": "Se leyó como tabla …",    // sólo sqlserver, sólo si FOR JSON no aplicó (v34, AC67)
   "filas": [ { ... } ],
   "filas_devueltas": <entero>,
   "truncado": <booleano>,
@@ -883,7 +899,7 @@ Casos en `SDD/tests/test_catalogo.sh` y `SDD/tests/test_servidor_mcp.sh`, assert
 - (m) proyectar `sesion` entera, con `formato`, el de las claves exactas;
 - (n) proyectar `sesion` sin `null` en una entrada sin bloque (`undefined`), el mismo.
 - **AC negativo** (v31, `E24`): la consulta del usuario no puede cambiar el parámetro de sesión. `RESET`, `SET`, `set_config` (también calificada o entre comillas dobles) y los identificadores con escape Unicode se rechazan antes de conectar (`AC47`, `AC53` para `SET` en SQL Server; en Postgres, la sentencia tiene que empezar con `SELECT` o `WITH`). Casos: los de rechazo de `casos-adversariales-v31.js`, por índice. **Parte `manual-only`**, a pedido de Patrick: con el tenant puesto, probarlo contra la base.
-**Parte `manual-only`**, contra la base real a través del plugin: en `smartcheck-qa`, `count(*)` de `smartcheck.requests` da 2998 y `count(DISTINCT tenant_id)` da 1 (lo medido por Patrick el 1-oct); en `proveedores-dev` la consulta responde igual que antes.
+**Parte `manual-only`**, contra la base real a través del plugin: en `smartcheck-qa`, `count(DISTINCT tenant_id)` de `smartcheck.requests` da 1 y `count(*)` da más de 0. El conteo de QA cambia con el tiempo: Patrick midió 2998 el 1-oct y la evidencia de v31 mide 3020; en `proveedores-dev` la consulta responde igual que antes.
 
 **AC65** (detección, v31) — En la respuesta de `consultar`, en los dos dialectos, el valor de toda columna cuyo nombre contenga `token`, `secret`, `password`, `passwd`, `key_hash` o `api_key`/`apikey` (sin mirar mayúsculas) se reemplaza por `[redactado]`, también si está vacío o es nulo: `psql --csv` entrega un NULL como campo vacío, y el parser no los distingue (review de v31, ronda 1). La respuesta lleva `columnas_redactadas`, con sus nombres, antes de `filas`, y sólo si hubo alguna. Se redacta antes de los topes. **Es por nombre**: una columna renombrada en la consulta no se detecta. Protege de la exposición accidental, no es una barrera de acceso (decisión de Ian, 1-oct). Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC65`. **Mutaciones declaradas**:
 - (a) sin redactar, los del valor y el de `[redactado]`;
@@ -901,6 +917,23 @@ Casos en `SDD/tests/test_catalogo.sh` y `SDD/tests/test_servidor_mcp.sh`, assert
 - (b) apartar toda línea que empiece con `Warning: `, aunque traiga separador, el del control;
 - (c) apartarlo sin informarlo, el de `avisos_motor`.
 **Parte `manual-only`**, contra la instancia real: una consulta con un `count` sobre una columna con nulos devuelve las filas sin el aviso, y el aviso en `avisos_motor`.
+
+**AC67** (detección, v34) — En SQL Server, el plugin le agrega a la consulta un salto de línea y `FOR JSON PATH, INCLUDE_NULL_VALUES`, y llama a `sqlcmd` con `-y 8000`. La salida es una columna con un nombre fijo, partida en trozos que se concatenan. Las filas son el arreglo JSON: un salto de línea llega dentro del valor, un texto largo llega entero y un número o un nulo llegan con su tipo JSON. Un resultado vacío da cero filas.
+- **Respaldo**: si el motor responde `Msg 13605` (una columna sin nombre) o `Msg 13601` (un nombre repetido), la consulta se vuelve a correr en formato de tabla, también con `-y 8000`. La respuesta lleva `formato_tabla`, que dice por qué y con qué límites: un texto de más de 8000 caracteres llega cortado, y un salto de línea puede partir la fila. Una columna sin nombre se nombra por posición (`columna_1`). Cualquier otro error no se reintenta.
+- **Medido el 2-oct**, antes del cambio: en formato de tabla, `sqlcmd` cortaba todo texto a 256 caracteres (de 5000 llegaban 256) y un valor con saltos de línea se partía en varias filas. `-y 0` saca el límite, pero también el encabezado.
+
+Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC67`. El stub de `sqlcmd` imita la salida de `FOR JSON`. **Mutaciones declaradas**:
+- (a) sin `FOR JSON`, el del argumento de `-Q`, más los de multilínea y vacío;
+- (b) sin `-y 8000`, el de la bandera;
+- (c) sin el salto de línea antes de `FOR JSON`, el del argumento;
+- (d) sin respaldo, los de "corre dos veces" y `formato_tabla`;
+- (e) reintentar con cualquier error, el de "no se reintenta";
+- (f) sin nombrar por posición la columna sin nombre, el de `columna_1`.
+
+**Parte `manual-only`**, contra la instancia real:
+- un valor de 20000 caracteres con un salto de línea llega entero;
+- una columna sin nombre pasa a tabla con su aviso;
+- la definición más larga de COMPRAS llega con el mismo largo que mide el motor.
 
 **AC51** (detección) — La normalización de la lista blanca es **un solo recorrido de izquierda a derecha** que conoce las reglas de comillado de cada dialecto, de modo que **el validador ve las mismas sentencias que ejecuta el motor**:
 - **en los dos dialectos**: literales entre comillas simples con `''` como escape; identificadores entre comillas dobles con `""` como escape (se copian tal cual); comentarios de línea (`--` hasta el fin de línea); comentarios de bloque **anidados**;

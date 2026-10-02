@@ -139,9 +139,43 @@ if [ -n "${BISALTA_STUB_CATALOGO_NUEVO:-}" ]; then
   cp "$BISALTA_STUB_CATALOGO_NUEVO" "$BISALTA_DB_CATALOGO"
 fi
 
+# AC67 (v34): cuando el plugin le agrega FOR JSON a la consulta (sqlcmd), el
+# stub responde como el motor: el encabezado fijo, la línea de guiones, el
+# JSON partido en trozos, una línea vacía y la de filas afectadas. Los modos
+# de error no pasan por acá: fallan antes de emitir nada.
+ENC_JSON='JSON_F52E2B61-18A1-11d1-B105-00805F49916B'
+json_salida() { printf '%s\n------\n%s\n\n(1 rows affected)\n' "$ENC_JSON" "$1"; }
+if printf '%s' "$*" | grep -q 'FOR JSON'; then
+  case "${BISALTA_STUB_PSQL_MODO:-normal}" in
+    normal) json_salida '[{"id":1,"nombre":"ana"},{"id":2,"nombre":"luis, el otro"}]'; exit 0 ;;
+    datos-con-timeout) json_salida '[{"texto":"Timeout expired"}]'; exit 0 ;;
+    columnas-sensibles-mssql) json_salida '[{"id":1,"token":"valor-sensible-mssql","user_email":"persona@ejemplo.com"}]'; exit 0 ;;
+    aviso-ansi)
+      printf '%s\n------\n%s\n\nWarning: Null value is eliminated by an aggregate or other SET operation.\n(1 rows affected)\n' "$ENC_JSON" '[{"tipo":"P","n":6},{"tipo":"Warning: dato","n":1}]'
+      exit 0 ;;
+    # Un valor con un salto de línea y otro de 5000 caracteres, partido en
+    # trozos como lo parte el motor.
+    json-multilinea)
+      largo="$(head -c 5000 /dev/zero | tr '\0' 'x')"
+      todo='[{"v":"a\nb","t":"'"$largo"'","n":1}]'
+      printf '%s\n------\n' "$ENC_JSON"
+      printf '%s' "$todo" | fold -w 2033
+      printf '\n\n(1 rows affected)\n'
+      exit 0 ;;
+    json-vacio) printf '%s\n------\n\n(0 rows affected)\n' "$ENC_JSON"; exit 0 ;;
+    sin-nombre)
+      printf 'Msg 13605, Level 16, State 1, Server EC2X, Line 1\nColumn expressions and data sources without names or aliases cannot be formatted as JSON text using FOR JSON clause.\n'
+      exit 1 ;;
+  esac
+fi
+
 case "${BISALTA_STUB_PSQL_MODO:-normal}" in
   normal)
     printf 'id,nombre\n1,ana\n2,"luis, el otro"\n'
+    ;;
+  # AC67: la misma consulta, ya sin FOR JSON: una columna sin nombre.
+  sin-nombre)
+    printf '\n-----\n953\n\n(1 rows affected)\n'
     ;;
   muchas-filas)
     printf 'id\n'
@@ -968,6 +1002,53 @@ assert_contains "$cuerpo_av" '"tipo":"Warning: dato"' "AC66 (control) un valor q
 reiniciar_registros
 cuerpo_sinav="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
 assert_no_contains "$cuerpo_sinav" 'avisos_motor' "AC66 sin avisos, la respuesta no trae avisos_motor"
+
+# ---------------------------------------------------------------------------
+# AC67 (v34) — el transporte de SQL Server: FOR JSON, con la tabla de respaldo
+# ---------------------------------------------------------------------------
+reiniciar_registros
+servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
+args_67="$(grep '^ARG ' "$TMP_DIR/psql-invocado.log" | tr '\n' '|')"
+assert_contains "$args_67" "ARG -y|ARG 8000|" "AC67 sqlcmd lleva -y 8000"
+# El argumento de -Q lleva un salto de línea, así que su segunda línea no
+# empieza con `ARG `: se mira el registro entero, no sólo las líneas ARG.
+log_67="$(tr '\n' '|' < "$TMP_DIR/psql-invocado.log")"
+assert_contains "$log_67" "ARG SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED; SELECT 1|FOR JSON PATH, INCLUDE_NULL_VALUES|" \
+  "AC67 la consulta va seguida de un salto de línea y FOR JSON PATH, INCLUDE_NULL_VALUES"
+BISALTA_STUB_PSQL_MODO=json-multilinea
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_67="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+forma_67="$("$NODE_BIN" -e "const f=JSON.parse(process.argv[1]).filas[0];process.stdout.write(JSON.stringify(f.v)+'|'+f.t.length+'|'+typeof f.n)" "$cuerpo_67")"
+assert_eq "$forma_67" '"a\nb"|5000|number' "AC67 un salto de línea llega dentro del valor, un texto de 5000 caracteres llega entero y un número llega como número"
+assert_contains "$cuerpo_67" '"filas_devueltas":1' "AC67 el valor partido en trozos es una sola fila"
+BISALTA_STUB_PSQL_MODO=json-vacio
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_vac="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+assert_contains "$cuerpo_vac" '"filas":[],"filas_devueltas":0' "AC67 un resultado vacío da cero filas"
+# Una columna sin nombre: FOR JSON falla con Msg 13605 y se vuelve a la tabla.
+BISALTA_STUB_PSQL_MODO=sin-nombre
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_sn="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+invocaciones_sn="$(grep -c '^ARGS ' "$TMP_DIR/psql-invocado.log")"
+assert_eq "$invocaciones_sn" "2" "AC67 con una columna sin nombre, sqlcmd corre dos veces: en JSON y en tabla"
+assert_contains "$(grep '^ARGS ' "$TMP_DIR/psql-invocado.log" | tail -1)" "-y 8000" "AC67 la tabla de respaldo también lleva -y 8000"
+assert_no_contains "$(grep '^ARGS ' "$TMP_DIR/psql-invocado.log" | tail -1)" "FOR JSON" "AC67 la tabla de respaldo va sin FOR JSON"
+assert_contains "$cuerpo_sn" '"formato_tabla":"Se leyó como tabla' "AC67 la respuesta de respaldo dice que se leyó como tabla"
+assert_contains "$cuerpo_sn" '"columna_1":"953"' "AC67 una columna sin nombre se nombra por posición, no con la línea de guiones"
+# Cualquier otro error no se reintenta en tabla.
+BISALTA_STUB_PSQL_MODO=falla-stdout
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
+assert_eq "$(grep -c '^ARGS ' "$TMP_DIR/psql-invocado.log")" "1" "AC67 un error que no es de FOR JSON no se reintenta en tabla"
+BISALTA_STUB_PSQL_MODO=normal
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_n67="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+assert_no_contains "$cuerpo_n67" 'formato_tabla' "AC67 una consulta que pasa por JSON no trae formato_tabla"
 
 # ---------------------------------------------------------------------------
 # AC55 (v25) — cifrado en Postgres
