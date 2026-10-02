@@ -362,6 +362,38 @@ done <<EOF
 $SIN_CERRAR
 EOF
 
+# Tercera tanda (contract v31, AC47 y AC64): los casos de Patrick Ocampo para
+# la regla `identificador_unicode` (Slack, 1-oct-2026). La consulta del
+# usuario no puede llegar a una función prohibida escribiéndola con escape
+# Unicode, y con eso cambiar el parámetro de sesión del tenant.
+recorrer_casos_adversariales "$REPO_ROOT/SDD/tests/fixtures/casos-adversariales-v31.js" CASOS_V31 "AC47 v31"
+
+# El motivo de cada rechazo. Un control dice en su descripción qué motivo
+# conserva ("sigue dando <motivo>"); el resto tiene que dar
+# `identificador_unicode`. Se lee sólo el campo `motivo`; la consulta nunca se
+# imprime.
+MOTIVOS_V31="$(node -e '
+  var casos = require(process.argv[1]).CASOS_V31;
+  var validar = require(process.argv[2]).validarSql;
+  var n = 0;
+  for (var i = 0; i < casos.length; i += 1) {
+    if (casos[i][2] !== false) continue;
+    n += 1;
+    var control = /sigue dando ([a-z_]+)/.exec(String(casos[i][3]));
+    var esperado = control ? control[1] : "identificador_unicode";
+    var motivo = String(validar(casos[i][1], casos[i][0]).motivo);
+    process.stdout.write(i + "\t" + esperado + "\t" + (motivo === esperado ? "si" : "no:" + motivo) + "\n");
+  }
+  if (n === 0) process.exit(3);
+' "$REPO_ROOT/SDD/tests/fixtures/casos-adversariales-v31.js" "$LISTA_BLANCA" 2>/dev/null)"
+assert_eq "$?" "0" "AC47 v31 hay casos de rechazo para verificar el motivo"
+while IFS="$(printf '\t')" read -r indice esperado resultado; do
+  [ -z "$indice" ] && continue
+  assert_eq "$resultado" "si" "AC47 v31 caso $indice: el motivo es $esperado"
+done <<EOF
+$MOTIVOS_V31
+EOF
+
 # ---------------------------------------------------------------------------
 # AC51 mutación (c) — la regla de los corchetes de SQL Server
 # ---------------------------------------------------------------------------

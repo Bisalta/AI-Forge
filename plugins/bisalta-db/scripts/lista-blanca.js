@@ -45,6 +45,12 @@ const ANCLA_LECTURA = /^(SELECT|WITH)[\s(]/i;
 // simple) y puede esconder cualquier cosa, incluido un `;`.
 const COMILLA_DOLAR = /\$([A-Za-z_][A-Za-z_0-9]*)?\$/;
 
+// Identificador con escape Unicode de Postgres: U&"…". El motor lo decodifica
+// DESPUES de que nosotros miramos el texto, asi que U&"set_c\006Fnfig" nombra a
+// set_config sin que la palabra aparezca escrita en ninguna parte. No se intenta
+// decodificar: se rechaza la forma entera, igual que con la comilla de dolar.
+const IDENTIFICADOR_UNICODE_POSTGRES = /(^|[^A-Za-z0-9_$])[Uu]&"/;
+
 // Reglas propias de SQL Server.
 const EJECUCION_SQLSERVER = /(^|[^A-Za-z0-9_])(EXEC|EXECUTE)([^A-Za-z0-9_]|$)/i;
 const PROCEDIMIENTO_SQLSERVER = /(^|[^A-Za-z0-9_])(sp_|xp_)/i;
@@ -269,6 +275,9 @@ function validarSql(sql, dialecto) {
     const escritura = dialecto === 'sqlserver' ? ESCRITURA_EMBEBIDA_SQLSERVER : ESCRITURA_EMBEBIDA;
     if (escritura.test(sentencia)) {
       return rechazo('escritura_embebida', sentencia);
+    }
+    if (dialecto === 'postgres' && IDENTIFICADOR_UNICODE_POSTGRES.test(sentencia)) {
+      return rechazo('identificador_unicode', sentencia);
     }
     if (dialecto === 'postgres' && FUNCION_PROHIBIDA_POSTGRES.test(sentencia)) {
       return rechazo('funcion_prohibida', sentencia);
