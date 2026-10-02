@@ -6,7 +6,7 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ### 0.3.0 — sin publicar
 
-Contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v31 (`AC64`, `AC65`).
+Contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v32 (`AC47`, `AC64`, `AC65`).
 
 - **Bases multitenant.** Una entrada del catálogo puede declarar el parámetro de sesión con que su base filtra por tenant (RLS), su formato y los nombres de los tenants. El plugin toma los UUID del secreto (`tenant_<nombre>`) y fija el parámetro antes de la consulta. Sin eso, el rol veía 0 filas. Ya hay dos convenciones: `app.tenant_ids` (una lista, SmartCheck) y `app.tenant_id` (uno solo, SmartFleet). Por ahora sólo `smartcheck-qa`, con el tenant de Construplaza.
 - **Columnas sensibles redactadas.** El valor de las columnas cuyo nombre indica una credencial (`token`, `secret`, `password`, `passwd`, `key_hash`, `api_key`, `apikey`) sale como `[redactado]`, también vacío o nulo, y la respuesta dice cuáles. Es por nombre: una columna renombrada en la consulta no se detecta.
