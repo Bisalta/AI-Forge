@@ -252,6 +252,47 @@ node "$VALIDADOR" "$TMP_DIR/no-existe.json" >/dev/null 2>&1
 assert_exit 2 "$?" "un catálogo inexistente sale 2, no 0"
 
 # ---------------------------------------------------------------------------
+# AC64 (v31) — el bloque `sesion` de una entrada multitenant
+# ---------------------------------------------------------------------------
+# El catálogo real lo declara en smartcheck-qa, y con nombres, nunca con UUID.
+sesion_real="$(node -e "const c=JSON.parse(require('fs').readFileSync('$CATALOGO_REAL','utf8'));const e=c.find(x=>x.nombre==='smartcheck-qa');process.stdout.write(e&&e.sesion?[e.sesion.parametro,e.sesion.formato,e.sesion.tenants.join('+')].join('|'):'AUSENTE');")"
+assert_eq "$sesion_real" "app.tenant_ids|uuid_lista|construplaza" "AC64 smartcheck-qa declara app.tenant_ids, uuid_lista y sólo construplaza"
+if grep -qiE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "$CATALOGO_REAL"; then uuid_en_catalogo=si; else uuid_en_catalogo=no; fi
+assert_eq "$uuid_en_catalogo" "no" "AC64 el catálogo público no trae ningún UUID"
+con_sesion="$(node -e "const c=JSON.parse(require('fs').readFileSync('$CATALOGO_REAL','utf8'));process.stdout.write(c.filter(x=>x.sesion).map(x=>x.nombre).join(','));")"
+assert_eq "$con_sesion" "smartcheck-qa" "AC64 sólo smartcheck-qa declara sesion (Ian, 1-oct)"
+
+# Cada forma inválida, una por una. `sc` es la entrada smartcheck-qa de la copia.
+SC="const sc=c.find(x=>x.nombre==='smartcheck-qa');"
+rechaza_sesion() {
+  ruta="$(fixture "$1.json" "$SC $2")"
+  # El motivo tiene que nombrar `sesion` y la salida ser la de un catálogo
+  # inválido (1), no la de uno ilegible (2): si no, una fixture rota pasaría
+  # por un rechazo.
+  motivo="$(node "$VALIDADOR" "$ruta" 2>&1)"
+  ec=$?
+  if [ "$ec" = "1" ] && printf '%s' "$motivo" | grep -q "sesion"; then r=rechaza-por-sesion; else r="exit-$ec"; fi
+  assert_eq "$r" "rechaza-por-sesion" "AC64 el validador rechaza $3"
+}
+rechaza_sesion sesion-sqlserver "const ms=c.find(x=>x.dialecto==='sqlserver');ms.sesion=sc.sesion" "sesion en una entrada sqlserver"
+rechaza_sesion sesion-param-inyeccion "sc.sesion.parametro=\"app.tenant_ids = 'x'; --\"" "un parametro fuera de <prefijo>.<nombre>"
+rechaza_sesion sesion-param-sin-punto "sc.sesion.parametro='tenant_ids'" "un parametro sin prefijo"
+rechaza_sesion sesion-formato "sc.sesion.formato='texto'" "un formato desconocido"
+rechaza_sesion sesion-uuid-dos "sc.sesion.formato='uuid';sc.sesion.tenants=['construplaza','otro']" "el formato uuid con dos tenants"
+rechaza_sesion sesion-sin-tenants "sc.sesion.tenants=[]" "tenants vacío"
+rechaza_sesion sesion-tenant-raro "sc.sesion.tenants=['Construplaza Ltda']" "un tenant fuera de minúsculas, dígitos y guiones bajos"
+rechaza_sesion sesion-tenant-repetido "sc.sesion.tenants=['construplaza','construplaza']" "un tenant repetido"
+rechaza_sesion sesion-sin-alcance "delete sc.sesion.alcance" "sesion sin alcance"
+# Un alcance en blanco lo deja pasar la lista de campos requeridos: sólo lo
+# frena la regla propia del alcance (mutación AC64 (j)).
+rechaza_sesion sesion-alcance-blanco "sc.sesion.alcance='   '" "un alcance en blanco"
+rechaza_sesion sesion-campo-extra "sc.sesion.valor='976ab659-0000-0000-0000-000000000000'" "un campo de sesion no declarado (un valor escrito en el catálogo)"
+# Control: la misma entrada con formato uuid y un solo tenant es válida.
+ruta="$(fixture sesion-uuid-uno.json "$SC sc.sesion.formato='uuid';sc.sesion.parametro='app.tenant_id'")"
+node "$VALIDADOR" "$ruta" >/dev/null 2>&1
+assert_exit 0 "$?" "AC64 (control) formato uuid con un solo tenant valida"
+
+# ---------------------------------------------------------------------------
 # AC36 — empaquetado
 # ---------------------------------------------------------------------------
 fuente="$(node -e "const m=JSON.parse(require('fs').readFileSync('$MARKETPLACE','utf8'));const e=(m.plugins||[]).filter(function(p){return p.name==='bisalta-db';})[0];process.stdout.write(e?String(e.source):'AUSENTE');")"

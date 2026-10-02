@@ -4,6 +4,30 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ## bisalta-db
 
+### 0.3.0 — sin publicar
+
+Contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v36 (`AC47`, `AC64`, `AC65`, `AC66`, `AC67`, `AC68`).
+
+- **Los textos de SQL Server llegan enteros.** La consulta va con `FOR JSON`: un texto largo llega completo y un salto de línea llega dentro del valor. Los números llegan como texto exacto, como en Postgres: un `decimal` o un `bigint` grande no se redondean. Antes, todo texto se cortaba a 256 caracteres y un salto de línea partía la fila, desde la primera versión. Si `FOR JSON` no acepta la consulta (una columna sin nombre o un nombre repetido), se vuelve a correr en tabla, y la respuesta lo avisa en `formato_tabla`.
+- **Requiere Node 22 o posterior.** Con uno anterior, el servidor no arranca y lo dice.
+- **Dos `SELECT` seguidos en SQL Server son un error**, en vez de devolver sólo el último.
+- **`salida_demasiado_grande` (código 10).** Una salida de más de 64 MiB ya no se informa como `tiempo_agotado`.
+- **La redacción entra en los nombres con punto**, que SQL Server devuelve anidados.
+- **Leer el código de SPs, vistas y triggers.** El README explica cómo hacerlo en cada motor. En SQL Server hace falta `VIEW DEFINITION`, que da Patrick. `sp_helptext` no funciona.
+- **Los avisos del motor no llegan como filas.** Un aviso ANSI de `sqlcmd` va en `avisos_motor`, en los dos formatos.
+
+- **Bases multitenant.** Una entrada del catálogo puede declarar el parámetro de sesión con que su base filtra por tenant (RLS), su formato y los nombres de los tenants. El plugin toma los UUID del secreto (`tenant_<nombre>`) y fija el parámetro antes de la consulta. Sin eso, el rol veía 0 filas. Ya hay dos convenciones: `app.tenant_ids` (una lista, SmartCheck) y `app.tenant_id` (uno solo, SmartFleet). Por ahora sólo `smartcheck-qa`, con el tenant de Construplaza.
+- **Columnas sensibles redactadas.** El valor de las columnas cuyo nombre indica una credencial (`token`, `secret`, `password`, `passwd`, `key_hash`, `api_key`, `apikey`) sale como `[redactado]`, también vacío o nulo, y la respuesta dice cuáles. Es por nombre: una columna renombrada en la consulta no se detecta.
+
+### 0.2.0 — 2026-10-01
+
+Contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v30 (`AC62`, `AC63`, `D86`).
+
+- **En SQL Server, la respuesta de `consultar` lleva el aislamiento y su aviso**: `aislamiento` y `aviso`, antes de `filas`. El aviso de `READ UNCOMMITTED` estaba sólo en la descripción de la herramienta, que el modelo lee una vez, así que informaba cifras sin confirmar con el mismo tono que las confirmadas. Lo propuso Patrick Ocampo en su review del PR #14. En Postgres la respuesta no cambia.
+- **Los errores de consulta de SQL Server llevan `aislamiento`** (`AC63`). Son los posteriores a resolver el secreto, así que también los lleva un login o una red que fallan: el campo dice con qué nivel corrió, y el `mensaje` dice si fue un 601, el error que sólo existe por `READ UNCOMMITTED`.
+- **El aviso es propio de cada nivel.** Si el nivel cambia y no tiene un aviso escrito, el servidor no arranca, en vez de mostrar un aviso falso.
+- **Primer bump de versión del plugin.** La 0.1.0 publicada en `prod` ya traía todo hasta v28: el seudónimo, `READ UNCOMMITTED` y TLS. Sin este bump, `/plugin update` no le ofrece el cambio a quien ya lo tiene instalado.
+
 ### 0.1.0 — 2026-09-18
 
 Plugin nuevo (ciclo `/sdd` `GEN-108`, contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v28).

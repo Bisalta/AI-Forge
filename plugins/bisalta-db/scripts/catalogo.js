@@ -26,6 +26,19 @@ const RUTA_POR_DEFECTO = path.join(__dirname, '..', 'catalogo.json');
 // catálogo entero se rechace: un campo desconocido es una suposición de
 // alguien que no leyó el contrato de datos, y callarla es peor que fallar.
 const CAMPOS = ['nombre', 'dialecto', 'ambiente', 'host', 'puerto', 'base', 'secret_id', 'region', 'garantias'];
+// AC64 (v31): el único campo opcional. Una base multitenant filtra por un
+// parámetro de sesión (RLS), y sin él el rol ve 0 filas. La entrada declara
+// el parámetro, su formato y los NOMBRES de los tenants; los UUID viven en el
+// secreto (`tenant_<nombre>`), nunca acá: este archivo es público.
+const CAMPOS_OPCIONALES = ['sesion'];
+const CAMPOS_SESION = ['parametro', 'formato', 'tenants', 'alcance'];
+// Hay dos convenciones medidas el 1-oct: SmartCheck usa `app.tenant_ids`, una
+// lista separada por coma; SmartFleet, `app.tenant_id`, un solo UUID.
+const FORMATOS_SESION = ['uuid', 'uuid_lista'];
+// Un parámetro de configuración propio: `<prefijo>.<nombre>`. Se interpola en
+// un SET, que no acepta parámetros: sólo pasa lo que cabe en este patrón.
+const PARAMETRO_SESION_VALIDO = /^[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*$/;
+const TENANT_VALIDO = /^[a-z0-9_]+$/;
 
 const DIALECTOS = ['postgres', 'sqlserver'];
 const AMBIENTES = ['dev', 'qa'];
@@ -93,7 +106,7 @@ function validarEntradas(entradas) {
 
     const claves = Object.keys(entrada);
     for (let k = 0; k < claves.length; k += 1) {
-      if (CAMPOS.indexOf(claves[k]) === -1) {
+      if (CAMPOS.indexOf(claves[k]) === -1 && CAMPOS_OPCIONALES.indexOf(claves[k]) === -1) {
         problemas.push(etiqueta + ': campo no declarado en el contrato de datos: ' + claves[k]);
       }
     }
@@ -180,9 +193,67 @@ function validarEntradas(entradas) {
         }
       }
     }
+
+    if (entrada.sesion !== undefined) {
+      validarSesion(entrada, etiqueta, problemas);
+    }
   }
 
   return problemas;
+}
+
+/** AC64 (v31): el bloque `sesion` de una entrada multitenant. */
+function validarSesion(entrada, etiqueta, problemas) {
+  const sesion = entrada.sesion;
+  const donde = etiqueta + ': sesion';
+  if (sesion === null || typeof sesion !== 'object' || Array.isArray(sesion)) {
+    problemas.push(donde + ': tiene que ser un objeto con ' + CAMPOS_SESION.join(', '));
+    return;
+  }
+  const claves = Object.keys(sesion);
+  for (let k = 0; k < claves.length; k += 1) {
+    if (CAMPOS_SESION.indexOf(claves[k]) === -1) problemas.push(donde + ': campo desconocido: ' + claves[k]);
+  }
+  for (let c = 0; c < CAMPOS_SESION.length; c += 1) {
+    if (claves.indexOf(CAMPOS_SESION[c]) === -1) problemas.push(donde + ': falta el campo requerido: ' + CAMPOS_SESION[c]);
+  }
+  // Sólo Postgres: el RLS por parámetro de sesión es de Postgres, y en SQL
+  // Server el prefijo de -Q ya es otra cosa (AC61).
+  if (entrada.dialecto !== 'postgres') {
+    problemas.push(donde + ': sólo se admite en dialecto postgres');
+  }
+  if (typeof sesion.parametro !== 'string' || !PARAMETRO_SESION_VALIDO.test(sesion.parametro)) {
+    problemas.push(donde + ': `parametro` tiene que ser <prefijo>.<nombre>, en minúsculas, dígitos y guiones bajos');
+  }
+  if (FORMATOS_SESION.indexOf(sesion.formato) === -1) {
+    problemas.push(donde + ': `formato` tiene que ser ' + FORMATOS_SESION.join(' o '));
+  }
+  if (!Array.isArray(sesion.tenants) || sesion.tenants.length === 0) {
+    problemas.push(donde + ': `tenants` tiene que ser un arreglo de al menos un nombre');
+  } else {
+    const vistos = {};
+    for (let t = 0; t < sesion.tenants.length; t += 1) {
+      const tenant = sesion.tenants[t];
+      if (typeof tenant !== 'string' || !TENANT_VALIDO.test(tenant)) {
+        problemas.push(donde + ': tenants[' + t + '] admite minúsculas, dígitos y guiones bajos');
+      } else if (Object.prototype.hasOwnProperty.call(vistos, tenant)) {
+        problemas.push(donde + ': tenants[' + t + '] repetido');
+      } else {
+        vistos[tenant] = true;
+      }
+    }
+    // Un parámetro de un solo UUID no puede llevar dos: se rechaza el
+    // catálogo, en vez de mandar sólo el primero y ocultar el segundo.
+    if (sesion.formato === 'uuid' && sesion.tenants.length !== 1) {
+      problemas.push(donde + ': el formato `uuid` admite exactamente un tenant');
+    }
+  }
+  // Lo que el parámetro destraba, escrito: el RLS de una base suele cubrir
+  // muchas más tablas que las que motivaron la entrada (1-oct: 43 en
+  // SmartCheck, no 3).
+  if (!esCadenaNoVacia(sesion.alcance)) {
+    problemas.push(donde + ': `alcance` tiene que decir qué destraba el parámetro');
+  }
 }
 
 /**
@@ -225,7 +296,13 @@ function proyectar(entrada) {
     dialecto: entrada.dialecto,
     ambiente: entrada.ambiente,
     base: entrada.base,
-    garantias: entrada.garantias
+    garantias: entrada.garantias,
+    // AC64: los nombres de los tenants y el alcance, nunca los UUID.
+    sesion: entrada.sesion === undefined ? null : {
+      parametro: entrada.sesion.parametro,
+      tenants: entrada.sesion.tenants,
+      alcance: entrada.sesion.alcance
+    }
   };
 }
 
@@ -235,6 +312,7 @@ module.exports = {
   proyectar: proyectar,
   RUTA_POR_DEFECTO: RUTA_POR_DEFECTO,
   CAMPOS: CAMPOS,
+  CAMPOS_OPCIONALES: CAMPOS_OPCIONALES,
   GARANTIAS: GARANTIAS
 };
 

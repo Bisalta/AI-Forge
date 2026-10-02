@@ -5,8 +5,8 @@ Plugin de Claude Code que expone dos herramientas MCP para leer las bases de
 
 | Herramienta | Qué hace |
 |---|---|
-| `listar_conexiones()` | Lista las conexiones del catálogo con su dialecto, ambiente, base y las garantías de solo lectura de cada una. |
-| `consultar(conexion, sql)` | Corre una consulta de solo lectura y devuelve las filas. |
+| `listar_conexiones()` | Lista las conexiones del catálogo con su dialecto, ambiente, base y las garantías de solo lectura de cada una, y en las multitenant, `sesion` (el parámetro, los tenants y qué destraba). |
+| `consultar(conexion, sql)` | Corre una consulta de solo lectura y devuelve las filas, con las columnas sensibles redactadas. |
 
 ## Para qué existe
 
@@ -32,7 +32,7 @@ conexión.
 
 Requisitos en la máquina (ninguno se instala con el plugin):
 
-- `node` (probado con v22.17). **No hay `package.json`, ni lockfile, ni
+- `node` **22 o posterior** (probado con v22.17): sin `context.source` en `JSON.parse`, los números de SQL Server llegarían redondeados, así que con un Node anterior el servidor no arranca y lo dice. **No hay `package.json`, ni lockfile, ni
   `node_modules`**: el servidor es Node plano, cero dependencias.
 - `psql` para las conexiones `postgres`; `sqlcmd` para las `sqlserver`. Si el
   binario falta, la consulta devuelve `cliente_ausente` (código 8) nombrando
@@ -286,6 +286,39 @@ En SQL Server la consulta corre en `READ UNCOMMITTED`. Ninguna de las seis bases
 - **Lo pone el plugin**, delante de tu consulta. Vos no podés mandar `SET` (lo rechaza la lista blanca).
 - **Postgres no lo necesita**: una lectura no bloquea la escritura de filas, y el plugin lee de la réplica.
 
+## Bases multitenant (v31, `AC64`)
+
+Algunas bases filtran por tenant con RLS: sin un parámetro de sesión, el rol ve 0 filas. La entrada del catálogo lo declara:
+
+```json
+"sesion": { "parametro": "app.tenant_ids", "formato": "uuid_lista",
+            "tenants": ["construplaza"], "alcance": "qué tablas destraba" }
+```
+
+- **Los UUID no van en el catálogo, que es público.** Van en el secreto de la entrada, como `tenant_<nombre>` (por ejemplo, `tenant_construplaza`). El plugin los lee en cada consulta y fija el parámetro antes de tu SQL.
+- **`formato`**: `uuid_lista` une los tenants con coma y sin espacios (SmartCheck, `app.tenant_ids`); `uuid` admite exactamente uno (SmartFleet, `app.tenant_id`).
+- **Sumar un tenant**: la clave `tenant_<nombre>` en el secreto y el nombre en `tenants`. Si la clave falta o no es un UUID, la consulta no corre (código 5).
+- **Hoy**: sólo `smartcheck-qa`, con el tenant de Construplaza. `alcance` dice qué destraba: las 43 tablas del esquema `smartcheck`, no sólo las que motivaron la entrada.
+
+## Columnas sensibles (v31, `AC65`)
+
+El valor de las columnas cuyo nombre contiene `token`, `secret`, `password`, `passwd`, `key_hash`, `api_key` o `apikey` sale como `[redactado]`, también si está vacío o es nulo, y la respuesta trae `columnas_redactadas` con cuáles. **Es por nombre**: si renombrás la columna en la consulta, no se detecta. Sirve para que una credencial no termine en el contexto por accidente, no para impedir que alguien la busque. En SQL Server, un nombre con punto (`[cred.token]`) llega anidado (`{"cred":{"token":…}}`), y se redacta igual: `columnas_redactadas` dice `cred.token`.
+
+## Cómo llegan los datos de SQL Server (v34 y v36, `AC67`)
+
+El plugin le agrega `FOR JSON` a tu consulta. Así los textos largos llegan enteros y los saltos de línea quedan dentro del valor. **Los números llegan como texto exacto**, igual que en Postgres: un `decimal(28,8)` o un `bigint` grande no se redondean. Un nulo llega como nulo y un `bit`, como booleano. Si la consulta tiene una columna **sin nombre** (`SELECT count(*)` sin alias) o dos columnas con el **mismo nombre**, `FOR JSON` no se puede aplicar: el plugin la lee como tabla y la respuesta trae `formato_tabla`, que avisa los límites (8000 caracteres, saltos de línea). **Poné un alias distinto a cada columna** y llega completa.
+
+- **No agregues `FOR JSON` ni `FOR XML`**: el plugin ya lo pide, y dos dan error de sintaxis.
+- **Un `SELECT` por consulta**: dos seguidos dan error, en vez de devolver sólo el último.
+- Un aviso o mensaje del motor llega en `avisos_motor`.
+
+## Leer el código de SPs, vistas y triggers (v33 y v34)
+
+- **Postgres**: `SELECT pg_get_functiondef('<esquema>.<funcion>'::regproc)`, o `prosrc` de `pg_proc`. Ya funciona.
+- **SQL Server**: `SELECT definition FROM sys.sql_modules WHERE object_id = OBJECT_ID('dbo.<nombre>')`, o `SELECT OBJECT_DEFINITION(OBJECT_ID('dbo.<nombre>')) AS definicion`. **El alias hace falta**: sin él, la consulta se lee como tabla y se corta a 8000 caracteres. **`sp_helptext` no funciona**: es un `EXEC` sobre un `sp_`, y la lista blanca lo rechaza. Hace falta que el login tenga `VIEW DEFINITION` en la base: lo dio Patrick el 2-oct en las seis. **Desde v34 la definición llega entera y con sus saltos de línea** (`AC67`). Hasta v33 se cortaba a 256 caracteres y se partía en filas.
+- **Ojo**: si el código tiene una credencial escrita, la vas a ver, y queda en el transcript. Es un riesgo aceptado (`D93`).
+- Un aviso del motor, como "Null value is eliminated by an aggregate…", no llega como fila sino en `avisos_motor` (`AC66`).
+
 ## Quién consulta (v27, `AC60`)
 
 Todos entran con el mismo rol de Postgres y el mismo login de SQL Server. Para que el motor distinga personas, el nombre de la sesión lleva además un **seudónimo de quien consulta**, sacado de su identidad de AWS: `<usuario del secreto>/u-<8 hex>`. Por ejemplo, `claude_lectura/u-349175ad` en Postgres (`application_name`) y `bisalta_lectura/u-349175ad` en SQL Server (`HOST_NAME()`).
@@ -332,6 +365,8 @@ Todos entran con el mismo rol de Postgres y el mismo login de SQL Server. Para q
 }
 ```
 
+En SQL Server la respuesta lleva además, antes de `filas`, `aislamiento` (el nivel con que corrió, hoy `READ UNCOMMITTED`) y `aviso` (qué puede estar mal en esas filas). Si vas a informar un número que sale de ahí, informá también el aviso (v29, `AC62`). Los errores de la consulta (códigos 6 y 7) también traen `aislamiento`: un error 601 se debe a ese nivel, no a la red (v30, `AC63`).
+
 Tope de **1000 filas** y **1048576 bytes** (1 MiB) de `filas` serializado. Al
 truncar, `filas` trae las que caben, `truncado` es `true` y `motivo_truncado`
 nombra cuál de los dos topes se alcanzó primero. **Truncar no es un error**:
@@ -354,6 +389,7 @@ plugin al equipo, no algo que este código controle.
 | Conexión rechazada o caída | 6 | `conexion_fallida`, con el mensaje del cliente, sin la credencial. En SQL Server el mensaje sale de stdout, porque `sqlcmd` escribe ahí sus errores (v25, `AC57`) |
 | Tiempo agotado: el motor corta por su propio límite de sentencia (Postgres: `statement_timeout` del rol, 60s — v19), `sqlcmd` corta la consulta (`-t 60`, v25), o el plugin corta el proceso (125 s, los dos motores) | 7 | `tiempo_agotado` |
 | Binario del cliente ausente | 8 | `cliente_ausente`, nombrando el binario |
+| La salida pasó el buffer del proceso, 64 MiB, antes de llegar a los topes (v36, `AC68`) | 10 | `salida_demasiado_grande`: pedí menos filas (`TOP`) o menos columnas |
 | La conexión Postgres no llegó a una réplica de lectura (v16) | 9 | `no_es_replica`, con el nombre de la conexión. **El SQL del consumidor no se ejecutó** |
 
 El catálogo ilegible o inválido también sale con código 2 (`catalogo_invalido`):
