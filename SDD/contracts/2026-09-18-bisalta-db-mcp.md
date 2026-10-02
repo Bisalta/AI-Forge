@@ -1,6 +1,28 @@
 # HLTC — Plugin `bisalta-db`: consulta de solo lectura sin credencial en contexto
 
-- **Versión**: v35
+- **Versión**: v36
+
+### Cambios v35 → v36 (la review de v34 y v35, ronda 2, 2-oct-2026)
+
+La ronda 2 salió `ESCALATE` (`E28`). Entra **`AC68`** y cambian las condiciones de aprobación de `AC65`, `AC66` y `AC67`: por eso el bump.
+
+- **Decisión de Ian Vargas (2-oct): los números de SQL Server llegan como texto exacto**, igual que hasta v33 y que en Postgres. v34 los pasaba por `JSON.parse`, que los convierte a double: un `decimal(28,8)` o un `bigint` mayor que 2^53 llegaban redondeados, sin aviso. v34 presentaba eso como mejora, y era un defecto del plan. El texto exacto sale de `context.source`, el tercer argumento del reviver de `JSON.parse`. Existe desde Node 22, así que con un Node anterior el servidor no arranca y lo dice.
+- **Medido el 2-oct en vivo**, con consultas sintéticas, sin leer ninguna tabla:
+  - el motor manda el decimal como literal exacto (`99999999999.99999999`);
+  - `[cred.token]` llega anidado (`{"cred":{"token":…}}`);
+  - un resultado vacío no trae trozos;
+  - dos `SELECT` seguidos ponen el primero en tabla, antes del encabezado;
+  - `OPTION (MAXDOP 1)` y un tipo CLR (`hierarchyid`) funcionan con el sufijo. La review suponía que no;
+  - un `FOR XML` propio da `Msg 156`.
+
+  La salida literal está en la evidencia de v36.
+- **El respaldo** se dispara sólo si se cumplen las tres condiciones: la corrida falló, la salida no trae el encabezado JSON y el **primer** error del motor es 13601 o 13605. Antes alcanzaba con que una línea cualquiera dijera `Msg 13605`.
+- **El parser de JSON**:
+  - después del resultado, todo lo que no sea la línea de filas afectadas va en `avisos_motor`, en vez de buscar sólo los avisos conocidos;
+  - algo antes del encabezado es otro resultado, y es un error. Hasta v35 se descartaba en silencio.
+- **La redacción (`AC65`)** recorre los objetos y los arreglos anidados por la ruta con puntos.
+- **`AC68`**: una salida que pasa el buffer del proceso es `salida_demasiado_grande` (código 10), no `tiempo_agotado`.
+- **El control que exige que caigan todas las mutaciones** vive en el pipeline del planner, fuera del árbol, y su texto va en el addendum de la evidencia. Que el runner de `sdd-flow` lo haga es deuda (`D94`).
 
 ### Cambios v34 → v35 (los avisos del motor en los dos transportes, 2-oct-2026)
 
@@ -9,7 +31,7 @@ Cambia la condición de aprobación de **`AC66`**, por eso el bump. Al sellar v3
 - **Casos nuevos**: el mismo aviso en la tabla de respaldo. El stub responde `Msg 13605` a la consulta con `FOR JSON` y la tabla con el aviso a la de respaldo.
 - **Mutación nueva** (d): el filtro del parser de JSON.
 - **Medido el 2-oct**, con una consulta sintética: en `FOR JSON`, el aviso llega después de la línea vacía que cierra el resultado. Por eso se sacó la búsqueda de avisos antes del encabezado: nunca aparece en vivo, y ningún test la mataba.
-- **El pipeline** ya no commitea la evidencia si alguna mutación no cae.
+- **El pipeline del planner** ya no commitea la evidencia si alguna mutación no cae (vive fuera del árbol; ver v36).
 
 ### Cambios v33 → v34 (el transporte de SQL Server, 2-oct-2026)
 
@@ -22,7 +44,7 @@ Entra **`AC67`**, por eso el bump. La ronda 1 de la review de v33 salió `ESCALA
   
   Era un defecto de transporte desde la primera versión, y afectaba a cualquier columna de texto largo, no sólo a los SPs.
 - **Decisión de Ian Vargas (2-oct)**: `FOR JSON` con la tabla de respaldo. La alternativa descartada era quedarse en tabla con `-y 8000` y recetas (`STRING_ESCAPE`, `SUBSTRING`).
-- **Cambio visible**: en SQL Server, los números y los nulos llegan con su tipo JSON, y ya no todo como texto.
+- ~~**Cambio visible**: en SQL Server, los números y los nulos llegan con su tipo JSON, y ya no todo como texto.~~ Revertido en v36 para los números (`E28`): `JSON.parse` redondeaba los decimales y los bigint.
 - **Patrick Ocampo dio `VIEW DEFINITION`** en las seis bases (2-oct). Verificado desde el plugin: en EXACTUS 3476 de 3497 módulos, y en COMPRAS 753 de 753. Además midió el riesgo de `D93`: hay 21 objetos que mencionan palabras de credencial, y ninguno tiene una asignación.
 - **`D92` pagada**: Patrick le sacó a `PUBLIC` el `EXECUTE` de las tres funciones `SECURITY DEFINER`. Hacerlo con `REVOKE … FROM claude_lectura` no habría servido, porque el permiso venía de `PUBLIC`. Verificado desde el plugin: `claude_lectura` ya no las puede ejecutar.
 
@@ -42,7 +64,7 @@ La ronda 1 de la review de v31 cambió la condición de aprobación de dos AC de
 - **`AC47`**: entra el motivo `identificador_unicode`, con la regla y los 11 casos de Patrick Ocampo (`E24`).
 - **`AC64`**: entran el AC negativo ("la consulta no puede cambiar el parámetro de sesión") y las mutaciones (l), (m) y (n).
 - **`AC65`**: la cláusula del nulo se invierte. Antes decía "un nulo queda nulo", y ahora el vacío y el nulo también se redactan. Entran las mutaciones (f) y (g).
-- La evidencia de v31 (`SDD/verification/feat-GEN-108-mcp-bisalta-db-v31.md`, sellada sobre `c11a810`) ya es la de este texto. El archivo conserva el nombre.
+- La evidencia de v31 (`SDD/verification/feat-GEN-108-mcp-bisalta-db-v31.md`, sellada sobre `c11a810` y vuelta a sellar en `d8f1ffe` sobre `26cbe49`) ya es la de este texto. El archivo conserva el nombre.
 - **Medido para el ADVISORY de la ronda 2** (2-oct, con el plugin, sólo metadatos): en `smartcheck` (dev y qa) ninguna función toca el parámetro de sesión. Pero hay **3 funciones `SECURITY DEFINER`** que `claude_lectura` puede ejecutar. Su dueño es `smartcheck`, que también es el dueño de las 55 tablas y tiene `BYPASSRLS`, y el RLS no está forzado en ninguna tabla. Dos de ellas reciben un id de solicitud y devuelven su contexto en JSON. [Probable] Devuelven datos de **cualquier** tenant, sin importar el parámetro de sesión. No se ejecutaron, para no leer datos de otros clientes. Esto existe desde antes de v31: el filtro por tenant no aplica dentro de esas funciones. Queda en `D92`, para Patrick, y entra en las condiciones para habilitar el plugin al equipo, no sólo el tenant. Alcanza a las dos entradas de SmartCheck que ya están en `prod`. SmartFleet qa no tiene funciones `SECURITY DEFINER`.
 - **Ronda 3: `ESCALATE`** (`E26`), porque el brief acotaba `D92` al tenant. El planner la ratifica corrigiendo los textos, sin ronda 4.
 
@@ -487,8 +509,8 @@ Superficie pública nueva: dos herramientas MCP. No hay consumidor previo, así 
 
 1. **¿Quién puede invocarlo?** Cualquier proceso local que tenga el plugin habilitado **y** credenciales AWS con permiso de lectura sobre el secreto de esa conexión. La barrera real es IAM, no el plugin: sin permiso sobre el secreto, la conexión falla aunque la entrada del catálogo esté presente.
 2. **¿Qué pasa con el rol equivocado?** Sin permiso IAM sobre el secreto, `consultar` devuelve `{ "error": "secreto_inaccesible" }` nombrando la conexión y el identificador del secreto, **sin volcar la respuesta cruda de AWS** (puede traer el ARN de la identidad llamante). Exit code 5.
-3. **¿Qué pasa con input hostil?** El único campo de entrada libre es `sql`. Lo valida la lista blanca del dialecto de la conexión, **antes de conectar**: se quitan comentarios y literales, se parte en sentencias, y cada sentencia debe empezar con `SELECT` o `WITH` **y no contener una escritura embebida** (AC47, v16: un `WITH` puede llevar un `INSERT`/`UPDATE`/`DELETE`/`MERGE`, y un `SELECT … INTO` crea una tabla). La lista blanca es **la primera** barrera, no la única: detrás están la sesión de solo lectura, la réplica —comprobada en cada consulta desde v16 (AC46)— y los permisos del rol. Al rechazar, el error devuelve los primeros 90 caracteres de la sentencia ofensora — nunca el archivo completo, nunca un stack trace. Exit code 4.
-4. **¿Qué datos toca y de quién?** Datos de proveedores, empleados y operación de Construplaza. Las conexiones de Postgres son de `dev`/`qa`. Las de SQL Server son **copias de producción** (`EXACTUS` 395 GB, `BI` 177 GB, `COMPRAS` 107 GB): los tamaños no son de desarrollo. No hay acceso por ID de recurso. **Hasta v30, la unidad de autorización era la conexión entera.** Desde v31, en las entradas con `sesion`, hay además autorización **por fila**: el RLS de la base filtra por el tenant que fija el plugin (`AC64`). Esa superficie necesita que la consulta del usuario no pueda cambiar el parámetro de sesión. **La review de v31, ronda 1, encontró una forma de cambiarlo (`E24`).** La cierra la regla `identificador_unicode` de Patrick Ocampo (`AC47`, v31), con el AC negativo de `AC64`. El parámetro se puede cambiar sólo llamando a `set_config`, y la lista blanca rechaza esa llamada en toda forma de escribirla que Patrick revisó. La barrera vale mientras esa enumeración esté completa, y la frenan además la sesión de solo lectura y el privilegio del rol para todo lo que no sea leer. **No cubre las funciones `SECURITY DEFINER` de la base** (v32, `D92`). En SmartCheck hay tres, ejecutables por `claude_lectura`, cuyo dueño tiene `BYPASSRLS`. Dentro de ellas el RLS no aplica, y [Probable] devuelven datos de cualquier tenant. La barrera está del lado de la base: un `REVOKE EXECUTE` para `claude_lectura`. Las columnas sensibles que el tenant destraba se redactan por nombre (`AC65`), como higiene y no como barrera (`D91`).
+3. **¿Qué pasa con input hostil?** El único campo de entrada libre es `sql`. Lo valida la lista blanca del dialecto de la conexión, **antes de conectar**: se quitan comentarios y literales, se parte en sentencias, y cada sentencia debe empezar con `SELECT` o `WITH` **y no contener una escritura embebida** (AC47, v16: un `WITH` puede llevar un `INSERT`/`UPDATE`/`DELETE`/`MERGE`, y un `SELECT … INTO` crea una tabla). La lista blanca es **la primera** barrera, no la única: detrás están la sesión de solo lectura, la réplica —comprobada en cada consulta desde v16 (AC46)— y los permisos del rol. Al rechazar, el error devuelve los primeros 90 caracteres de la sentencia ofensora — nunca el archivo completo, nunca un stack trace. Exit code 4. **Desde v34, en SQL Server se ejecuta el SQL validado más un sufijo fijo** (`\nFOR JSON PATH, INCLUDE_NULL_VALUES`, `AC67`). El sufijo es constante y sólo de formato. El salto de línea cierra un comentario de línea con que termine la consulta, y un literal, identificador o comentario de bloque sin cerrar ya lo rechaza `AC51`: el sufijo no puede quedar adentro de una construcción del usuario. El reintento en tabla corre la misma variable ya validada, sin el sufijo, y sólo ante los dos errores de `FOR JSON`.
+4. **¿Qué datos toca y de quién?** Datos de proveedores, empleados y operación de Construplaza. Las conexiones de Postgres son de `dev`/`qa`. Las de SQL Server son **copias de producción** (`EXACTUS` 395 GB, `BI` 177 GB, `COMPRAS` 107 GB): los tamaños no son de desarrollo. No hay acceso por ID de recurso. **Hasta v30, la unidad de autorización era la conexión entera.** Desde v31, en las entradas con `sesion`, hay además autorización **por fila**: el RLS de la base filtra por el tenant que fija el plugin (`AC64`). Esa superficie necesita que la consulta del usuario no pueda cambiar el parámetro de sesión. **La review de v31, ronda 1, encontró una forma de cambiarlo (`E24`).** La cierra la regla `identificador_unicode` de Patrick Ocampo (`AC47`, v31), con el AC negativo de `AC64`. El parámetro se puede cambiar sólo llamando a `set_config`, y la lista blanca rechaza esa llamada en toda forma de escribirla que Patrick revisó. La barrera vale mientras esa enumeración esté completa, y la frenan además la sesión de solo lectura y el privilegio del rol para todo lo que no sea leer. **No cubre las funciones `SECURITY DEFINER` de la base** (v32, `D92`). En SmartCheck hay tres, ejecutables por `claude_lectura`, cuyo dueño tiene `BYPASSRLS`. Dentro de ellas el RLS no aplica, y [Probable] devuelven datos de cualquier tenant. **Pagada el 2-oct**: Patrick le sacó a `PUBLIC` el `EXECUTE` de las tres, y se verificó desde el plugin que `claude_lectura` ya no las puede ejecutar. Las columnas sensibles que el tenant destraba se redactan por nombre (`AC65`), como higiene y no como barrera (`D91`).
 
 ### Riesgo aceptado, con dueño
 
@@ -599,6 +621,7 @@ Arreglo de objetos. El validador **rechaza cualquier campo no listado acá** y c
   "columnas_redactadas": [ "<nombre>" ],     // sólo si se redactó alguna (v31, AC65)
   "avisos_motor": [ "Warning: …" ],          // sólo sqlserver, sólo si hubo (v33, AC66)
   "formato_tabla": "Se leyó como tabla …",    // sólo sqlserver, sólo si FOR JSON no aplicó (v34, AC67)
+  // Un número llega como texto exacto en los dos dialectos (v36, AC67); un bit, como booleano
   "filas": [ { ... } ],
   "filas_devueltas": <entero>,
   "truncado": <booleano>,
@@ -626,6 +649,7 @@ Arreglo con `nombre`, `dialecto`, `ambiente`, `base`, `garantias` y, desde v31, 
 | Conexión rechazada o caída | 6 | `{ "error": "conexion_fallida" }` con el mensaje del cliente, sin la credencial. En SQL Server el mensaje sale de stdout (v25, `AC57`) |
 | Tiempo agotado — en Postgres, el `statement_timeout` del rol (60 s desde v19); en SQL Server, `sqlcmd -t 60` (v25, `AC54`); en los dos motores, el corte del proceso a los 125 s | 7 | `{ "error": "tiempo_agotado" }` |
 | Binario del cliente ausente | 8 | `{ "error": "cliente_ausente" }` nombrando el binario que falta |
+| La salida del cliente pasó el buffer del proceso, 64 MiB, antes de llegar a los topes (v36, `AC68`) | 10 | `{ "error": "salida_demasiado_grande" }`, con la indicación de pedir menos filas o columnas. En SQL Server lleva `aislamiento` (`AC63`) |
 | La conexión Postgres no llegó a una réplica de lectura (v16, AC46) | 9 | `{ "error": "no_es_replica" }` con el nombre de la conexión. **El SQL del consumidor no se ejecutó.** |
 | Catálogo ilegible o inválido (v3) | 2 | `{ "error": "catalogo_invalido" }` con el motivo del rechazo. Es error de configuración, no de conexión: sin catálogo válido no hay conexión que nombrar. |
 
@@ -910,28 +934,32 @@ Casos en `SDD/tests/test_catalogo.sh` y `SDD/tests/test_servidor_mcp.sh`, assert
 - **AC negativo** (v31, `E24`): la consulta del usuario no puede cambiar el parámetro de sesión. `RESET`, `SET`, `set_config` (también calificada o entre comillas dobles) y los identificadores con escape Unicode se rechazan antes de conectar (`AC47`, `AC53` para `SET` en SQL Server; en Postgres, la sentencia tiene que empezar con `SELECT` o `WITH`). Casos: los de rechazo de `casos-adversariales-v31.js`, por índice. **Parte `manual-only`**, a pedido de Patrick: con el tenant puesto, probarlo contra la base.
 **Parte `manual-only`**, contra la base real a través del plugin: en `smartcheck-qa`, `count(DISTINCT tenant_id)` de `smartcheck.requests` da 1 y `count(*)` da más de 0. El conteo de QA cambia con el tiempo: Patrick midió 2998 el 1-oct y la evidencia de v31 mide 3020; en `proveedores-dev` la consulta responde igual que antes.
 
-**AC65** (detección, v31) — En la respuesta de `consultar`, en los dos dialectos, el valor de toda columna cuyo nombre contenga `token`, `secret`, `password`, `passwd`, `key_hash` o `api_key`/`apikey` (sin mirar mayúsculas) se reemplaza por `[redactado]`, también si está vacío o es nulo: `psql --csv` entrega un NULL como campo vacío, y el parser no los distingue (review de v31, ronda 1). La respuesta lleva `columnas_redactadas`, con sus nombres, antes de `filas`, y sólo si hubo alguna. Se redacta antes de los topes. **Es por nombre**: una columna renombrada en la consulta no se detecta. Protege de la exposición accidental, no es una barrera de acceso (decisión de Ian, 1-oct). Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC65`. **Mutaciones declaradas**:
+**AC65** (detección, v31) — En la respuesta de `consultar`, en los dos dialectos, el valor de toda columna cuyo nombre contenga `token`, `secret`, `password`, `passwd`, `key_hash` o `api_key`/`apikey` (sin mirar mayúsculas) se reemplaza por `[redactado]`, también si está vacío o es nulo: `psql --csv` entrega un NULL como campo vacío, y el parser no los distingue (review de v31, ronda 1). La respuesta lleva `columnas_redactadas`, con sus nombres, antes de `filas`, y sólo si hubo alguna. Se redacta antes de los topes. Desde v36 se redacta también dentro de los objetos y arreglos anidados, por la ruta con puntos: `FOR JSON PATH` convierte `[cred.token]` en `{"cred":{"token":…}}`, y `columnas_redactadas` nombra `cred.token`. **Es por nombre**: una columna renombrada en la consulta no se detecta. Protege de la exposición accidental, no es una barrera de acceso (decisión de Ian, 1-oct). Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC65`. **Mutaciones declaradas**:
 - (a) sin redactar, los del valor y el de `[redactado]`;
 - (b) sin `columnas_redactadas`, el de esa lista;
 - (c) el patrón sensible a mayúsculas, el de los patrones;
 - (d) dejar sin redactar el vacío, el del valor vacío;
 - (f) redactar sólo en `postgres`, los de SQL Server;
 - (g) redactar después de los topes, los del token de más de 1 MiB;
-- (e) sin `passwd`, el mismo.
-**Parte `manual-only`**, contra la base real a través del plugin: una consulta a una tabla con una columna `token` la devuelve redactada.
+- (e) sin `passwd`, el mismo;
+- (h) (v36) sin redactar dentro de un objeto anidado, los de `cred.token`;
+- (i) (v36) sin recorrer los arreglos, el de `columnas_redactadas`.
+**Parte `manual-only`**, contra la base real a través del plugin: una consulta a una tabla con una columna `token` la devuelve redactada. Desde v36, también `SELECT 'x' AS [cred.token]` en SQL Server.
 **Límites conocidos** (`D91`): es por nombre, así que una columna renombrada no se detecta, y el `mensaje` de un error de `psql` puede traer el valor de una columna (por ejemplo, en un error de conversión).
 
 **AC66** (detección, v33) — En SQL Server, una línea de la salida que no trae separador y empieza con `Warning: ` no es una fila. Es un aviso ANSI del motor, por ejemplo "Null value is eliminated by an aggregate…", que `sqlcmd` imprime en stdout. Va en `avisos_motor`, antes de `filas`, y sólo si hubo alguno. No cuenta en `filas_devueltas`. Una fila cuyo primer valor empieza igual pero trae separador sigue siendo una fila. **Límite conocido**: en un resultado de una sola columna, un valor que empiece con `Warning: ` se toma por aviso. Medido el 2-oct: `sqlcmd -m 11` no lo saca, porque no tiene nivel de severidad. `SET ANSI_WARNINGS OFF` se descartó, porque cambia la semántica de la consulta (por ejemplo, una división por cero deja de ser error). Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC66`. **Mutaciones declaradas**:
 - (a) sin apartar el aviso, los de `filas_devueltas` y `avisos_motor`;
 - (b) apartar toda línea que empiece con `Warning: `, aunque traiga separador, el del control;
 - (c) apartarlo sin informarlo, el de `avisos_motor`;
-- (d) (v35) en JSON, sin apartar el aviso, el de `avisos_motor`.
+- (d) (v35) en JSON, sin apartar el aviso, el de `avisos_motor`;
+- (e) (v36) en JSON, la línea de filas afectadas cuenta como aviso, los de `avisos_motor` exacto;
+- (f) (v36) en JSON, la línea vacía no cierra el resultado, los del aviso.
 
-(a) y (b) se miden con los casos de la tabla de respaldo (v35). Con `FOR JSON`, el aviso llega después de la línea vacía que cierra el resultado y fuera del arreglo, y se aparta sólo por igualdad exacta con un aviso conocido. El **límite conocido** de arriba aplica sólo a la tabla de respaldo.
+(a) y (b) se miden con los casos de la tabla de respaldo (v35). **En JSON (v36)**, el aviso llega después de la línea vacía que cierra el resultado, fuera del arreglo. Todo lo que viene después, salvo la línea "(N rows affected)", va en `avisos_motor`: un mensaje que no se conoce se informa, no se descarta. El **límite conocido** de arriba aplica sólo a la tabla de respaldo.
 **Parte `manual-only`**, contra la instancia real: una consulta con un `count` sobre una columna con nulos devuelve las filas sin el aviso, y el aviso en `avisos_motor`.
 
-**AC67** (detección, v34) — En SQL Server, el plugin le agrega a la consulta un salto de línea y `FOR JSON PATH, INCLUDE_NULL_VALUES`, y llama a `sqlcmd` con `-y 8000`. La salida es una columna con un nombre fijo, partida en trozos que se concatenan. Las filas son el arreglo JSON: un salto de línea llega dentro del valor, un texto largo llega entero y un número o un nulo llegan con su tipo JSON. Un resultado vacío da cero filas.
-- **Respaldo**: si el motor responde `Msg 13605` (una columna sin nombre) o `Msg 13601` (un nombre repetido), la consulta se vuelve a correr en formato de tabla, también con `-y 8000`. La respuesta lleva `formato_tabla`, que dice por qué y con qué límites: un texto de más de 8000 caracteres llega cortado, y un salto de línea puede partir la fila. Una columna sin nombre se nombra por posición (`columna_1`). Cualquier otro error no se reintenta.
+**AC67** (detección, v34) — En SQL Server, el plugin le agrega a la consulta un salto de línea y `FOR JSON PATH, INCLUDE_NULL_VALUES`, y llama a `sqlcmd` con `-y 8000`. La salida es una columna con un nombre fijo, partida en trozos que se concatenan. Las filas son el arreglo JSON: un salto de línea llega dentro del valor, un texto largo llega entero y un nulo llega como nulo. **Un número llega como el texto exacto que mandó el motor** (v36, decisión de Ian): un `decimal(28,8)` o un `bigint` mayor que 2^53 no se redondean. Un `bit` llega como booleano. Con un Node sin `context.source` (anterior a 22), el servidor no arranca y lo dice. Un resultado vacío da cero filas. Algo antes del encabezado es otro resultado (dos `SELECT` seguidos) y es `conexion_fallida`: el plugin devuelve un solo resultado. **Límite conocido**: un `FOR XML` o `FOR JSON` propio en la consulta da error de sintaxis (`Msg 156`, medido), y el README y la descripción de la herramienta lo dicen.
+- **Respaldo**: si la corrida falló, la salida no trae el encabezado JSON y el **primer** error del motor es `Msg 13605` (una columna sin nombre) o `Msg 13601` (un nombre repetido), la consulta se vuelve a correr en formato de tabla, también con `-y 8000`. La respuesta lleva `formato_tabla`, que dice por qué y con qué límites: un texto de más de 8000 caracteres llega cortado, y un salto de línea puede partir la fila. Una columna sin nombre se nombra por posición (`columna_1`). Cualquier otro error no se reintenta.
 - **Medido el 2-oct**, antes del cambio: en formato de tabla, `sqlcmd` cortaba todo texto a 256 caracteres (de 5000 llegaban 256) y un valor con saltos de línea se partía en varias filas. `-y 0` saca el límite, pero también el encabezado.
 
 Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC67`. El stub de `sqlcmd` imita la salida de `FOR JSON`. **Mutaciones declaradas**:
@@ -939,13 +967,28 @@ Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC67`. El stub de `sqlcmd` i
 - (b) sin `-y 8000`, el de la bandera;
 - (c) sin el salto de línea antes de `FOR JSON`, el del argumento;
 - (d) sin respaldo, los de "corre dos veces" y `formato_tabla`;
-- (e) reintentar con cualquier error, el de "no se reintenta";
-- (f) sin nombrar por posición la columna sin nombre, el de `columna_1`.
+- (e) reintentar con cualquier error, los de "no se reintenta";
+- (f) sin nombrar por posición la columna sin nombre, el de `columna_1`;
+- (g) (v36) el respaldo sin `Msg 13601`, los de 13601;
+- (h) (v36) el respaldo sin mirar el exit code, el de exit 0;
+- (i) (v36) el respaldo sin mirar el encabezado JSON, el del encabezado;
+- (j) (v36) el respaldo con cualquier línea `Msg 1360x`, no con el primer error, el de "el primer error no es de FOR JSON";
+- (k) (v36) los números por `JSON.parse`, los de decimal, bigint y ceros;
+- (l) (v36) sin el error claro cuando falta `context.source`, el de Node;
+- (m) (v36) sin verificar el Node al cargar el módulo, el mismo;
+- (n) (v36) un resultado antes del JSON se descarta, el de dos resultados.
 
 **Parte `manual-only`**, contra la instancia real:
 - un valor de 20000 caracteres con un salto de línea llega entero;
+- (v36) un `decimal(28,8)` y un `bigint` mayor que 2^53 llegan exactos;
+- (v36) un resultado vacío da cero filas;
+- (v36) dos `SELECT` seguidos dan error;
 - una columna sin nombre pasa a tabla con su aviso;
 - la definición más larga de COMPRAS llega con el mismo largo que mide el motor.
+
+**AC68** (detección, v36) — Si la salida del cliente (`psql` o `sqlcmd`) pasa el buffer del proceso (64 MiB) antes de llegar a los topes, `consultar` responde `salida_demasiado_grande`, código 10, con la indicación de pedir menos filas o columnas. Hasta v35, Node mataba al cliente con `SIGTERM` y eso se informaba como `tiempo_agotado`. Con los textos enteros de `AC67` es más fácil de alcanzar. La regla va antes de la del tiempo agotado. En SQL Server el error lleva `aislamiento` (`AC63`). Casos en `SDD/tests/test_servidor_mcp.sh`, asserts `AC68`. **Mutaciones declaradas**:
+- (a) sin la regla de `ENOBUFS`, el del código;
+- (b) el código 10 sin `aislamiento`, el de `aislamiento`.
 
 **AC51** (detección) — La normalización de la lista blanca es **un solo recorrido de izquierda a derecha** que conoce las reglas de comillado de cada dialecto, de modo que **el validador ve las mismas sentencias que ejecuta el motor**:
 - **en los dos dialectos**: literales entre comillas simples con `''` como escape; identificadores entre comillas dobles con `""` como escape (se copian tal cual); comentarios de línea (`--` hasta el fin de línea); comentarios de bloque **anidados**;

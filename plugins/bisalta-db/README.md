@@ -32,7 +32,7 @@ conexión.
 
 Requisitos en la máquina (ninguno se instala con el plugin):
 
-- `node` (probado con v22.17). **No hay `package.json`, ni lockfile, ni
+- `node` **22 o posterior** (probado con v22.17): sin `context.source` en `JSON.parse`, los números de SQL Server llegarían redondeados, así que con un Node anterior el servidor no arranca y lo dice. **No hay `package.json`, ni lockfile, ni
   `node_modules`**: el servidor es Node plano, cero dependencias.
 - `psql` para las conexiones `postgres`; `sqlcmd` para las `sqlserver`. Si el
   binario falta, la consulta devuelve `cliente_ausente` (código 8) nombrando
@@ -302,16 +302,20 @@ Algunas bases filtran por tenant con RLS: sin un parámetro de sesión, el rol v
 
 ## Columnas sensibles (v31, `AC65`)
 
-El valor de las columnas cuyo nombre contiene `token`, `secret`, `password`, `passwd`, `key_hash`, `api_key` o `apikey` sale como `[redactado]`, también si está vacío o es nulo, y la respuesta trae `columnas_redactadas` con cuáles. **Es por nombre**: si renombrás la columna en la consulta, no se detecta. Sirve para que una credencial no termine en el contexto por accidente, no para impedir que alguien la busque.
+El valor de las columnas cuyo nombre contiene `token`, `secret`, `password`, `passwd`, `key_hash`, `api_key` o `apikey` sale como `[redactado]`, también si está vacío o es nulo, y la respuesta trae `columnas_redactadas` con cuáles. **Es por nombre**: si renombrás la columna en la consulta, no se detecta. Sirve para que una credencial no termine en el contexto por accidente, no para impedir que alguien la busque. En SQL Server, un nombre con punto (`[cred.token]`) llega anidado (`{"cred":{"token":…}}`), y se redacta igual: `columnas_redactadas` dice `cred.token`.
 
-## Cómo llegan los datos de SQL Server (v34, `AC67`)
+## Cómo llegan los datos de SQL Server (v34 y v36, `AC67`)
 
-El plugin le agrega `FOR JSON` a tu consulta. Así los textos largos llegan enteros, los saltos de línea quedan dentro del valor, y los números y los nulos llegan con su tipo, no como texto. Si la consulta tiene una columna **sin nombre** (`SELECT count(*)` sin alias) o dos columnas con el **mismo nombre**, `FOR JSON` no se puede aplicar: el plugin la lee como tabla y la respuesta trae `formato_tabla`, que avisa los límites (8000 caracteres, saltos de línea). **Poné un alias distinto a cada columna** y llega completa.
+El plugin le agrega `FOR JSON` a tu consulta. Así los textos largos llegan enteros y los saltos de línea quedan dentro del valor. **Los números llegan como texto exacto**, igual que en Postgres: un `decimal(28,8)` o un `bigint` grande no se redondean. Un nulo llega como nulo y un `bit`, como booleano. Si la consulta tiene una columna **sin nombre** (`SELECT count(*)` sin alias) o dos columnas con el **mismo nombre**, `FOR JSON` no se puede aplicar: el plugin la lee como tabla y la respuesta trae `formato_tabla`, que avisa los límites (8000 caracteres, saltos de línea). **Poné un alias distinto a cada columna** y llega completa.
+
+- **No agregues `FOR JSON` ni `FOR XML`**: el plugin ya lo pide, y dos dan error de sintaxis.
+- **Un `SELECT` por consulta**: dos seguidos dan error, en vez de devolver sólo el último.
+- Un aviso o mensaje del motor llega en `avisos_motor`.
 
 ## Leer el código de SPs, vistas y triggers (v33 y v34)
 
 - **Postgres**: `SELECT pg_get_functiondef('<esquema>.<funcion>'::regproc)`, o `prosrc` de `pg_proc`. Ya funciona.
-- **SQL Server**: `SELECT definition FROM sys.sql_modules WHERE object_id = OBJECT_ID('dbo.<nombre>')`, o `SELECT OBJECT_DEFINITION(OBJECT_ID('dbo.<nombre>'))`. **`sp_helptext` no funciona**: es un `EXEC` sobre un `sp_`, y la lista blanca lo rechaza. Hace falta que el login tenga `VIEW DEFINITION` en la base: lo dio Patrick el 2-oct en las seis. **Desde v34 la definición llega entera y con sus saltos de línea** (`AC67`). Hasta v33 se cortaba a 256 caracteres y se partía en filas.
+- **SQL Server**: `SELECT definition FROM sys.sql_modules WHERE object_id = OBJECT_ID('dbo.<nombre>')`, o `SELECT OBJECT_DEFINITION(OBJECT_ID('dbo.<nombre>')) AS definicion`. **El alias hace falta**: sin él, la consulta se lee como tabla y se corta a 8000 caracteres. **`sp_helptext` no funciona**: es un `EXEC` sobre un `sp_`, y la lista blanca lo rechaza. Hace falta que el login tenga `VIEW DEFINITION` en la base: lo dio Patrick el 2-oct en las seis. **Desde v34 la definición llega entera y con sus saltos de línea** (`AC67`). Hasta v33 se cortaba a 256 caracteres y se partía en filas.
 - **Ojo**: si el código tiene una credencial escrita, la vas a ver, y queda en el transcript. Es un riesgo aceptado (`D93`).
 - Un aviso del motor, como "Null value is eliminated by an aggregate…", no llega como fila sino en `avisos_motor` (`AC66`).
 
@@ -385,6 +389,7 @@ plugin al equipo, no algo que este código controle.
 | Conexión rechazada o caída | 6 | `conexion_fallida`, con el mensaje del cliente, sin la credencial. En SQL Server el mensaje sale de stdout, porque `sqlcmd` escribe ahí sus errores (v25, `AC57`) |
 | Tiempo agotado: el motor corta por su propio límite de sentencia (Postgres: `statement_timeout` del rol, 60s — v19), `sqlcmd` corta la consulta (`-t 60`, v25), o el plugin corta el proceso (125 s, los dos motores) | 7 | `tiempo_agotado` |
 | Binario del cliente ausente | 8 | `cliente_ausente`, nombrando el binario |
+| La salida pasó el buffer del proceso, 64 MiB, antes de llegar a los topes (v36, `AC68`) | 10 | `salida_demasiado_grande`: pedí menos filas (`TOP`) o menos columnas |
 | La conexión Postgres no llegó a una réplica de lectura (v16) | 9 | `no_es_replica`, con el nombre de la conexión. **El SQL del consumidor no se ejecutó** |
 
 El catálogo ilegible o inválido también sale con código 2 (`catalogo_invalido`):

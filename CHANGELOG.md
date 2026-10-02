@@ -6,9 +6,13 @@ Cambios del marketplace `ai-forge`. Orden descendente (lo más reciente primero)
 
 ### 0.3.0 — sin publicar
 
-Contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v35 (`AC47`, `AC64`, `AC65`, `AC66`, `AC67`).
+Contract `SDD/contracts/2026-09-18-bisalta-db-mcp.md` v36 (`AC47`, `AC64`, `AC65`, `AC66`, `AC67`, `AC68`).
 
-- **Los textos de SQL Server llegan enteros.** La consulta va con `FOR JSON`: un texto largo llega completo, un salto de línea llega dentro del valor, y los números y los nulos llegan con su tipo JSON. Antes, todo texto se cortaba a 256 caracteres y un salto de línea partía la fila, desde la primera versión. Si `FOR JSON` no acepta la consulta (una columna sin nombre o un nombre repetido), se vuelve a correr en tabla, y la respuesta lo avisa en `formato_tabla`.
+- **Los textos de SQL Server llegan enteros.** La consulta va con `FOR JSON`: un texto largo llega completo y un salto de línea llega dentro del valor. Los números llegan como texto exacto, como en Postgres: un `decimal` o un `bigint` grande no se redondean. Antes, todo texto se cortaba a 256 caracteres y un salto de línea partía la fila, desde la primera versión. Si `FOR JSON` no acepta la consulta (una columna sin nombre o un nombre repetido), se vuelve a correr en tabla, y la respuesta lo avisa en `formato_tabla`.
+- **Requiere Node 22 o posterior.** Con uno anterior, el servidor no arranca y lo dice.
+- **Dos `SELECT` seguidos en SQL Server son un error**, en vez de devolver sólo el último.
+- **`salida_demasiado_grande` (código 10).** Una salida de más de 64 MiB ya no se informa como `tiempo_agotado`.
+- **La redacción entra en los nombres con punto**, que SQL Server devuelve anidados.
 - **Leer el código de SPs, vistas y triggers.** El README explica cómo hacerlo en cada motor. En SQL Server hace falta `VIEW DEFINITION`, que da Patrick. `sp_helptext` no funciona.
 - **Los avisos del motor no llegan como filas.** Un aviso ANSI de `sqlcmd` va en `avisos_motor`, en los dos formatos.
 

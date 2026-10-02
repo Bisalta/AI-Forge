@@ -124,16 +124,25 @@ const AVISO_FORMATO_TABLA = 'Se leyó como tabla porque la consulta tiene una co
 function redactarColumnasSensibles(filas) {
   const redactadas = [];
   const vistas = {};
+  const registrar = function (ruta) {
+    if (!Object.prototype.hasOwnProperty.call(vistas, ruta)) { vistas[ruta] = true; redactadas.push(ruta); }
+  };
+  // AC65 (v36): FOR JSON PATH convierte un nombre con punto (`[cred.token]`)
+  // en un objeto anidado. La ruta con puntos es el nombre de la columna, así
+  // que se mira en cada nivel, también dentro de un arreglo.
+  const redactarValor = function (valor, ruta) {
+    if (COLUMNA_SENSIBLE.test(ruta)) { registrar(ruta); return VALOR_REDACTADO; }
+    if (Array.isArray(valor)) return valor.map(function (v) { return redactarValor(v, ruta); });
+    if (valor !== null && typeof valor === 'object') {
+      const copia = {};
+      Object.keys(valor).forEach(function (clave) { copia[clave] = redactarValor(valor[clave], ruta + '.' + clave); });
+      return copia;
+    }
+    return valor;
+  };
   const salida = filas.map(function (fila) {
     const copia = {};
-    Object.keys(fila).forEach(function (columna) {
-      if (COLUMNA_SENSIBLE.test(columna)) {
-        if (!Object.prototype.hasOwnProperty.call(vistas, columna)) { vistas[columna] = true; redactadas.push(columna); }
-        copia[columna] = VALOR_REDACTADO;
-      } else {
-        copia[columna] = fila[columna];
-      }
-    });
+    Object.keys(fila).forEach(function (columna) { copia[columna] = redactarValor(fila[columna], columna); });
     return copia;
   });
   return { filas: salida, redactadas: redactadas };
@@ -227,7 +236,7 @@ function manejarConsultar(args) {
     // del prefijo, y uno de ellos, el Msg 601, sólo existe por ese nivel. Sin
     // el campo, se lee como una caída de la red. El 5 (secreto) no llegó a
     // correr nada y no lo lleva.
-    if (entrada.dialecto === 'sqlserver' && (codigo === 6 || codigo === 7)) {
+    if (entrada.dialecto === 'sqlserver' && (codigo === 6 || codigo === 7 || codigo === 10)) {
       extra.aislamiento = conexion.NIVEL_AISLAMIENTO_SQLSERVER;
     }
     return terminar(codigo, cuerpoDeError(codigo, nombreError, extra), 0, false);
@@ -302,6 +311,8 @@ const HERRAMIENTAS = [
       'SQL Server lo repiten en los campos aislamiento y aviso, y sus errores de consulta, en aislamiento. Un aviso ' +
       'del motor llega en avisos_motor. En SQL Server poné un alias distinto a cada columna: si falta o se repite, ' +
       'la consulta se lee como tabla (formato_tabla) y un texto de más de 8000 caracteres llega cortado. ' +
+      'En SQL Server no agregues FOR JSON ni FOR XML: el plugin ya pide el resultado en JSON. Los números ' +
+      'llegan como texto exacto, en todos los dialectos. ' +
       'En Postgres, si la conexión no llegó a una réplica de lectura, se niega con no_es_replica sin ' +
       'ejecutar el SQL. En una conexión multitenant (la que tiene sesion en listar_conexiones), el plugin fija ' +
       'el tenant antes de la consulta. Las columnas cuyo nombre indica una credencial (token, secret, password, ' +

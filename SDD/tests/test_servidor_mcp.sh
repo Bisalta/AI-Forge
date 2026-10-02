@@ -163,6 +163,31 @@ if printf '%s' "$*" | grep -q 'FOR JSON'; then
       printf '\n\n(1 rows affected)\n'
       exit 0 ;;
     json-vacio) printf '%s\n------\n\n(0 rows affected)\n' "$ENC_JSON"; exit 0 ;;
+    # v36: lo que el motor manda y un double no guarda (medido en vivo).
+    numeros-exactos) json_salida '[{"m":99999999999.99999999,"b":9007199254740993,"d":1.10,"f":true}]'; exit 0 ;;
+    # v36: un nombre con punto, que FOR JSON PATH anida (medido en vivo).
+    nombre-con-punto) json_salida '[{"cred":{"token":"valor-anidado"},"id":1,"hijos":[{"api_key":"valor-en-arreglo"},{"x":"y"}]}]'; exit 0 ;;
+    # v36: un mensaje del motor que no está en ninguna lista.
+    aviso-desconocido)
+      printf '%s\n------\n%s\n\nWarning: otro mensaje del motor.\n(1 row affected)\n' "$ENC_JSON" '[{"n":1}]'
+      exit 0 ;;
+    # v36: dos SELECT seguidos. El primero sale en tabla antes del encabezado.
+    dos-resultados)
+      printf 'a\n-\n1\n\n(1 row affected)\n%s\n------\n%s\n\n(1 row affected)\n' "$ENC_JSON" '[{"b":2}]'
+      exit 0 ;;
+    # v36: los casos que NO piden la tabla de respaldo.
+    respaldo-status-0) printf 'Msg 13605, Level 16, State 1, Server EC2X, Line 1\nColumn expressions and data sources without names or aliases cannot be formatted as JSON text using FOR JSON clause.\n'; exit 0 ;;
+    respaldo-otro-primero)
+      printf 'Msg 208, Level 16, State 1, Server EC2X, Line 1\nInvalid object name.\nMsg 13605, Level 16, State 1, Server EC2X, Line 1\nColumn expressions and data sources without names or aliases cannot be formatted as JSON text using FOR JSON clause.\n'
+      exit 1 ;;
+    respaldo-con-encabezado)
+      printf '%s\n------\n%s\n\nMsg 13605, Level 16, State 1, Server EC2X, Line 1\nColumn expressions and data sources without names or aliases cannot be formatted as JSON text using FOR JSON clause.\n' "$ENC_JSON" '[{"n":1}]'
+      exit 1 ;;
+    msg-13601)
+      printf 'Msg 13601, Level 16, State 1, Server EC2X, Line 1\nProperty names must be unique.\n'
+      exit 1 ;;
+    # AC68 (v36): una salida que pasa el buffer del proceso (64 MiB).
+    salida-enorme) head -c 68000000 /dev/zero | tr '\0' 'x'; exit 0 ;;
     sin-nombre|aviso-ansi-tabla)
       printf 'Msg 13605, Level 16, State 1, Server EC2X, Line 1\nColumn expressions and data sources without names or aliases cannot be formatted as JSON text using FOR JSON clause.\n'
       exit 1 ;;
@@ -174,7 +199,7 @@ case "${BISALTA_STUB_PSQL_MODO:-normal}" in
     printf 'id,nombre\n1,ana\n2,"luis, el otro"\n'
     ;;
   # AC67: la misma consulta, ya sin FOR JSON: una columna sin nombre.
-  sin-nombre)
+  sin-nombre|msg-13601)
     printf '\n-----\n953\n\n(1 rows affected)\n'
     ;;
   muchas-filas)
@@ -1032,7 +1057,7 @@ export BISALTA_STUB_PSQL_MODO
 reiniciar_registros
 cuerpo_67="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
 forma_67="$("$NODE_BIN" -e "const f=JSON.parse(process.argv[1]).filas[0];process.stdout.write(JSON.stringify(f.v)+'|'+f.t.length+'|'+typeof f.n)" "$cuerpo_67")"
-assert_eq "$forma_67" '"a\nb"|5000|number' "AC67 un salto de línea llega dentro del valor, un texto de 5000 caracteres llega entero y un número llega como número"
+assert_eq "$forma_67" '"a\nb"|5000|string' "AC67 un salto de línea llega dentro del valor, un texto de 5000 caracteres llega entero y un número llega como texto"
 assert_contains "$cuerpo_67" '"filas_devueltas":1' "AC67 el valor partido en trozos es una sola fila"
 BISALTA_STUB_PSQL_MODO=json-vacio
 export BISALTA_STUB_PSQL_MODO
@@ -1061,6 +1086,63 @@ export BISALTA_STUB_PSQL_MODO
 reiniciar_registros
 cuerpo_n67="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
 assert_no_contains "$cuerpo_n67" 'formato_tabla' "AC67 una consulta que pasa por JSON no trae formato_tabla"
+
+# v36: el respaldo, sólo con los dos errores de FOR JSON y como primer error.
+consulta_modo() { # modo → cuerpo; deja el registro de invocaciones
+  BISALTA_STUB_PSQL_MODO="$1"
+  export BISALTA_STUB_PSQL_MODO
+  reiniciar_registros
+  cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")"
+  BISALTA_STUB_PSQL_MODO=normal
+  export BISALTA_STUB_PSQL_MODO
+}
+invocaciones() { grep -c '^ARGS ' "$TMP_DIR/psql-invocado.log"; }
+cuerpo_601="$(consulta_modo msg-13601)"
+assert_eq "$(invocaciones)" "2" "AC67 con Msg 13601 (un nombre repetido), sqlcmd corre dos veces"
+assert_contains "$cuerpo_601" '"formato_tabla":"Se leyó como tabla' "AC67 con Msg 13601 la respuesta dice que se leyó como tabla"
+cuerpo_s0="$(consulta_modo respaldo-status-0)"
+assert_eq "$(invocaciones)" "1" "AC67 con exit 0 no se reintenta en tabla, aunque la salida diga Msg 13605"
+assert_contains "$cuerpo_s0" '"error":"conexion_fallida"' "AC67 con exit 0 y sin encabezado JSON es un error"
+consulta_modo respaldo-otro-primero >/dev/null
+assert_eq "$(invocaciones)" "1" "AC67 si el primer error no es de FOR JSON, no se reintenta aunque después aparezca Msg 13605"
+consulta_modo respaldo-con-encabezado >/dev/null
+assert_eq "$(invocaciones)" "1" "AC67 si la salida ya trae el encabezado JSON, no se reintenta en tabla"
+# v36: los números llegan como el texto exacto del motor.
+cuerpo_num="$(consulta_modo numeros-exactos)"
+assert_contains "$cuerpo_num" '"m":"99999999999.99999999"' "AC67 un decimal(28,8) llega exacto, como texto"
+assert_contains "$cuerpo_num" '"b":"9007199254740993"' "AC67 un bigint mayor que 2^53 llega exacto, como texto"
+assert_contains "$cuerpo_num" '"d":"1.10"' "AC67 un decimal conserva sus ceros"
+assert_contains "$cuerpo_num" '"f":true' "AC67 un bit llega como booleano"
+# v36: con un Node sin context.source el módulo no carga. Se simula un Node
+# viejo quitándole al reviver su tercer argumento antes de cargarlo.
+sin_fuente="$("$NODE_BIN" -e "
+  const original = JSON.parse;
+  JSON.parse = function (t, rev) { return rev ? original(t, function (k, v) { return rev(k, v); }) : original(t); };
+  try { require('$PLUGIN_DIR/scripts/conexion.js'); process.stdout.write('arranca'); } catch (e) { process.stdout.write('no arranca: ' + e.message); }
+" 2>&1)"
+assert_contains "$sin_fuente" "no arranca: bisalta-db necesita Node 22 o posterior" "AC67 con un Node sin context.source el servidor no arranca y lo dice"
+# v36: un resultado antes del JSON es otro SELECT, y es un error.
+cuerpo_dos="$(consulta_modo dos-resultados)"
+assert_contains "$cuerpo_dos" 'más de un resultado' "AC67 dos resultados seguidos son un error, no se descarta el primero"
+# AC66 (v36): en JSON, todo lo que viene después del resultado, salvo la
+# línea de filas afectadas, va en avisos_motor.
+cuerpo_desc="$(consulta_modo aviso-desconocido)"
+assert_contains "$cuerpo_desc" '"avisos_motor":["Warning: otro mensaje del motor."]' "AC66 en JSON un mensaje desconocido del motor llega en avisos_motor, sin la línea de filas afectadas"
+assert_contains "$cuerpo_desc" '"filas_devueltas":1' "AC66 en JSON el mensaje no cuenta como fila"
+# AC65 (v36): un nombre con punto se anida, y se redacta igual.
+cuerpo_pto="$(consulta_modo nombre-con-punto)"
+assert_no_contains "$cuerpo_pto" 'valor-anidado' "AC65 un valor bajo un nombre con punto (cred.token) no sale"
+assert_no_contains "$cuerpo_pto" 'valor-en-arreglo' "AC65 un valor sensible dentro de un arreglo no sale"
+assert_contains "$cuerpo_pto" '"cred":{"token":"[redactado]"}' "AC65 el objeto anidado conserva su forma, con el valor redactado"
+assert_contains "$cuerpo_pto" '"columnas_redactadas":["cred.token","hijos.api_key"]' "AC65 columnas_redactadas nombra la ruta con puntos"
+assert_contains "$cuerpo_pto" '{"x":"y"}' "AC65 (control) lo que no es sensible dentro de un arreglo sigue igual"
+
+# ---------------------------------------------------------------------------
+# AC68 (v36) — una salida más grande que el buffer del proceso
+# ---------------------------------------------------------------------------
+cuerpo_enobufs="$(consulta_modo salida-enorme)"
+assert_contains "$cuerpo_enobufs" '"error":"salida_demasiado_grande","codigo":10' "AC68 una salida de más de 64 MiB es salida_demasiado_grande, no tiempo_agotado"
+assert_contains "$cuerpo_enobufs" '"aislamiento":"READ UNCOMMITTED"' "AC68 el error de SQL Server lleva aislamiento (AC63)"
 
 # ---------------------------------------------------------------------------
 # AC55 (v25) — cifrado en Postgres

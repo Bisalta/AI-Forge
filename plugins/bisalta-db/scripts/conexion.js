@@ -87,10 +87,8 @@ const AVISO_AISLAMIENTO_SQLSERVER = avisoParaNivel(NIVEL_AISLAMIENTO_SQLSERVER);
 // Separador de campos para SQL Server: un carácter de control que no aparece
 // en datos de texto normales (unit separator, 0x1F).
 const SEPARADOR_SQLSERVER = String.fromCharCode(31);
-// AC66 y AC67: los avisos ANSI del motor que se apartan en el formato JSON,
-// por texto exacto. En JSON una línea no puede ser un pedazo de dato que
-// empiece igual, pero tampoco se adivina: sólo los medidos.
-const AVISOS_ANSI_SQLSERVER = ['Warning: Null value is eliminated by an aggregate or other SET operation.'];
+// AC67 (v36): la línea con que sqlcmd cierra un resultado. No es un aviso.
+const FILAS_AFECTADAS_SQLSERVER = /^\(\d+ rows? affected\)$/;
 // Nombre de la variable de entorno de la contraseña de sqlcmd, armado en dos
 // piezas a propósito: escrito entero y contiguo junto a su asignación, este
 // archivo dispararía el propio gate 9 (secret-scan) contra sí mismo.
@@ -355,7 +353,53 @@ function construirComandoPostgres(entrada, usuario, rutaPassfile, sql, identidad
 const SUFIJO_JSON_SQLSERVER = '\nFOR JSON PATH, INCLUDE_NULL_VALUES';
 const ANCHO_SQLSERVER = '8000';
 const ENCABEZADO_JSON_SQLSERVER = 'JSON_F52E2B61-18A1-11d1-B105-00805F49916B';
-const SIN_JSON_SQLSERVER = /^Msg 1360[15],/m;
+// Los dos errores del motor que piden la tabla de respaldo (AC67).
+const ERRORES_SIN_JSON_SQLSERVER = ['13601', '13605'];
+
+/**
+ * AC67 (v36): ¿hay que volver a correr la consulta como tabla? Sólo si la
+ * corrida falló, la salida no trae el resultado en JSON y el PRIMER error
+ * del motor es uno de los dos que dicen que FOR JSON no se puede aplicar. Un
+ * texto que diga "Msg 13605" más abajo (un dato, o el mensaje de otra
+ * sentencia) no lo dispara. El reintento corre el mismo SQL ya validado.
+ */
+function pideRespaldoTabla(r) {
+  if (r.status === 0) return false;
+  const salida = String(r.stdout === null || r.stdout === undefined ? '' : r.stdout);
+  if (salida.indexOf(ENCABEZADO_JSON_SQLSERVER) !== -1) return false;
+  const primero = /^Msg (\d+), Level /m.exec(salida);
+  return primero !== null && ERRORES_SIN_JSON_SQLSERVER.indexOf(primero[1]) !== -1;
+}
+
+/**
+ * AC67 (v36): los números llegan como el texto exacto que mandó el motor,
+ * igual que en la tabla y en Postgres. `JSON.parse` solo los pasaría a
+ * double: un decimal(28,8) o un bigint grande llegarían redondeados sin
+ * aviso. El texto exacto sale del tercer argumento del reviver
+ * (`context.source`), que existe desde Node 22.
+ */
+function leerJsonConNumerosExactos(texto, parse) {
+  return (parse || JSON.parse)(texto, function (clave, valor, contexto) {
+    if (typeof valor !== 'number') return valor;
+    if (!contexto || typeof contexto.source !== 'string') {
+      throw new Error('bisalta-db necesita Node 22 o posterior: sin el texto de origen de un número, ' +
+        'un decimal o un bigint de SQL Server llegaría redondeado');
+    }
+    return contexto.source;
+  });
+}
+
+/**
+ * Se llama al cargar el módulo: con un Node sin `context.source`, el
+ * servidor no arranca, en vez de redondear montos en silencio.
+ */
+function verificarNumerosExactos(parse) {
+  const leido = leerJsonConNumerosExactos('[1.10]', parse);
+  if (leido[0] !== '1.10') {
+    throw new Error('bisalta-db necesita Node 22 o posterior: los números de SQL Server no llegarían exactos');
+  }
+}
+verificarNumerosExactos(JSON.parse);
 
 function construirComandoSqlserver(entrada, usuario, contrasena, sql, identidad, formato) {
   // El salto de línea antes de FOR JSON corta un comentario de línea con que
@@ -469,35 +513,41 @@ function parsearSalidaSqlserver(texto) {
 /**
  * AC67 (v34): la salida de una consulta con FOR JSON. El motor devuelve una
  * sola columna, con un nombre fijo, partida en trozos que se concatenan. Un
- * resultado vacío no trae ningún trozo. Los avisos ANSI conocidos se apartan
- * igual que en la tabla (AC66), por igualdad exacta con AVISOS_ANSI_SQLSERVER.
+ * resultado vacío no trae ningún trozo. Medido en vivo (v36): los trozos van
+ * hasta la primera línea vacía. Después vienen los avisos del motor, si hubo,
+ * y la línea "(N rows affected)". Todo lo que no sea esa línea va en
+ * `avisos_motor` (AC66): un mensaje que no se espera se informa, no se tira.
+ * Algo antes del encabezado es otro resultado (dos SELECT seguidos, que la
+ * lista blanca acepta) y es un error: el plugin devuelve un solo resultado.
  */
 function parsearSalidaJsonSqlserver(texto) {
   const lineas = String(texto).split(/\r?\n/);
   const avisos = [];
   let i = 0;
-  // Medido en vivo (v34): el aviso llega después de la línea vacía que cierra
-  // el resultado, nunca antes del encabezado.
   while (i < lineas.length && lineas[i].indexOf(ENCABEZADO_JSON_SQLSERVER) !== 0) i += 1;
   if (i >= lineas.length) {
     throw fallo(6, 'conexion_fallida', 'la salida de SQL Server no trae el resultado en JSON');
+  }
+  if (lineas.slice(0, i).some(function (l) { return l.trim() !== ''; })) {
+    throw fallo(6, 'conexion_fallida', 'la consulta devolvió más de un resultado: el plugin devuelve uno solo, ' +
+      'mandá cada SELECT por separado');
   }
   i += 1;
   if (i < lineas.length && /^-+$/.test(lineas[i].replace(/\s+/g, ''))) i += 1;
   const trozos = [];
   let cerrado = false;
   for (; i < lineas.length; i += 1) {
-    const linea = lineas[i];
-    if (AVISOS_ANSI_SQLSERVER.indexOf(linea.replace(/\s+$/, '')) !== -1) { avisos.push(linea.replace(/\s+$/, '')); continue; }
-    // Un trozo nunca está vacío: la primera línea vacía cierra el resultado,
-    // y después sólo se buscan avisos.
-    if (linea === '') { cerrado = true; continue; }
-    if (!cerrado) trozos.push(linea);
+    const linea = lineas[i].replace(/\s+$/, '');
+    // Un trozo nunca está vacío: la primera línea vacía cierra el resultado.
+    if (!cerrado && linea === '') { cerrado = true; continue; }
+    if (!cerrado) { trozos.push(lineas[i]); continue; }
+    if (linea === '' || FILAS_AFECTADAS_SQLSERVER.test(linea)) continue;
+    avisos.push(linea);
   }
   let filas = [];
   if (trozos.length > 0) {
     try {
-      filas = JSON.parse(trozos.join(''));
+      filas = leerJsonConNumerosExactos(trozos.join(''));
     } catch (e) {
       throw fallo(6, 'conexion_fallida', 'la salida de SQL Server no se pudo leer como JSON');
     }
@@ -553,7 +603,7 @@ function ejecutarConsulta(entrada, sql) {
     // sin nombre o repetida), se vuelve a correr en formato de tabla, y la
     // respuesta lo dice. Cualquier otro error sigue su camino.
     let respaldo = false;
-    if (entrada.dialecto === 'sqlserver' && r.status !== 0 && SIN_JSON_SQLSERVER.test(String(r.stdout))) {
+    if (entrada.dialecto === 'sqlserver' && pideRespaldoTabla(r)) {
       plan = construirComandoSqlserver(entrada, credencial.usuario, credencial.contrasena, sql, identidad, 'tabla');
       respaldo = true;
       r = correr(plan);
@@ -561,6 +611,13 @@ function ejecutarConsulta(entrada, sql) {
 
     if (r.error && r.error.code === 'ENOENT') {
       throw fallo(8, 'cliente_ausente', 'falta el binario `' + plan.comando + '` en el PATH');
+    }
+    // AC68 (v36): la salida pasó el buffer del proceso. Node mata al cliente
+    // con SIGTERM, y sin esto se leía como `tiempo_agotado`. Va antes de esa
+    // regla.
+    if (r.error && r.error.code === 'ENOBUFS') {
+      throw fallo(10, 'salida_demasiado_grande', 'la salida pasó los ' + MAX_BUFFER + ' bytes antes de llegar ' +
+        'a los topes: pedí menos filas (TOP) o menos columnas');
     }
     // AC57 (v25): sqlcmd escribe sus errores en stdout y deja stderr vacío
     // (medido el 25-sep). Sin esto, todo error de SQL Server llegaba al
@@ -675,6 +732,10 @@ module.exports = {
   parsearCsv: parsearCsv,
   parsearSalidaSqlserver: parsearSalidaSqlserver,
   parsearSalidaJsonSqlserver: parsearSalidaJsonSqlserver,
+  leerJsonConNumerosExactos: leerJsonConNumerosExactos,
+  verificarNumerosExactos: verificarNumerosExactos,
+  pideRespaldoTabla: pideRespaldoTabla,
+  MAX_BUFFER: MAX_BUFFER,
   redactar: redactar,
   TIMEOUT_SENTENCIA_MS: TIMEOUT_SENTENCIA_MS,
   PREFIJO_TEMP: PREFIJO_TEMP,
