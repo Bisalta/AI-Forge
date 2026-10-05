@@ -406,8 +406,9 @@ octubre de 2026.
   ella (`D102`). Pasó con EXACTUS el 2-oct, restaurada a las 12:11, dos horas después de recibir
   `VIEW DEFINITION`. Ninguna otra señal lo avisa: aparece recién cuando alguien consulta. **El arreglo
   es el script `aprovisionamiento/sqlserver-post-restauracion.sql`**, que armó Patrick Ocampo y que
-  recrea o reengancha el usuario en las seis bases y corta con error si alguna queda mal. *Al 5-oct
-  todavía no está en el repo*: hasta que entre, el arreglo lo hace Patrick.
+  recrea o reengancha el usuario en las seis bases y corta con error si alguna queda mal. Se corre con
+  `sqlcmd` y no con DBeaver, que rompe los `GO` (el encabezado del script explica por qué). Lo corre
+  quien tenga permisos de administración sobre Dev SQL.
 - **`conexion_fallida` con `password authentication failed`** (Postgres). Además de las causas de
   siempre, **el secreto pudo haber sido sobrescrito.** Las 24 personas del grupo IAM
   `developer-resources-bisalta` pueden escribir y borrar `dev/bd/claude-lectura-*` (`D103`, medido por
