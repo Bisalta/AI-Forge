@@ -395,6 +395,36 @@ plugin al equipo, no algo que este código controle.
 El catálogo ilegible o inválido también sale con código 2 (`catalogo_invalido`):
 es un error de configuración, del mismo lado que el uso incorrecto.
 
+### Causas conocidas que el mensaje no dice
+
+Tres errores cuya causa real no aparece en el texto del error. Las tres pasaron o se midieron en
+octubre de 2026.
+
+- **`conexion_fallida` con `Cannot open database "<BASE>" that was requested by the login`** (SQL
+  Server). **La base se restauró y el usuario de `bisalta_lectura` se fue con ella.** El login vive en
+  la instancia y sobrevive a la restauración, pero el usuario vive dentro de la base y se pierde con
+  ella (`D102`). Pasó con EXACTUS el 2-oct, restaurada a las 12:11, dos horas después de recibir
+  `VIEW DEFINITION`. Ninguna otra señal lo avisa: aparece recién cuando alguien consulta. **El arreglo
+  es el script `aprovisionamiento/sqlserver-post-restauracion.sql`**, que armó Patrick Ocampo y que
+  recrea o reengancha el usuario en las seis bases y corta con error si alguna queda mal. *Al 5-oct
+  todavía no está en el repo*: hasta que entre, el arreglo lo hace Patrick.
+- **`conexion_fallida` con `password authentication failed`** (Postgres). Además de las causas de
+  siempre, **el secreto pudo haber sido sobrescrito.** Las 24 personas del grupo IAM
+  `developer-resources-bisalta` pueden escribir y borrar `dev/bd/claude-lectura-*` (`D103`, medido por
+  Patrick el 5-oct). El error no distingue "la contraseña cambió" de "el rol no existe". Para
+  descartarlo, mirar cuándo cambió el secreto por última vez:
+  ```
+  aws secretsmanager describe-secret --secret-id dev/bd/claude-lectura-postgres --query LastChangedDate
+  ```
+  Ese comando necesita `DescribeSecret`, que la política del plugin no da. Lo tienen, por ejemplo,
+  los del grupo de arriba. Si el secreto cambió y nadie recuerda haberlo hecho, esa es la causa.
+- **Respuestas con la forma de una versión vieja.** Por ejemplo, en SQL Server la respuesta no trae
+  `aislamiento`, un aviso del motor llega como una fila, o `listar_conexiones` no trae `sesion`. Eso
+  es **la versión 0.1.0** de `prod`, aunque el repo esté en otra rama. Pasa cuando el marketplace
+  `ai-forge` apunta a GitHub (`Bisalta/AI-Forge`) en vez de a la carpeta local. Al reiniciar, la app
+  vuelve a sincronizar desde ese origen (medido el 5-oct). `claude plugin list` muestra la versión, y
+  `Read from:` aparece sólo cuando el origen es la carpeta local.
+
 En el servidor MCP el código viaja en el campo `codigo` del cuerpo de la
 respuesta — el proceso vive toda la sesión y no puede salir por consulta. Es
 **el mismo código** con el que sale el modo de una sola consulta:
