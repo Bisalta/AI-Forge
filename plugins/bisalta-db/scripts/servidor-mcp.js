@@ -37,7 +37,7 @@ const listaBlanca = require('./lista-blanca.js');
 const conexion = require('./conexion.js');
 
 const NOMBRE_SERVIDOR = 'bisalta-db';
-const VERSION_SERVIDOR = '0.1.0';
+const VERSION_SERVIDOR = '0.3.0';
 const VERSION_PROTOCOLO = '2024-11-05';
 
 // Topes duros de la respuesta (contract v3, "Respuesta de `consultar`"). Son
@@ -101,6 +101,51 @@ function aplicarTopes(filas) {
     bytes += extra;
   }
   return { filas: aceptadas, truncado: motivo !== null, motivo_truncado: motivo };
+}
+
+// AC65 (v31): columnas cuyo nombre indica una credencial. Su valor se
+// reemplaza en la respuesta, en todos los dialectos. Es por NOMBRE: una
+// columna renombrada en la consulta (`SELECT token AS t`) no se detecta. Es
+// higiene contra la exposición accidental, no una barrera de acceso; el
+// acceso lo decide el rol de la base (decisión de Ian, 1-oct).
+const COLUMNA_SENSIBLE = /token|secret|pass(?:word|wd)|key_hash|api_?key/i;
+const VALOR_REDACTADO = '[redactado]';
+// AC67 (v34): por qué una respuesta de SQL Server vino en formato de tabla.
+const AVISO_FORMATO_TABLA = 'Se leyó como tabla porque la consulta tiene una columna sin nombre o con un nombre ' +
+  'repetido: un texto de más de 8000 caracteres llega cortado, y un salto de línea dentro de un valor puede ' +
+  'partir la fila. Poné un alias distinto a cada columna.';
+
+/**
+ * Reemplaza el valor de las columnas sensibles y devuelve cuáles fueron.
+ * Todo valor, también el vacío y el nulo: `psql --csv` entrega un NULL como
+ * campo vacío y el parser no los distingue (review de v31, ronda 1), así que
+ * dejar pasar uno de los dos dejaría pasar los dos.
+ */
+function redactarColumnasSensibles(filas) {
+  const redactadas = [];
+  const vistas = {};
+  const registrar = function (ruta) {
+    if (!Object.prototype.hasOwnProperty.call(vistas, ruta)) { vistas[ruta] = true; redactadas.push(ruta); }
+  };
+  // AC65 (v36): FOR JSON PATH convierte un nombre con punto (`[cred.token]`)
+  // en un objeto anidado. La ruta con puntos es el nombre de la columna, así
+  // que se mira en cada nivel, también dentro de un arreglo.
+  const redactarValor = function (valor, ruta) {
+    if (COLUMNA_SENSIBLE.test(ruta)) { registrar(ruta); return VALOR_REDACTADO; }
+    if (Array.isArray(valor)) return valor.map(function (v) { return redactarValor(v, ruta); });
+    if (valor !== null && typeof valor === 'object') {
+      const copia = {};
+      Object.keys(valor).forEach(function (clave) { copia[clave] = redactarValor(valor[clave], ruta + '.' + clave); });
+      return copia;
+    }
+    return valor;
+  };
+  const salida = filas.map(function (fila) {
+    const copia = {};
+    Object.keys(fila).forEach(function (columna) { copia[columna] = redactarValor(fila[columna], columna); });
+    return copia;
+  });
+  return { filas: salida, redactadas: redactadas };
 }
 
 function cuerpoDeError(codigo, error, extra) {
@@ -187,18 +232,50 @@ function manejarConsultar(args) {
     } else {
       extra.mensaje = e.message;
     }
+    // v30: un error de la consulta en SQL Server (6 o 7) corrió con el nivel
+    // del prefijo, y uno de ellos, el Msg 601, sólo existe por ese nivel. Sin
+    // el campo, se lee como una caída de la red. El 5 (secreto) no llegó a
+    // correr nada y no lo lleva.
+    if (entrada.dialecto === 'sqlserver' && (codigo === 6 || codigo === 7 || codigo === 10)) {
+      extra.aislamiento = conexion.NIVEL_AISLAMIENTO_SQLSERVER;
+    }
     return terminar(codigo, cuerpoDeError(codigo, nombreError, extra), 0, false);
   }
 
-  const topes = aplicarTopes(resultado.filas);
+  // AC65: se redacta ANTES de los topes, así el tope de bytes mide lo que de
+  // verdad sale.
+  const redaccion = redactarColumnasSensibles(resultado.filas);
+  const topes = aplicarTopes(redaccion.filas);
   const cuerpo = {
     conexion: entrada.nombre,
-    dialecto: entrada.dialecto,
+    dialecto: entrada.dialecto
+  };
+  // AC62 (v29, D86): en SQL Server el nivel y su aviso van en la respuesta,
+  // antes de las filas, para que quien las lea no informe una cifra sin
+  // confirmar con el mismo tono que una confirmada.
+  if (entrada.dialecto === 'sqlserver') {
+    cuerpo.aislamiento = conexion.NIVEL_AISLAMIENTO_SQLSERVER;
+    cuerpo.aviso = conexion.AVISO_AISLAMIENTO_SQLSERVER;
+  }
+  // AC65: qué columnas se taparon, para que quien lee no tome '[redactado]'
+  // por el dato.
+  if (redaccion.redactadas.length > 0) {
+    cuerpo.columnas_redactadas = redaccion.redactadas;
+  }
+  // AC66 (v33): los avisos del motor que no son filas, para que no se pierdan.
+  if (resultado.avisos && resultado.avisos.length > 0) {
+    cuerpo.avisos_motor = resultado.avisos;
+  }
+  // AC67 (v34): la consulta se leyó como tabla, con los límites de la tabla.
+  if (resultado.respaldo) {
+    cuerpo.formato_tabla = AVISO_FORMATO_TABLA;
+  }
+  Object.assign(cuerpo, {
     filas: topes.filas,
     filas_devueltas: topes.filas.length,
     truncado: topes.truncado,
     motivo_truncado: topes.motivo_truncado
-  };
+  });
   return terminar(0, cuerpo, topes.filas.length, topes.truncado);
 }
 
@@ -230,9 +307,17 @@ const HERRAMIENTAS = [
       'OPENDATASOURCE), con un límite de 60 s por consulta. En SQL Server la consulta corre en ' +
       'READ UNCOMMITTED para no bloquear a quien escribe: puede devolver filas que otra transacción ' +
       'todavía no confirmó y, si alguien escribe mientras tanto, leer dos veces o saltear filas ya ' +
-      'confirmadas (un COUNT o un total pueden dar mal) o cortar con el error 601. ' +
+      'confirmadas (un COUNT o un total pueden dar mal) o cortar con el error 601. Las respuestas exitosas de ' +
+      'SQL Server lo repiten en los campos aislamiento y aviso, y sus errores de consulta, en aislamiento. Un aviso ' +
+      'del motor llega en avisos_motor. En SQL Server poné un alias distinto a cada columna: si falta o se repite, ' +
+      'la consulta se lee como tabla (formato_tabla) y un texto de más de 8000 caracteres llega cortado. ' +
+      'En SQL Server no agregues FOR JSON ni FOR XML: el plugin ya pide el resultado en JSON. Los números ' +
+      'llegan como texto exacto, en todos los dialectos. ' +
       'En Postgres, si la conexión no llegó a una réplica de lectura, se niega con no_es_replica sin ' +
-      'ejecutar el SQL. Tope de ' + LIMITE_FILAS + ' filas y ' + LIMITE_BYTES + ' bytes.',
+      'ejecutar el SQL. En una conexión multitenant (la que tiene sesion en listar_conexiones), el plugin fija ' +
+      'el tenant antes de la consulta. Las columnas cuyo nombre indica una credencial (token, secret, password, ' +
+      'key_hash, api_key) salen como [redactado], y columnas_redactadas dice cuáles. Tope de ' + LIMITE_FILAS +
+      ' filas y ' + LIMITE_BYTES + ' bytes.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -247,7 +332,8 @@ const HERRAMIENTAS = [
   {
     name: 'listar_conexiones',
     description: 'Lista las conexiones disponibles con su dialecto, ambiente, base y las garantías de solo ' +
-      'lectura que cada una tiene. No expone host, puerto, identificador del secreto ni región.',
+      'lectura que cada una tiene, y en las multitenant, sesion: el parámetro, los tenants y qué destraba. ' +
+      'No expone host, puerto, identificador del secreto, región ni ningún UUID de tenant.',
     inputSchema: { type: 'object', properties: {}, required: [] }
   }
 ];
@@ -374,6 +460,7 @@ module.exports = {
   manejarConsultar: manejarConsultar,
   manejarListar: manejarListar,
   aplicarTopes: aplicarTopes,
+  redactarColumnasSensibles: redactarColumnasSensibles,
   HERRAMIENTAS: HERRAMIENTAS,
   LIMITE_FILAS: LIMITE_FILAS,
   LIMITE_BYTES: LIMITE_BYTES,

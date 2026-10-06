@@ -65,6 +65,10 @@ export BISALTA_STUB_MARCA="$MARCA_CRUDA_AWS"
 export BISALTA_STUB_AWS_FALLA=0
 export BISALTA_STUB_PSQL_MODO=normal
 export BISALTA_STUB_CATALOGO_NUEVO=''
+# AC64 (v31): las claves de tenant del secreto, como fragmento JSON. Un UUID de
+# prueba, que no es el de ningún cliente.
+TENANT_PRUEBA='11111111-2222-4333-8444-555555555555'
+export BISALTA_STUB_EXTRA=", \"tenant_construplaza\": \"$TENANT_PRUEBA\""
 
 CATALOGO_VIVO="$TMP_DIR/catalogo.json"
 CATALOGO_SIN_QA="$TMP_DIR/catalogo-sin-qa.json"
@@ -98,7 +102,7 @@ if [ "${BISALTA_STUB_AWS_FALLA:-0}" = "1" ]; then
   printf 'An error occurred (AccessDeniedException): %s\n' "$BISALTA_STUB_MARCA" >&2
   exit 255
 fi
-printf '{"username": "%s", "%s": "%s"}\n' "$BISALTA_STUB_USUARIO" "$BISALTA_STUB_CAMPO" "$BISALTA_STUB_VALOR"
+printf '{"username": "%s", "%s": "%s"%s}\n' "$BISALTA_STUB_USUARIO" "$BISALTA_STUB_CAMPO" "$BISALTA_STUB_VALOR" "${BISALTA_STUB_EXTRA:-}"
 STUB
 
 cat > "$BIN_DIR/psql" <<'STUB'
@@ -135,9 +139,68 @@ if [ -n "${BISALTA_STUB_CATALOGO_NUEVO:-}" ]; then
   cp "$BISALTA_STUB_CATALOGO_NUEVO" "$BISALTA_DB_CATALOGO"
 fi
 
+# AC67 (v34): cuando el plugin le agrega FOR JSON a la consulta (sqlcmd), el
+# stub responde como el motor: el encabezado fijo, la línea de guiones, el
+# JSON partido en trozos, una línea vacía y la de filas afectadas. Los modos
+# de error no pasan por acá: fallan antes de emitir nada.
+ENC_JSON='JSON_F52E2B61-18A1-11d1-B105-00805F49916B'
+json_salida() { printf '%s\n------\n%s\n\n(1 rows affected)\n' "$ENC_JSON" "$1"; }
+if printf '%s' "$*" | grep -q 'FOR JSON'; then
+  case "${BISALTA_STUB_PSQL_MODO:-normal}" in
+    normal) json_salida '[{"id":1,"nombre":"ana"},{"id":2,"nombre":"luis, el otro"}]'; exit 0 ;;
+    datos-con-timeout) json_salida '[{"texto":"Timeout expired"}]'; exit 0 ;;
+    columnas-sensibles-mssql) json_salida '[{"id":1,"token":"valor-sensible-mssql","user_email":"persona@ejemplo.com"}]'; exit 0 ;;
+    aviso-ansi)
+      printf '%s\n------\n%s\n\nWarning: Null value is eliminated by an aggregate or other SET operation.\n(1 rows affected)\n' "$ENC_JSON" '[{"tipo":"P","n":6},{"tipo":"Warning: dato","n":1}]'
+      exit 0 ;;
+    # Un valor con un salto de línea y otro de 5000 caracteres, partido en
+    # trozos como lo parte el motor.
+    json-multilinea)
+      largo="$(head -c 5000 /dev/zero | tr '\0' 'x')"
+      todo='[{"v":"a\nb","t":"'"$largo"'","n":1}]'
+      printf '%s\n------\n' "$ENC_JSON"
+      printf '%s' "$todo" | fold -w 2033
+      printf '\n\n(1 rows affected)\n'
+      exit 0 ;;
+    json-vacio) printf '%s\n------\n\n(0 rows affected)\n' "$ENC_JSON"; exit 0 ;;
+    # v36: lo que el motor manda y un double no guarda (medido en vivo).
+    numeros-exactos) json_salida '[{"m":99999999999.99999999,"b":9007199254740993,"d":1.10,"f":true}]'; exit 0 ;;
+    # v36: un nombre con punto, que FOR JSON PATH anida (medido en vivo).
+    nombre-con-punto) json_salida '[{"cred":{"token":"valor-anidado"},"id":1,"hijos":[{"api_key":"valor-en-arreglo"},{"x":"y"}]}]'; exit 0 ;;
+    # v36: un mensaje del motor que no está en ninguna lista.
+    aviso-desconocido)
+      printf '%s\n------\n%s\n\nWarning: otro mensaje del motor.\n(1 row affected)\n' "$ENC_JSON" '[{"n":1}]'
+      exit 0 ;;
+    # v36: dos SELECT seguidos. El primero sale en tabla antes del encabezado.
+    dos-resultados)
+      printf 'a\n-\n1\n\n(1 row affected)\n%s\n------\n%s\n\n(1 row affected)\n' "$ENC_JSON" '[{"b":2}]'
+      exit 0 ;;
+    # v36: los casos que NO piden la tabla de respaldo.
+    respaldo-status-0) printf 'Msg 13605, Level 16, State 1, Server EC2X, Line 1\nColumn expressions and data sources without names or aliases cannot be formatted as JSON text using FOR JSON clause.\n'; exit 0 ;;
+    respaldo-otro-primero)
+      printf 'Msg 208, Level 16, State 1, Server EC2X, Line 1\nInvalid object name.\nMsg 13605, Level 16, State 1, Server EC2X, Line 1\nColumn expressions and data sources without names or aliases cannot be formatted as JSON text using FOR JSON clause.\n'
+      exit 1 ;;
+    respaldo-con-encabezado)
+      printf '%s\n------\n%s\n\nMsg 13605, Level 16, State 1, Server EC2X, Line 1\nColumn expressions and data sources without names or aliases cannot be formatted as JSON text using FOR JSON clause.\n' "$ENC_JSON" '[{"n":1}]'
+      exit 1 ;;
+    msg-13601)
+      printf 'Msg 13601, Level 16, State 1, Server EC2X, Line 1\nProperty names must be unique.\n'
+      exit 1 ;;
+    # AC68 (v36): una salida que pasa el buffer del proceso (64 MiB).
+    salida-enorme) head -c 68000000 /dev/zero | tr '\0' 'x'; exit 0 ;;
+    sin-nombre|aviso-ansi-tabla)
+      printf 'Msg 13605, Level 16, State 1, Server EC2X, Line 1\nColumn expressions and data sources without names or aliases cannot be formatted as JSON text using FOR JSON clause.\n'
+      exit 1 ;;
+  esac
+fi
+
 case "${BISALTA_STUB_PSQL_MODO:-normal}" in
   normal)
     printf 'id,nombre\n1,ana\n2,"luis, el otro"\n'
+    ;;
+  # AC67: la misma consulta, ya sin FOR JSON: una columna sin nombre.
+  sin-nombre|msg-13601)
+    printf '\n-----\n953\n\n(1 rows affected)\n'
     ;;
   muchas-filas)
     printf 'id\n'
@@ -193,6 +256,28 @@ case "${BISALTA_STUB_PSQL_MODO:-normal}" in
   # Una corrida EXITOSA cuyo dato dice "Timeout expired": no es un corte.
   datos-con-timeout)
     printf 'texto\nTimeout expired\n'
+    ;;
+  # AC65 (v31): columnas cuyo nombre indica una credencial, junto a otras que no.
+  columnas-sensibles)
+    printf 'id,token,api_key,user_email\n1,valor-sensible-abc,valor-sensible-def,persona@ejemplo.com\n2,,,\n'
+    ;;
+  # La misma forma para sqlcmd: separador 0x1F y la línea de guiones.
+  columnas-sensibles-mssql)
+    s="$(printf '\037')"
+    printf 'id%stoken%suser_email\n--%s-----%s----------\n1%svalor-sensible-mssql%spersona@ejemplo.com\n' "$s" "$s" "$s" "$s" "$s" "$s"
+    ;;
+  # AC66 (v33): un aviso ANSI de sqlcmd, en su línea y sin separador, después
+  # de las filas; y una fila cuyo primer valor empieza igual pero trae
+  # separador, que es un dato.
+  aviso-ansi|aviso-ansi-tabla)
+    s="$(printf '\037')"
+    printf 'tipo%sn\n----%s-\nP%s6\nWarning: dato%s1\nWarning: Null value is eliminated by an aggregate or other SET operation.\n' "$s" "$s" "$s" "$s"
+    ;;
+  # Un token de más de 1 MiB: sin redactar, la fila no entra en el tope de bytes.
+  token-enorme)
+    printf 'id,token\n1,'
+    head -c 1100000 /dev/zero | tr '\0' 'z'
+    printf '\n'
     ;;
 esac
 STUB
@@ -250,6 +335,15 @@ salida="$(servidor_jsonrpc "$tramas" "$PATH_CON_STUBS")"
 
 assert_contains "$salida" '"protocolVersion":"2024-11-05"' "AC34 initialize responde el protocolVersion declarado"
 assert_contains "$salida" '"name":"bisalta-db"' "AC34 initialize se identifica como bisalta-db"
+# v29: la versión que informa el servidor es la de plugin.json. Se desalineó una
+# vez (0.1.0 contra 0.2.0) y ningún test lo veía.
+version_plugin="$("$NODE_BIN" -e "process.stdout.write(require('$PLUGIN_DIR/.claude-plugin/plugin.json').version)")"
+version_servidor="$(printf '%s\n' "$salida" | "$NODE_BIN" -e "
+let crudo='';process.stdin.on('data',function(c){crudo+=c;});process.stdin.on('end',function(){
+  crudo.split('\\n').forEach(function(l){ let m; try{m=JSON.parse(l);}catch(e){return;}
+    if(m.result&&m.result.serverInfo) process.stdout.write(String(m.result.serverInfo.version));});});")"
+assert_eq "$([ -n "$version_plugin" ] && echo si || echo no)" "si" "AC34 (control) plugin.json declara una versión"
+assert_eq "$version_servidor" "$version_plugin" "AC34 serverInfo.version es la de plugin.json"
 
 nombres="$(printf '%s\n' "$salida" | "$NODE_BIN" -e "
 let crudo='';process.stdin.on('data',function(c){crudo+=c;});process.stdin.on('end',function(){
@@ -457,6 +551,7 @@ export BISALTA_STUB_PSQL_MODO
 salida="$(servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS")"
 cuerpo="$(cuerpos "$salida")"
 assert_contains "$cuerpo" '"codigo":6' "AC25 una conexión que falla devuelve el código 6"
+assert_no_contains "$cuerpo" '"aislamiento"' "AC63 un error de postgres no lleva aislamiento"
 assert_contains "$cuerpo" 'no route to host' "AC25 el error de conexión trae el mensaje del cliente"
 case "$salida" in
   *"$VALOR_CREDENCIAL"*) filtra=si ;;
@@ -715,6 +810,47 @@ assert_contains "$lineas_arg" "ARG -Q|ARG SET TRANSACTION ISOLATION LEVEL READ U
   "AC61 sqlcmd recibe el nivel de aislamiento antes de la consulta, y la consulta intacta"
 
 # ---------------------------------------------------------------------------
+# AC62 (v29, D86) — el aislamiento y su aviso viajan en la respuesta
+# ---------------------------------------------------------------------------
+# v30: AC62 hace su propia consulta y lee su propio registro, en vez de usar
+# las variables de un bloque anterior. El nivel que se informa tiene que ser
+# el que se mandó en -Q: se comparan los dos, no cada uno contra un literal.
+reiniciar_registros
+cuerpo_62="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+lineas_arg_62="$(grep '^ARG ' "$TMP_DIR/psql-invocado.log" | tr '\n' '|')"
+campo_aislamiento="$("$NODE_BIN" -e "process.stdout.write(String(JSON.parse(process.argv[1]).aislamiento))" "$cuerpo_62")"
+nivel_enviado="$(printf '%s' "$lineas_arg_62" | sed -n 's/.*ARG SET TRANSACTION ISOLATION LEVEL \([A-Z ]*\); .*/\1/p')"
+assert_eq "$campo_aislamiento" "READ UNCOMMITTED" "AC62 la respuesta de sqlserver informa el nivel de aislamiento"
+assert_eq "$campo_aislamiento" "$nivel_enviado" "AC62 el nivel informado es el mismo que se mandó a sqlcmd"
+assert_contains "$cuerpo_62" '"aviso":"Corrió en READ UNCOMMITTED' "AC62 la respuesta de sqlserver trae el aviso"
+assert_contains "$cuerpo_62" "\"aviso\":\"Corrió en $campo_aislamiento:" "AC62 el aviso nombra el mismo nivel que el campo aislamiento"
+assert_contains "$cuerpo_62" 'otra transacción todavía no confirmó' "AC62 el aviso nombra las filas sin confirmar"
+assert_contains "$cuerpo_62" 'filas leídas dos veces o salteadas' "AC62 el aviso nombra las filas leídas dos veces o salteadas"
+orden="$("$NODE_BIN" -e "process.stdout.write(Object.keys(JSON.parse(process.argv[1])).join(','))" "$cuerpo_62")"
+assert_eq "$orden" "conexion,dialecto,aislamiento,aviso,filas,filas_devueltas,truncado,motivo_truncado" \
+  "AC62 el aviso va antes de las filas"
+reiniciar_registros
+cuerpo_pg="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS")")"
+assert_contains "$cuerpo_pg" '"dialecto":"postgres"' "AC62 (control) la consulta postgres responde"
+assert_no_contains "$cuerpo_pg" '"aislamiento"' "AC62 la respuesta de postgres no lleva aislamiento"
+assert_no_contains "$cuerpo_pg" '"aviso"' "AC62 la respuesta de postgres no lleva aviso"
+# v30: un nivel sin aviso escrito no se cubre con un texto genérico.
+nivel_sin_aviso="$("$NODE_BIN" -e "
+const c = require('$DIR_SCRIPTS/conexion.js');
+try { c.avisoParaNivel('SNAPSHOT'); process.stdout.write('devolvio'); } catch (e) { process.stdout.write('rechaza'); }")"
+assert_eq "$nivel_sin_aviso" "rechaza" "AC62 un nivel sin aviso escrito se rechaza"
+# v30: el aviso del módulo pasa por avisoParaNivel al cargar. Una copia de
+# conexion.js con un nivel sin aviso escrito no carga; la copia sin tocar, sí.
+mkdir -p "$TMP_DIR/copia-conexion"
+cp "$DIR_SCRIPTS/conexion.js" "$TMP_DIR/copia-conexion/sin-tocar.js"
+sed "s/^const NIVEL_AISLAMIENTO_SQLSERVER = 'READ UNCOMMITTED';/const NIVEL_AISLAMIENTO_SQLSERVER = 'SNAPSHOT';/" \
+  "$DIR_SCRIPTS/conexion.js" > "$TMP_DIR/copia-conexion/snapshot.js"
+carga_de() { "$NODE_BIN" -e "try { require('$TMP_DIR/copia-conexion/' + process.argv[1]); process.stdout.write('carga'); } catch (e) { process.stdout.write('no-carga'); }" "$1"; }
+assert_eq "$(grep -c "'SNAPSHOT'" "$TMP_DIR/copia-conexion/snapshot.js")" "1" "AC62 (control) la copia lleva el nivel sustituido"
+assert_eq "$(carga_de sin-tocar.js)" "carga" "AC62 (control) la copia sin tocar de conexion.js carga"
+assert_eq "$(carga_de snapshot.js)" "no-carga" "AC62 con un nivel sin aviso escrito, conexion.js no carga"
+
+# ---------------------------------------------------------------------------
 # AC57 (v25) — el error de sqlcmd sale por stdout
 # ---------------------------------------------------------------------------
 for modo in falla-stdout filas-y-error larga-sin-msg timeout-stdout datos-con-timeout; do
@@ -728,6 +864,7 @@ for modo in falla-stdout filas-y-error larga-sin-msg timeout-stdout datos-con-ti
       assert_contains "$cuerpo" "VIEW SERVER STATE permission was denied" "AC57 el mensaje de un error de sqlcmd no llega vacío"
       assert_no_contains "$cuerpo" "$VALOR_CREDENCIAL" "AC57 la credencial no sale en el mensaje tomado de stdout"
       assert_contains "$cuerpo" "[redactado]" "AC57 (control) el mensaje tomado de stdout pasa por la redacción"
+      assert_contains "$cuerpo" '"aislamiento":"READ UNCOMMITTED"' "AC63 un error de consulta de sqlserver informa el aislamiento"
       ;;
     larga-sin-msg)
       assert_contains "$cuerpo" "FIN-DEL-ERROR" "AC57 sin Msg, el mensaje es el final de stdout"
@@ -740,6 +877,7 @@ for modo in falla-stdout filas-y-error larga-sin-msg timeout-stdout datos-con-ti
       ;;
     timeout-stdout)
       assert_contains "$cuerpo" '"error":"tiempo_agotado"' "AC57 el corte por -t de sqlcmd se informa como tiempo_agotado"
+      assert_contains "$cuerpo" '"aislamiento":"READ UNCOMMITTED"' "AC63 un corte de sqlserver informa el aislamiento"
       ;;
     datos-con-timeout)
       assert_no_contains "$cuerpo" '"error"' "AC57 una corrida exitosa cuyo dato dice Timeout expired no es un error"
@@ -748,6 +886,263 @@ for modo in falla-stdout filas-y-error larga-sin-msg timeout-stdout datos-con-ti
 done
 BISALTA_STUB_PSQL_MODO=normal
 export BISALTA_STUB_PSQL_MODO
+
+# ---------------------------------------------------------------------------
+# AC63 (v30) — los errores de SQL Server que no corrieron la consulta no llevan
+# aislamiento: el 5 (el secreto no resolvió) y el 8 (falta sqlcmd)
+# ---------------------------------------------------------------------------
+BISALTA_STUB_AWS_FALLA=1
+export BISALTA_STUB_AWS_FALLA
+reiniciar_registros
+cuerpo_5="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+BISALTA_STUB_AWS_FALLA=0
+export BISALTA_STUB_AWS_FALLA
+assert_contains "$cuerpo_5" '"codigo":5' "AC63 (control) un secreto de sqlserver que no resuelve da el código 5"
+assert_no_contains "$cuerpo_5" '"aislamiento"' "AC63 el código 5 de sqlserver no lleva aislamiento"
+cuerpo_8="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_SIN_PSQL")")"
+assert_contains "$cuerpo_8" '"codigo":8' "AC63 (control) sin sqlcmd en el PATH la consulta da el código 8"
+assert_no_contains "$cuerpo_8" '"aislamiento"' "AC63 el código 8 de sqlserver no lleva aislamiento"
+
+# ---------------------------------------------------------------------------
+# AC64 (v31) — el parámetro de sesión de una entrada multitenant
+# ---------------------------------------------------------------------------
+GUARDA="$("$NODE_BIN" -e "const s=require('fs').readFileSync('$DIR_SCRIPTS/conexion.js','utf8');process.stdout.write(s.match(/const GUARDA_REPLICA = \"([^\"]+)\"/)[1])")"
+reiniciar_registros
+cuerpo_t="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 'smartcheck-qa' 'SELECT 1')" "$PATH_CON_STUBS")")"
+args_t="$(grep '^ARG ' "$TMP_DIR/psql-invocado.log" | tr '\n' '|')"
+assert_contains "$cuerpo_t" '"dialecto":"postgres"' "AC64 (control) la consulta a smartcheck-qa responde"
+assert_contains "$args_t" "ARG --command|ARG $GUARDA|ARG --command|ARG SET app.tenant_ids = '$TENANT_PRUEBA'|ARG --command|ARG SELECT 1|" \
+  "AC64 el SET del tenant va entre la guarda de réplica y el SQL, con el valor del secreto"
+reiniciar_registros
+servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
+assert_no_contains "$(grep '^ARG ' "$TMP_DIR/psql-invocado.log")" "ARG SET " "AC64 una entrada sin sesion no manda ningún SET"
+# Un tenant que falta en el secreto, o que no es un UUID: la consulta no corre.
+for caso in falta no-uuid inyeccion; do
+  case $caso in
+    falta) BISALTA_STUB_EXTRA='' ;;
+    no-uuid) BISALTA_STUB_EXTRA=', "tenant_construplaza": "construplaza"' ;;
+    inyeccion) BISALTA_STUB_EXTRA="$(printf ', "tenant_construplaza": "%s%s"' "$TENANT_PRUEBA" "'; SELECT 1; --")" ;;
+  esac
+  export BISALTA_STUB_EXTRA
+  reiniciar_registros
+  cuerpo_f="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 'smartcheck-qa' 'SELECT 1')" "$PATH_CON_STUBS")")"
+  assert_contains "$cuerpo_f" '"codigo":5' "AC64 un tenant $caso en el secreto devuelve el código 5"
+  assert_contains "$cuerpo_f" 'tenant_construplaza' "AC64 el error de un tenant $caso nombra la clave"
+  if [ -s "$TMP_DIR/psql-invocado.log" ]; then corrio=si; else corrio=no; fi
+  assert_eq "$corrio" "no" "AC64 con un tenant $caso, psql no se invoca"
+done
+assert_no_contains "$cuerpo_f" "SELECT 1; --" "AC64 el error no repite el valor del secreto"
+export BISALTA_STUB_EXTRA=", \"tenant_construplaza\": \"$TENANT_PRUEBA\""
+# Un UUID en mayúsculas en el secreto viaja en minúsculas.
+TENANT_MAYUS='ABCDEF12-3456-4789-8ABC-DEF012345678'
+export BISALTA_STUB_EXTRA=", \"tenant_construplaza\": \"$TENANT_MAYUS\""
+reiniciar_registros
+servidor_jsonrpc "$(trama_consultar 1 'smartcheck-qa' 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
+assert_contains "$(grep '^ARG ' "$TMP_DIR/psql-invocado.log")" "ARG SET app.tenant_ids = 'abcdef12-3456-4789-8abc-def012345678'" \
+  "AC64 un UUID en mayúsculas en el secreto viaja en minúsculas"
+export BISALTA_STUB_EXTRA=", \"tenant_construplaza\": \"$TENANT_PRUEBA\""
+# uuid_lista con dos tenants: separados por coma y sin espacios.
+TENANT_OTRO='aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
+CATALOGO_DOS="$TMP_DIR/catalogo-dos-tenants.json"
+"$NODE_BIN" -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('$CATALOGO_VIVO','utf8'));c.find(x=>x.nombre==='smartcheck-qa').sesion.tenants=['construplaza','otro'];fs.writeFileSync('$CATALOGO_DOS',JSON.stringify(c,null,2));"
+export BISALTA_STUB_EXTRA=", \"tenant_construplaza\": \"$TENANT_PRUEBA\", \"tenant_otro\": \"$TENANT_OTRO\""
+reiniciar_registros
+BISALTA_DB_CATALOGO="$CATALOGO_DOS" servidor_jsonrpc "$(trama_consultar 1 'smartcheck-qa' 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
+assert_contains "$(grep '^ARG ' "$TMP_DIR/psql-invocado.log")" "ARG SET app.tenant_ids = '$TENANT_PRUEBA,$TENANT_OTRO'" \
+  "AC64 uuid_lista une los tenants con coma y sin espacios, en el orden del catálogo"
+export BISALTA_STUB_EXTRA=", \"tenant_construplaza\": \"$TENANT_PRUEBA\""
+# listar_conexiones muestra los nombres y el alcance, nunca el UUID.
+cuerpo_l="$(cuerpos "$(servidor_jsonrpc '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"listar_conexiones"}}' "$PATH_CON_STUBS")")"
+assert_contains "$cuerpo_l" '"tenants":["construplaza"]' "AC64 listar_conexiones muestra el tenant de smartcheck-qa por nombre"
+assert_contains "$cuerpo_l" '43 tablas del esquema smartcheck' "AC64 listar_conexiones muestra el alcance"
+assert_no_contains "$cuerpo_l" "$TENANT_PRUEBA" "AC64 listar_conexiones no muestra ningún UUID"
+proyeccion="$("$NODE_BIN" -e "
+const c=JSON.parse(process.argv[1]).conexiones;
+const sc=c.find(x=>x.nombre==='smartcheck-qa'); const pd=c.find(x=>x.nombre==='proveedores-dev');
+process.stdout.write(Object.keys(sc.sesion).join(',')+'|'+sc.sesion.parametro+'|'+JSON.stringify(pd.sesion));" "$cuerpo_l")"
+assert_eq "$proyeccion" "parametro,tenants,alcance|app.tenant_ids|null" \
+  "AC64 listar_conexiones proyecta sesion con parametro, tenants y alcance, y null sin bloque"
+
+# ---------------------------------------------------------------------------
+# AC65 (v31) — las columnas cuyo nombre indica una credencial se redactan
+# ---------------------------------------------------------------------------
+BISALTA_STUB_PSQL_MODO=columnas-sensibles
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_r="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS")")"
+BISALTA_STUB_PSQL_MODO=normal
+export BISALTA_STUB_PSQL_MODO
+assert_no_contains "$cuerpo_r" 'valor-sensible-abc' "AC65 el valor de token no sale en la respuesta"
+assert_no_contains "$cuerpo_r" 'valor-sensible-def' "AC65 el valor de api_key no sale en la respuesta"
+assert_contains "$cuerpo_r" '"token":"[redactado]"' "AC65 token queda como [redactado]"
+assert_contains "$cuerpo_r" '"user_email":"persona@ejemplo.com"' "AC65 (control) una columna sin nombre sensible no se toca"
+assert_contains "$cuerpo_r" '"columnas_redactadas":["token","api_key"]' "AC65 la respuesta dice qué columnas se redactaron"
+vacio_r="$("$NODE_BIN" -e "const f=JSON.parse(process.argv[1]).filas[1];process.stdout.write(f.token+'|'+f.api_key+'|'+f.user_email)" "$cuerpo_r")"
+assert_eq "$vacio_r" "[redactado]|[redactado]|" "AC65 un valor vacío (un NULL de psql) también se redacta, y una columna no sensible vacía queda vacía"
+orden_r="$("$NODE_BIN" -e "process.stdout.write(Object.keys(JSON.parse(process.argv[1])).join(','))" "$cuerpo_r")"
+assert_eq "$orden_r" "conexion,dialecto,columnas_redactadas,filas,filas_devueltas,truncado,motivo_truncado" "AC65 columnas_redactadas va antes de las filas"
+reiniciar_registros
+cuerpo_n="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS")")"
+assert_no_contains "$cuerpo_n" 'columnas_redactadas' "AC65 sin columnas sensibles, la respuesta no trae columnas_redactadas"
+patrones="$("$NODE_BIN" -e "
+const s=require('$DIR_SCRIPTS/servidor-mcp.js');
+// Los nombres se arman por partes: escritos junto a su valor, el secret-scan
+// (gate 9) los lee como una credencial.
+const nombres=['secret'+'_key','db_'+'pass'+'word','pass'+'wd','api'+'key','KEY'+'_HASH','refresh'+'_token','monto'];
+const fila={};nombres.forEach(function(n){fila[n]='v';});fila['nulo'+'_token']=null;
+const r=s.redactarColumnasSensibles([fila]);
+process.stdout.write(r.redactadas.join(',')+'|'+r.filas[0].monto+'|'+r.filas[0].nulo_token);")"
+assert_eq "$patrones" "secret_key,db_password,passwd,apikey,KEY_HASH,refresh_token,nulo_token|v|[redactado]" \
+  "AC65 los patrones cubren secret, password, passwd, apikey, key_hash y token, sin mirar mayúsculas; un nulo también se redacta"
+# En SQL Server, la misma redacción.
+BISALTA_STUB_PSQL_MODO=columnas-sensibles-mssql
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_rm="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+assert_contains "$cuerpo_rm" '"dialecto":"sqlserver"' "AC65 (control) la consulta sqlserver responde"
+assert_no_contains "$cuerpo_rm" 'valor-sensible-mssql' "AC65 en sqlserver el valor de token no sale"
+assert_contains "$cuerpo_rm" '"columnas_redactadas":["token"]' "AC65 en sqlserver la respuesta dice qué columnas se redactaron"
+# Se redacta antes de los topes: un token de más de 1 MiB, redactado, entra.
+BISALTA_STUB_PSQL_MODO=token-enorme
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_te="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 'proveedores-dev' 'SELECT 1')" "$PATH_CON_STUBS")")"
+BISALTA_STUB_PSQL_MODO=normal
+export BISALTA_STUB_PSQL_MODO
+assert_contains "$cuerpo_te" '"filas_devueltas":1' "AC65 una fila con un token de más de 1 MiB, redactada, entra en el tope de bytes"
+assert_contains "$cuerpo_te" '"truncado":false' "AC65 esa respuesta no se trunca, porque se mide después de redactar"
+
+# ---------------------------------------------------------------------------
+# AC66 (v33) — un aviso del motor no es una fila
+# ---------------------------------------------------------------------------
+BISALTA_STUB_PSQL_MODO=aviso-ansi
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_av="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+BISALTA_STUB_PSQL_MODO=normal
+export BISALTA_STUB_PSQL_MODO
+assert_contains "$cuerpo_av" '"filas_devueltas":2' "AC66 el aviso no cuenta como fila"
+assert_contains "$cuerpo_av" '"avisos_motor":["Warning: Null value is eliminated by an aggregate or other SET operation."]' "AC66 el aviso llega en avisos_motor"
+assert_contains "$cuerpo_av" '"tipo":"Warning: dato"' "AC66 (control) un valor que empieza con Warning: pero trae separador sigue siendo una fila"
+reiniciar_registros
+cuerpo_sinav="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+assert_no_contains "$cuerpo_sinav" 'avisos_motor' "AC66 sin avisos, la respuesta no trae avisos_motor"
+# v34: el mismo aviso en la tabla de respaldo (AC67). Sin este caso, el filtro
+# del parser de tabla no corría en ningún test (mutaciones AC66 (a) y (b)).
+BISALTA_STUB_PSQL_MODO=aviso-ansi-tabla
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_avt="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+BISALTA_STUB_PSQL_MODO=normal
+export BISALTA_STUB_PSQL_MODO
+assert_contains "$cuerpo_avt" '"formato_tabla"' "AC66 (control) el caso de respaldo se leyó como tabla"
+assert_contains "$cuerpo_avt" '"filas_devueltas":2' "AC66 en la tabla de respaldo el aviso no cuenta como fila"
+assert_contains "$cuerpo_avt" '"avisos_motor":["Warning: Null value is eliminated by an aggregate or other SET operation."]' "AC66 en la tabla de respaldo el aviso llega en avisos_motor"
+assert_contains "$cuerpo_avt" '"tipo":"Warning: dato"' "AC66 en la tabla de respaldo un valor que empieza con Warning: y trae separador sigue siendo una fila"
+
+# ---------------------------------------------------------------------------
+# AC67 (v34) — el transporte de SQL Server: FOR JSON, con la tabla de respaldo
+# ---------------------------------------------------------------------------
+reiniciar_registros
+servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
+args_67="$(grep '^ARG ' "$TMP_DIR/psql-invocado.log" | tr '\n' '|')"
+assert_contains "$args_67" "ARG -y|ARG 8000|" "AC67 sqlcmd lleva -y 8000"
+# El argumento de -Q lleva un salto de línea, así que su segunda línea no
+# empieza con `ARG `: se mira el registro entero, no sólo las líneas ARG.
+log_67="$(tr '\n' '|' < "$TMP_DIR/psql-invocado.log")"
+assert_contains "$log_67" "ARG SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED; SELECT 1|FOR JSON PATH, INCLUDE_NULL_VALUES|" \
+  "AC67 la consulta va seguida de un salto de línea y FOR JSON PATH, INCLUDE_NULL_VALUES"
+BISALTA_STUB_PSQL_MODO=json-multilinea
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_67="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+forma_67="$("$NODE_BIN" -e "const f=JSON.parse(process.argv[1]).filas[0];process.stdout.write(JSON.stringify(f.v)+'|'+f.t.length+'|'+typeof f.n)" "$cuerpo_67")"
+assert_eq "$forma_67" '"a\nb"|5000|string' "AC67 un salto de línea llega dentro del valor, un texto de 5000 caracteres llega entero y un número llega como texto"
+assert_contains "$cuerpo_67" '"filas_devueltas":1' "AC67 el valor partido en trozos es una sola fila"
+BISALTA_STUB_PSQL_MODO=json-vacio
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_vac="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+assert_contains "$cuerpo_vac" '"filas":[],"filas_devueltas":0' "AC67 un resultado vacío da cero filas"
+# Una columna sin nombre: FOR JSON falla con Msg 13605 y se vuelve a la tabla.
+BISALTA_STUB_PSQL_MODO=sin-nombre
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_sn="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+invocaciones_sn="$(grep -c '^ARGS ' "$TMP_DIR/psql-invocado.log")"
+assert_eq "$invocaciones_sn" "2" "AC67 con una columna sin nombre, sqlcmd corre dos veces: en JSON y en tabla"
+assert_contains "$(grep '^ARGS ' "$TMP_DIR/psql-invocado.log" | tail -1)" "-y 8000" "AC67 la tabla de respaldo también lleva -y 8000"
+assert_no_contains "$(grep '^ARGS ' "$TMP_DIR/psql-invocado.log" | tail -1)" "FOR JSON" "AC67 la tabla de respaldo va sin FOR JSON"
+assert_contains "$cuerpo_sn" '"formato_tabla":"Se leyó como tabla' "AC67 la respuesta de respaldo dice que se leyó como tabla"
+assert_contains "$cuerpo_sn" '"columna_1":"953"' "AC67 una columna sin nombre se nombra por posición, no con la línea de guiones"
+# Cualquier otro error no se reintenta en tabla.
+BISALTA_STUB_PSQL_MODO=falla-stdout
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS" >/dev/null
+assert_eq "$(grep -c '^ARGS ' "$TMP_DIR/psql-invocado.log")" "1" "AC67 un error que no es de FOR JSON no se reintenta en tabla"
+BISALTA_STUB_PSQL_MODO=normal
+export BISALTA_STUB_PSQL_MODO
+reiniciar_registros
+cuerpo_n67="$(cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")")"
+assert_no_contains "$cuerpo_n67" 'formato_tabla' "AC67 una consulta que pasa por JSON no trae formato_tabla"
+
+# v36: el respaldo, sólo con los dos errores de FOR JSON y como primer error.
+consulta_modo() { # modo → cuerpo; deja el registro de invocaciones
+  BISALTA_STUB_PSQL_MODO="$1"
+  export BISALTA_STUB_PSQL_MODO
+  reiniciar_registros
+  cuerpos "$(servidor_jsonrpc "$(trama_consultar 1 "$CONEXION_MSSQL" 'SELECT 1')" "$PATH_CON_STUBS")"
+  BISALTA_STUB_PSQL_MODO=normal
+  export BISALTA_STUB_PSQL_MODO
+}
+invocaciones() { grep -c '^ARGS ' "$TMP_DIR/psql-invocado.log"; }
+cuerpo_601="$(consulta_modo msg-13601)"
+assert_eq "$(invocaciones)" "2" "AC67 con Msg 13601 (un nombre repetido), sqlcmd corre dos veces"
+assert_contains "$cuerpo_601" '"formato_tabla":"Se leyó como tabla' "AC67 con Msg 13601 la respuesta dice que se leyó como tabla"
+cuerpo_s0="$(consulta_modo respaldo-status-0)"
+assert_eq "$(invocaciones)" "1" "AC67 con exit 0 no se reintenta en tabla, aunque la salida diga Msg 13605"
+assert_contains "$cuerpo_s0" '"error":"conexion_fallida"' "AC67 con exit 0 y sin encabezado JSON es un error"
+consulta_modo respaldo-otro-primero >/dev/null
+assert_eq "$(invocaciones)" "1" "AC67 si el primer error no es de FOR JSON, no se reintenta aunque después aparezca Msg 13605"
+consulta_modo respaldo-con-encabezado >/dev/null
+assert_eq "$(invocaciones)" "1" "AC67 si la salida ya trae el encabezado JSON, no se reintenta en tabla"
+# v36: los números llegan como el texto exacto del motor.
+cuerpo_num="$(consulta_modo numeros-exactos)"
+assert_contains "$cuerpo_num" '"m":"99999999999.99999999"' "AC67 un decimal(28,8) llega exacto, como texto"
+assert_contains "$cuerpo_num" '"b":"9007199254740993"' "AC67 un bigint mayor que 2^53 llega exacto, como texto"
+assert_contains "$cuerpo_num" '"d":"1.10"' "AC67 un decimal conserva sus ceros"
+assert_contains "$cuerpo_num" '"f":true' "AC67 un bit llega como booleano"
+# v36: con un Node sin context.source el módulo no carga. Se simula un Node
+# viejo quitándole al reviver su tercer argumento antes de cargarlo.
+sin_fuente="$("$NODE_BIN" -e "
+  const original = JSON.parse;
+  JSON.parse = function (t, rev) { return rev ? original(t, function (k, v) { return rev(k, v); }) : original(t); };
+  try { require('$PLUGIN_DIR/scripts/conexion.js'); process.stdout.write('arranca'); } catch (e) { process.stdout.write('no arranca: ' + e.message); }
+" 2>&1)"
+assert_contains "$sin_fuente" "no arranca: bisalta-db necesita Node 22 o posterior" "AC67 con un Node sin context.source el servidor no arranca y lo dice"
+# v36: un resultado antes del JSON es otro SELECT, y es un error.
+cuerpo_dos="$(consulta_modo dos-resultados)"
+assert_contains "$cuerpo_dos" 'más de un resultado' "AC67 dos resultados seguidos son un error, no se descarta el primero"
+# AC66 (v36): en JSON, todo lo que viene después del resultado, salvo la
+# línea de filas afectadas, va en avisos_motor.
+cuerpo_desc="$(consulta_modo aviso-desconocido)"
+assert_contains "$cuerpo_desc" '"avisos_motor":["Warning: otro mensaje del motor."]' "AC66 en JSON un mensaje desconocido del motor llega en avisos_motor, sin la línea de filas afectadas"
+assert_contains "$cuerpo_desc" '"filas_devueltas":1' "AC66 en JSON el mensaje no cuenta como fila"
+# AC65 (v36): un nombre con punto se anida, y se redacta igual.
+cuerpo_pto="$(consulta_modo nombre-con-punto)"
+assert_no_contains "$cuerpo_pto" 'valor-anidado' "AC65 un valor bajo un nombre con punto (cred.token) no sale"
+assert_no_contains "$cuerpo_pto" 'valor-en-arreglo' "AC65 un valor sensible dentro de un arreglo no sale"
+assert_contains "$cuerpo_pto" '"cred":{"token":"[redactado]"}' "AC65 el objeto anidado conserva su forma, con el valor redactado"
+assert_contains "$cuerpo_pto" '"columnas_redactadas":["cred.token","hijos.api_key"]' "AC65 columnas_redactadas nombra la ruta con puntos"
+assert_contains "$cuerpo_pto" '{"x":"y"}' "AC65 (control) lo que no es sensible dentro de un arreglo sigue igual"
+
+# ---------------------------------------------------------------------------
+# AC68 (v36) — una salida más grande que el buffer del proceso
+# ---------------------------------------------------------------------------
+cuerpo_enobufs="$(consulta_modo salida-enorme)"
+assert_contains "$cuerpo_enobufs" '"error":"salida_demasiado_grande","codigo":10' "AC68 una salida de más de 64 MiB es salida_demasiado_grande, no tiempo_agotado"
+assert_contains "$cuerpo_enobufs" '"aislamiento":"READ UNCOMMITTED"' "AC68 el error de SQL Server lleva aislamiento (AC63)"
 
 # ---------------------------------------------------------------------------
 # AC55 (v25) — cifrado en Postgres
