@@ -17,6 +17,11 @@
    restauraciones fueron ANTES del 23-sep, cuando se creo el login.
    EXACTUS se restaura seguido: 8-jul, 9-sep, 2-oct.
 
+   OJO CON EL SINTOMA: "Cannot open database" se lee como si la base no
+   existiera, y no es un error de permisos que se reconozca como tal. Quien lo
+   vea por primera vez va a ir a buscar la base, no el usuario. La base esta;
+   el que falta es el usuario. (Patrick Ocampo, 5-oct-2026)
+
    Es idempotente: correrlo de mas no hace nada. Correrlo de menos se nota
    tarde. Ante la duda, correlo.
 
@@ -32,6 +37,16 @@
      3) "Puede escribir" mira tambien los permisos concedidos directo al
         usuario (INSERT, UPDATE, DELETE, EXECUTE, ALTER, CONTROL, CREATE ...),
         no solo la pertenencia a roles.
+
+   PROBADO (5-oct-2026, contra la instancia, en transacciones deshechas):
+     - camino feliz: Ian Vargas, sqlcmd -b, seis bases 1/1/0/0, exit 0.
+     - correccion 1: Patrick, sin VIEW DEFINITION en Ecommerce_qa ->
+       "GUARDA FALLIDA" y NO se imprime "GUARDA OK".
+     - correccion 3: Patrick, por tres caminos (GRANT INSERT y GRANT EXECUTE
+       sobre el esquema, y db_ddladmin) -> los tres dan "puede ESCRIBIR".
+     - correccion 2 (base que no esta ONLINE): NO probada. Para hacerlo habia
+       que poner una base offline en una instancia compartida; no valia el
+       riesgo. Es el unico camino sin correr.
 
    COMO CORRERLO: con sqlcmd, que respeta los GO. Usar -b para que el exit
    code refleje la guarda, y -N true -C por el certificado de la instancia:
